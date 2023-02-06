@@ -8,7 +8,7 @@
 # please report bugs: forster@cbs.mpg.de
 
 # TODO:
-# - add stats tests for confidence and rts
+
 # - change colors for congruency and accuracy plots
 
 import numpy as np
@@ -149,12 +149,11 @@ plt.show()
 
 # sign. difference in hitrates ? 
 
-# parametric
-t,p = stats.ttest_rel(low_condition.iloc[:,1], high_condition.iloc[:,1])
 # non parametric
+
 t,p = stats.wilcoxon(low_condition.iloc[:,1], high_condition.iloc[:,1])
 
-# Yes!
+print('hitrate diff significant? p_value (non parametric): ' + str(p))
 
 # Check false alarm rate
 
@@ -214,12 +213,10 @@ fig.savefig(savepath + "\FArate.svg", bbox_inches='tight', format='svg')
 
 # sign. difference in farates ? 
 
-# parametric
-t,p = stats.ttest_rel(low_condition.iloc[:,1], high_condition.iloc[:,1])
 # non parametric
 t,p = stats.wilcoxon(low_condition.iloc[:,1], high_condition.iloc[:,1])
 
-# Yes!
+print('farate diff significant? p_value (non parametric): ' + str(p))
 
 # Now we plot SDT parameters
 
@@ -238,7 +235,6 @@ d_prime_high = [stats.norm.ppf(h) - stats.norm.ppf(f) for h,f in zip(hitrate_hig
 criterion_high = [-0.5 * (stats.norm.ppf(h) + stats.norm.ppf(f)) for h,f in zip(hitrate_high, farate_high)]
 
 # ### plot the criterion
-
 
 fig,ax = plt.subplots()
 
@@ -283,10 +279,10 @@ fig.savefig(savepath + "\criterion.svg", bbox_inches='tight', format='svg')
 
 # sign. difference in c ? 
 
-# parametric
-t,p = stats.ttest_rel(criterion_high, criterion_low)
 # non parametric
 t,p = stats.wilcoxon(criterion_high, criterion_low)
+
+print('c diff significant? p_value (non parametric): ' + str(p))
 
 # now we plot sensitivity (dprime)
 
@@ -332,10 +328,9 @@ fig.savefig(savepath + "\sensitivity.svg", bbox_inches='tight', format='svg')
 # sign. difference in hitrates ? 
 
 # non parametric
-
 t,p = stats.wilcoxon(d_prime_high, d_prime_low)
 
-# no sign. difference (p = .45)
+print('dprime diff significant? p_value (non parametric): ' + str(p))
 
 # now we look at confidence ratings
 
@@ -386,6 +381,8 @@ fig.savefig(savepath + "\confidence_cue.svg", bbox_inches='tight', format='svg')
 # non parametric
 
 t,p = stats.wilcoxon(low_condition.iloc[:,1], high_condition.iloc[:,1])
+
+print('confidence cue diff significant? p_value (non parametric): ' + str(p))
 
 # ### now we look at congruency effects on confidence
 
@@ -443,6 +440,8 @@ ax.set_ylabel('Mean confidence', fontsize=12)
 fig.savefig(savepath + "\confidence_congruency.svg", bbox_inches='tight', format='svg')
 
 t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+
+print('confidence congruency diff significant? p_value (non parametric): ' + str(p))
 
 # Finally let's check overall accuraccy
 
@@ -507,6 +506,8 @@ fig.savefig(savepath + "\cue_correct.svg", bbox_inches='tight', format='svg')
 
 t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
 
+print('accuracy cue diff significant? p_value (non parametric): ' + str(p))
+
 # accuraccy depending on congruency?
 
 data_grouped = data.groupby(['ID', 'congruency']).mean()['correct']
@@ -560,6 +561,11 @@ ax.set_xticklabels(['Congruent','Incongruent'],fontsize=12)
 ax.set_ylabel('Mean correct', fontsize=12)
 
 fig.savefig(savepath + "\correct_congruency.svg", bbox_inches='tight', format='svg')
+
+# non parametric
+t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+
+print('accuracy congruency diff significant? p_value (non parametric): ' + str(p))
 
 # reaction times 
 
@@ -617,6 +623,11 @@ ax.set_ylabel('Reaction times detection', fontsize=12)
 
 fig.savefig(savepath + "\cue_rt1.svg", bbox_inches='tight', format='svg')
 
+# non parametric
+t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+
+print('reaction time cue diff significant? p_value (non parametric): ' + str(p))
+
 # congruency on rts
 
 data_grouped = data.groupby(['ID', 'congruency']).mean()['respt1']
@@ -672,6 +683,11 @@ ax.set_xticklabels(['Congruent','Incongruent'],fontsize=12)
 ax.set_ylabel('Reaction times detection', fontsize=12)
 
 fig.savefig(savepath + "\cue_rt1.svg", bbox_inches='tight', format='svg')
+
+# non parametric
+t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+
+print('reaction time congruency diff significant? p_value (non parametric): ' + str(p))
 
 # accuraccy on rts
 
@@ -729,4 +745,9 @@ ax.set_xticklabels(['Correct','Incorrect'],fontsize=12)
 ax.set_ylabel('Reaction times detection', fontsize=12)
 
 fig.savefig(savepath + "\correct_rt1.svg", bbox_inches='tight', format='svg')
+
+# non parametric
+t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+
+print('reaction time accuracy diff significant? p_value (non parametric): ' + str(p))
 
