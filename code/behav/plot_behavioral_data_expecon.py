@@ -1,13 +1,13 @@
-# ## Plot behavioral data expecon study
+# Plot behavioral data expecon study
 # 
-# ### last update: 06.02.2023
+# last update: 06.02.2023
 #
-# ### this script produces data for Figure 1 Part II and III
+# this script produces data for Figure 1 Part II and III
 # 
-# ### written by Carina Forster 
-# # please report bugs: forster@cbs.mpg.de
+# written by Carina Forster 
+# please report bugs: forster@cbs.mpg.de
 
-#TODO:
+# TODO:
 # - add stats tests for confidence and rts
 # - change colors for congruency and accuracy plots
 
@@ -23,7 +23,7 @@ sns.color_palette("colorblind")[9]
 
 # Set the paths for the behavioral data and the save path
 behavpath = r'D:\expecon\data\behav_brain'
-savepath = r'D:\expecon_EEG_112021\figs\behavior'
+savepath = r'D:\expecon_ms\figs\behavior'
 
 # Load the behavioral data from the specified path
 data = []
@@ -57,10 +57,13 @@ data = data.drop(data[((data.ID == 32) & (data.block == 2))].index)
 data = data.drop(data[((data.ID == 32) & (data.block == 3))].index)
 data = data.drop(data[((data.ID == 39) & (data.block == 3))].index)
 
+data.to_csv("clean_bb.csv")
+
 # Get the number of unique participants
 n_subs = len(data.ID.unique())
 
 # Prepare the data for hitrate calculation
+
 signal = data[data.isyes == 1]
 signal_grouped = signal.groupby(['ID', 'cue']).mean()['sayyes']
 signal_grouped.head()
