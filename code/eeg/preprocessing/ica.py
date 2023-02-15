@@ -1,6 +1,10 @@
-#function to run ICA on epoched data and save as pickle
-#function that selects ICA components based on template matching or labels and rejects them
-#function that applys ICA to raw or epoched data and saves clean data after ICA
+#function to run ICA on epoched data and save the ica solution
+#function that selects ICA components based on template matching or ica labels and rejects them
+
+# please report bugs
+# Author: Carina Forster, forsteca@cbs.mpg.de
+
+# last update: 15.02.2023
 
 import os
 
@@ -12,44 +16,35 @@ from autoreject import Ransac
 import pickle 
 from mne_icalabel import label_components
 
-
-#IMPORTANT
-
-# for template matching function: run in terminal with this command:
-# ipython --pyvistaqt preprocessing.py
-# cd Documents\expecon_EEG_analysis\python
-# from ica_mne import template_matching
-# template_matching()
-
-#interactive mne plots only work with this settings (Windows11)
-
 # directory of clean epoched data
 
-clean_epochs_dir = 'D:\expecon_ms\data\eeg\prepro_stim'
+clean_epochs_dir = 'D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching'
 
 # directory where to save the ica cleaned epochs
 
 save_dir_ica = 'D:\expecon_ms\data\eeg\prepro_ica'
+save_dir_psd = 'D:\expecon_ms\data\eeg\prepro_ica\psd'
 
-raw_dir = r'D:\expecon_EEG\raw'
+raw_dir = 'D:\expecon_EEG\raw'
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
           '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
-def run_ica(ica_fast=1, trigger="epochs", idlist=IDlist, plot_stuff=0):
+def run_ica():
     """
-    This script takes as input cleaned epoched data (at least high pass filtered). It saves the PSD before and after ICA
+    This script takes as input cleaned epoched data (at least high pass filtered).
+    It saves the PSD before ICA and computes infomax ica over all non-zero PCA components
+    (accounts for interpolated channels)
+    output: ica solution for each participant saved as a pickle file
      """
 
-    icas, epochss = [],[]
+    icas = []
 
-    for counter, i in enumerate(idlist):
+    for counter, i in enumerate(IDlist):
 
         if i == '040' or i == '045':
             continue
-
-        plt.close('all')
 
         os.chdir(clean_epochs_dir)
 
@@ -57,9 +52,11 @@ def run_ica(ica_fast=1, trigger="epochs", idlist=IDlist, plot_stuff=0):
 
         picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
 
-        epochs.plot_psd(average=True, picks=picks, show=False)
+        epochs.compute_psd(fmax=60, picks=picks).plot(show=False)
 
-        plt.save('PSD_' + str(counter) + '.png')
+        os.chdir(save_dir_psd)
+
+        plt.savefig('PSD_' + str(counter) + '.png')
 
         ica = mne.preprocessing.ICA(method='infomax', fit_params=dict(extended=True)).fit(
             epochs, picks=picks)
@@ -70,6 +67,8 @@ def run_ica(ica_fast=1, trigger="epochs", idlist=IDlist, plot_stuff=0):
 
     return "Done with ICA"
 
+# pickle helper function
+
 def save_data(data):
 
     os.chdir(save_dir_ica)
@@ -79,7 +78,11 @@ def save_data(data):
 
 def icalabel():
 
-    """new mne feature that allows you to label ica components automatically"""
+    """implementation of new mne feature that allows you to label ica components automatically
+    for more info checkout: https://github.com/mne-tools/mne-icalabel
+    input: cleaned epochs, ica solution
+    output: cleaned epochs after ica component rejection
+    csv file that contains the ica labels marked as non brain from icalabel"""
 
     # store ica components removed
 
@@ -93,16 +96,19 @@ def icalabel():
         icas = pickle.load(f)
         f.close()
 
+    #loop over participants
     for counter, i in enumerate(IDlist):
         
         if i == '040' or i == '045':
             continue
 
         os.chdir(clean_epochs_dir)
-
+        # open clean epochs
         epochs = mne.read_epochs('P' + i + '_epochs_stim-epo.fif')
 
         picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
+
+        # run icalabel on the ica components and the clean epoched data for each participant
 
         ic_labels = label_components(picks, icas[counter], method="iclabel")
 
@@ -111,35 +117,45 @@ def icalabel():
         # "Other" is a catch-all that for non-classifiable components.
         # We will ere on the side of caution and assume we cannot blindly remove these.
 
+        #extract labels
         labels = ic_labels["labels"]
 
+        # get indices of labels that are not brain or other labelled
         exclude_idx = [idx for idx, label in enumerate(labels) if label not in ["brain", "other"]]
         
         print(f"Excluding these ICA components: {exclude_idx}")
 
+        # save the labelled indices
         icalist.append(len(exclude_idx))
 
+        # remove the non brain components from the clean epochs
         icas[counter].apply(picks)
 
         # rereference to average
-
         picks.set_eeg_reference('average', ch_type="eeg")
 
         os.chdir(save_dir_ica)
-
+        # save the clean data
         picks.save('P' + i + '_epochs_after_ica-epo.fif')
 
         print('Saved ica cleaned epochs for participant ' + i)
 
     # save a dataframe with info on how many components were removed
-
-    ica_kickedout = pd.DataFrame(icalist)
-    ica_kickedout.to_csv('ica_components.csv')
+    pd.DataFrame(icalist).to_csv('ica_components.csv')
 
     return "Done with removing ica components"
 
+# Unused functions but might be useful´for others (remove ica components based on template matching)
 
-# Unused functions but might be useful´for others
+#IMPORTANT
+
+# for template matching function: run in terminal with this command:
+# ipython --pyvistaqt preprocessing.py
+# cd Documents\expecon_EEG_analysis\python
+# from ica_mne import template_matching
+# template_matching()
+
+#interactive mne plots only work with this settings (Windows11)
 
 def template_matching(apply_raw=0, save=1, manual=0):
 
