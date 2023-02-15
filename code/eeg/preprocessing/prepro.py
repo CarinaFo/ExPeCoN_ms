@@ -1,11 +1,10 @@
 # file contains functions that does minimal preprocessing for raw eeg data (.fif files)
 # using the mne toolbox
 
+# please report bugs
+# Author: Carina Forster, forsteca@cbs.mpg.de
 
-# Please report bugs
-# Author: Carina Forster
-# Last update: 15.02.2023
-
+# last update: 15.02.2023
 
 import os
 import copy
