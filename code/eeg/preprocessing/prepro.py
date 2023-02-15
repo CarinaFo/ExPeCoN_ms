@@ -186,8 +186,7 @@ def remove_trials(filename='updated_behav.csv'):
 
 def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
            tmin=-1.5, tmax=1.5, resample_rate=250, laplace=0, sf=2500,
-           detrend=1, ransac=1, autoreject=0, reject_criteria = dict(eeg=100e-6,eog=200e-6),
-           flat_criteria = dict(eeg=1e-6)):
+           detrend=1, ransac=1, autoreject=0):
 
     """
     this function bandpass filters the data using a finite response filter as
@@ -250,15 +249,17 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
         # add cue as a trigger to event structure
 
-        cue_timings = [i - int(0.4 * sf) for i in
-                       events[:,
-                       0]]
+        if trigger == 1:
 
-        # subtract 0.4*sampling frequency to get the cue time stamps
+            cue_timings = [i - int(0.4 * sf) for i in
+                        events[:,
+                        0]]
 
-        cue_events = copy.deepcopy(events)
-        cue_events[:, 0] = cue_timings
-        cue_events[:, 2, ] = 2
+            # subtract 0.4*sampling frequency to get the cue time stamps
+
+            cue_events = copy.deepcopy(events)
+            cue_events[:, 0] = cue_timings
+            cue_events[:, 2, ] = 2
 
         # add dataframe as metadata to epochs
 
@@ -266,14 +267,13 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
         metadata = df_sub
 
-        # lock the data to the cue trigger and create epochs
+        # lock the data to the specified trigger and create epochs
 
         if trigger == 1:
 
             epochs = mne.Epochs(raw, cue_events, event_id=2, tmin=tmin,
-                                tmax=tmax,
-                                preload=True, baseline=None, detrend=detrend,
-                                metadata=metadata)
+                                tmax=tmax, preload=True, baseline=None, 
+                                detrend=detrend, metadata=metadata)
         # or stimulus onset
 
         else:
@@ -299,9 +299,11 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
         # epochs, takes quite long and removes a lot of epochs due to
         # blink artifacts)
 
-        if ransac == 1:
+        if ransac:
+            
+            print('Run runsac for ' + i)
 
-            ransac = Ransac(verbose='progressbar', picks=picks, n_jobs=5)
+            ransac = Ransac(verbose='progressbar', picks=picks, n_jobs=3)
 
             # which channels have been marked bad by RANSAC
 
@@ -309,9 +311,7 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
             print('\n'.join(ransac.bad_chs_))
 
-            print(len(ransac.bad_chs_))
-
-            ch_interp.append(len(ransac.bad_chs_))
+            ch_interp.append(ransac.bad_chs_)
 
         # detect bad epochs
 
