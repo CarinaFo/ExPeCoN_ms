@@ -26,7 +26,7 @@ behavpath = r'D:\expecon_ms\data\behav'
 
 # save cleaned EEG data
 save_dir_cue = r'D:\expecon_ms\data\eeg\prepro_cue'
-save_dir_stim = r'D:\expecon_ms\data\eeg\prepro_stim'
+save_dir_stim = r'D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching'
 
 IDlist = (
 '007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017',
@@ -348,7 +348,7 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
             print('saved epochs for participant ' + i)
 
-    ch_df = pd.Dataframe(ch_interp)
+    ch_df = pd.DataFrame(ch_interp)
 
     ch_df.to_csv('interpolated_channels.csv')
 
@@ -374,11 +374,3 @@ def add_reaction_time_trigger():
     rtnts = copy.deepcopy(events)
     rtnts[:, 0] = rt_timings
     rtnts[:, 2, ] = 3
-
-    # concatenate all trigger events
-
-    trigger_events = np.concatenate([events, cue_events, rtnts])
-
-    # save trigger events for each participant in a list
-
-    events_allsubs.append(trigger_events)
