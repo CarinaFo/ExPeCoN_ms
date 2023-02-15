@@ -3,3 +3,5 @@
 scripts for the manuscript expecon (Expectation Perception Confidence Neural Correlates)
 
 code is not yet reviewed
+
+data will be oploaded to OSF
