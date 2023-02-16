@@ -11,6 +11,7 @@ import os
 import pandas as pd
 import mne
 import matplotlib.pyplot as plt
+import numpy as np
 
 from autoreject import Ransac
 import pickle 
@@ -25,13 +26,19 @@ clean_epochs_dir = 'D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching
 save_dir_ica = 'D:\expecon_ms\data\eeg\prepro_ica'
 save_dir_psd = 'D:\expecon_ms\data\eeg\prepro_ica\psd'
 
-raw_dir = 'D:\expecon_EEG\raw'
+# directory of ica solution
+
+save_dir_ica_sol = 'D:\expecon_ms\data\eeg\prepro_ica\ica_solution'
+save_dir_ica_comps = 'D:\expecon_ms\data\eeg\prepro_ica\ica_comps'
+
+raw_dir = r'D:\expecon_EEG\raw'
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
           '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
-def run_ica():
+def run_ica(infomax=0):
+
     """
     This script takes as input cleaned epoched data (at least high pass filtered).
     It saves the PSD before ICA and computes infomax ica over all non-zero PCA components
@@ -52,29 +59,148 @@ def run_ica():
 
         picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
 
-        epochs.compute_psd(fmax=60, picks=picks).plot(show=False)
+        if counter > 30: 
 
-        os.chdir(save_dir_psd)
+            epochs.compute_psd(fmax=60, picks=picks).plot(show=False)
 
-        plt.savefig('PSD_' + str(counter) + '.png')
+            os.chdir(save_dir_psd)
 
-        ica = mne.preprocessing.ICA(method='infomax', fit_params=dict(extended=True)).fit(
-            epochs, picks=picks)
+            plt.savefig('PSD_' + str(counter) + '.png')
 
-        icas.append(ica)
+        if infomax == 1:
+
+            ica = mne.preprocessing.ICA(method='infomax', fit_params=dict(extended=True)).fit(
+                epochs, picks=picks)
+        else:
+
+            ica = mne.preprocessing.ICA(method='fastica').fit(
+                epochs, picks=picks)
     
-    save_data(data=icas)
+        save_data(data=ica,id = i)
 
     return "Done with ICA"
 
 # pickle helper function
 
-def save_data(data):
+def save_data(data,id):
 
     os.chdir(save_dir_ica)
 
-    with open('icas.pkl', 'wb') as f:
+    with open('icas_' + id + '.pkl', 'wb') as f:
         pickle.dump(data, f)
+
+# expecon study: template matching, icalabel didn't work on Windows11
+
+def template_matching(apply_raw=0, save=1, manual=0):
+
+    """
+    In order to detect blink and cardiac artifacts we use the mne function detect_artifacts.
+    If you choose to manually remove components, set detect_artifacts to "manual".
+    This allows you to see all the components and select which one to remove.
+    After removing artifact components we check for remaining bad epochs.
+    We use autoreject and delete them (as recommended by autoreject).
+    The cleaned data will be saved as a -epo.fif file
+    Update: added rereferencing after ICA
+    """
+
+    ch_name_blinks = "VEOG"
+    ch_name_ecg = "ECG"
+
+    comps_removed = []
+    eog_ics_list = []
+    ecg_ics_list = []
+
+    for counter, i in enumerate(IDlist):
+
+        # load epochs
+        os.chdir(clean_epochs_dir)
+        epochs = mne.read_epochs('P' + i + '_epochs_stim-epo.fif')
+        # load ica solution
+        os.chdir(save_dir_ica_sol)
+        with open('icas_' + i + '.pkl', 'rb') as f:
+            ica_sol = pickle.load(f)
+            f.close()
+
+        eog_inds, eog_scores = ica_sol.find_bads_eog(epochs, ch_name=ch_name_blinks)
+
+        ecg_inds, ecg_scores = ica_sol.find_bads_ecg(epochs, ch_name=ch_name_ecg, method='correlation')
+
+        inds_to_exclude = eog_inds + ecg_inds
+
+        # plot ICs applied to raw data, with ECG matches highlighted
+
+        ica_sol.plot_sources(epochs, show_scrollbars=False, show=False, picks=list(range(21)))
+
+        os.chdir(save_dir_ica_comps)
+
+        plt.savefig('ica_sources_' + i)
+
+        ica_sol.plot_components(inst=epochs, show=False, picks=list(range(21)))
+
+        plt.savefig('ica_comps_' + i)
+
+        ica_sol.plot_components(inst=epochs, show=False, picks=inds_to_exclude)
+        
+        plt.savefig('ica_del_' + i)
+
+        input("Press Enter to continue after you inspected the selected ICs ...")
+        
+        ica_sol.exclude = inds_to_exclude
+
+        comps_removed.append(len(inds_to_exclude))
+
+        if manual == 1:
+
+            ica_sol.exclude = inds_to_exclude
+
+            ica_sol.plot_components(inst=epochs_Rpeak)
+
+            input("Press Enter to continue after you rejected alll desired components...")
+
+            n_exclude = len(ica_sol.exclude)
+
+            comps_removed.append(n_exclude)
+
+            print("Removed " + str(n_exclude) + " components for participant Nr " + i)
+
+        # kick out components
+
+        if apply_raw == 1:
+
+            raw_clean.load_data()
+
+            print("Removed " + str(len(inds_to_exclude)) + " ica components for subject Nr " + i)
+
+            ica_sol.apply(raw_clean, exclude=inds_to_exclude)
+
+            # rereference to average
+
+            raw_clean.set_eeg_reference('average', ch_type="eeg")
+
+            if save == 1:
+
+                os.chdir(save_dir_raw_ica)
+
+                raw_clean.save('P' + i + '_raw_after_ica-raw.fif', overwrite=True)
+
+                print('Saved ica cleaned raw data for participant ' + i)
+        else:
+
+            ica_sol.apply(epochs)
+
+            # rereference to average
+
+            epochs.set_eeg_reference('average', ch_type="eeg")
+
+            if save == 1:
+
+                os.chdir(save_dir_ica)
+
+                epochs.save('P' + i + '_epochs_after_ica-epo.fif', overwrite=True)
+
+                print('Saved ica cleaned epochs for participant ' + i)
+
+    return comps_removed
 
 def icalabel():
 
@@ -88,29 +214,34 @@ def icalabel():
 
     icalist = []
 
-    # open ica solution
-
-    os.chdir(save_dir_ica)
-
-    with open('icas.pkl', 'rb') as f:
-        icas = pickle.load(f)
-        f.close()
-
     #loop over participants
+
     for counter, i in enumerate(IDlist):
         
         if i == '040' or i == '045':
             continue
-
+        
         os.chdir(clean_epochs_dir)
+
         # open clean epochs
+
         epochs = mne.read_epochs('P' + i + '_epochs_stim-epo.fif')
 
         picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
 
+        # open ica solution
+
+            # open ica solution
+
+        os.chdir(save_dir_ica_sol)
+
+        with open('icas_' + i + '.pkl', 'rb') as f:
+            ica_sol = pickle.load(f)
+            f.close()
+
         # run icalabel on the ica components and the clean epoched data for each participant
 
-        ic_labels = label_components(picks, icas[counter], method="iclabel")
+        ic_labels = label_components(epochs, ica_sol, method="iclabel")
 
         # We can extract the labels of each component and exclude
         # non-brain classified components, keeping 'brain' and 'other'.
@@ -144,131 +275,3 @@ def icalabel():
     pd.DataFrame(icalist).to_csv('ica_components.csv')
 
     return "Done with removing ica components"
-
-# Unused functions but might be useful´for others (remove ica components based on template matching)
-
-#IMPORTANT
-
-# for template matching function: run in terminal with this command:
-# ipython --pyvistaqt preprocessing.py
-# cd Documents\expecon_EEG_analysis\python
-# from ica_mne import template_matching
-# template_matching()
-
-#interactive mne plots only work with this settings (Windows11)
-
-def template_matching(apply_raw=0, save=1, manual=0):
-
-    """
-    In order to detect blink and cardiac artifacts we use the mne function detect_artifacts.
-    If you choose to manually remove components, set detect_artifacts to "manual".
-    This allows you to see all the components and select which one to remove.
-    After removing artifact components we check for remaining bad epochs.
-    We use autoreject and delete them (as recommended by autoreject).
-    The cleaned data will be saved as a -epo.fif file
-    Update: added rereferencing after ICA
-    """
-
-    ch_name_blinks = "VEOG"
-    ch_name_ecg = "ECG"
-
-    comps_removed = []
-    eog_ics_list = []
-    ecg_ics_list = []
-
-    #open icas and epochs pickle object (list)
-
-    os.chdir(path)
-
-    with open('icas.pkl', 'rb') as f:
-        icas = pickle.load(f)
-        f.close()
-
-    with open('epochs.pkl', 'rb') as f:
-        epochs = pickle.load(f)
-        f.close()
-
-    for counter, i in enumerate(IDlist):
-
-        os.chdir(raw_dir)
-
-        raw_clean = mne.io.read_raw_fif('P' + i + '_raw_before_ica.fif')
-
-        ecg_events = mne.preprocessing.find_ecg_events(raw_clean)
-
-        epochs_Rpeak = mne.Epochs(raw_clean, ecg_events[0], tmin=-0.3, tmax=0.5,
-                            preload=True, baseline=None)
-
-        ecg_evoked = epochs_Rpeak.average()
-
-        eog_inds, eog_scores = icas[counter].find_bads_eog(raw_clean, ch_name=ch_name_blinks)
-
-        ecg_inds, ecg_scores = icas[counter].find_bads_ecg(raw_clean, ch_name=ch_name_ecg, method='correlation')
-
-        # plot ICs applied to raw data, with ECG matches highlighted
-
-        icas[counter].plot_sources(raw_clean, show_scrollbars=False)
-
-        # plot ICs applied to the averaged ECG epochs, with ECG matches highlighted
-        icas[counter].plot_sources(ecg_evoked)
-
-        icas[counter].plot_components(inst=epochs_Rpeak)
-
-        input("Press Enter to continue after you inspected the selected ICs ...")
-
-        inds_to_exclude = icas[counter].exclude
-
-        comps_removed.append(len(inds_to_exclude))
-
-        if manual == 1:
-
-            icas[counter].exclude = inds_to_exclude
-
-            icas[counter].plot_components(inst=epochs_Rpeak)
-
-            input("Press Enter to continue after you rejected alll desired components...")
-
-            n_exclude = len(icas[counter].exclude)
-
-            comps_removed.append(n_exclude)
-
-            print("Removed " + str(n_exclude) + " components for participant Nr " + i)
-
-        # kick out components
-
-        if apply_raw == 1:
-
-            raw_clean.load_data()
-
-            print("Removed " + str(len(inds_to_exclude)) + " ica components for subject Nr " + i)
-
-            icas[counter].apply(raw_clean, exclude=inds_to_exclude)
-
-            # rereference to average
-
-            raw_clean.set_eeg_reference('average', ch_type="eeg")
-
-            if save == 1:
-
-                os.chdir(save_dir_raw_ica)
-
-                raw_clean.save('P' + i + '_raw_after_ica-raw.fif', overwrite=True)
-
-                print('Saved ica cleaned raw data for participant ' + i)
-        else:
-
-            icas[counter].apply(epochs[counter])
-
-            # rereference to average
-
-            epochs[counter].set_eeg_reference('average', ch_type="eeg")
-
-            if save == 1:
-
-                os.chdir(save_dir_ica)
-
-                epochs.save('P' + i + '_epochs_after_ica-epo.fif', overwrite=True)
-
-                print('Saved ica cleaned epochs for participant ' + i)
-
-    return comps_removed
