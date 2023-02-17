@@ -169,7 +169,7 @@ def prepare_data():
 
     list_condition = [hitrate_condition, farate_condition, criterion_condition, d_prime_condition, accuracy_condition, RT_condition]
     list_congruency = [confidence_congruency, accuracy_congruency, RT_congruency]
-    
+
     return list_condition, list_congruency
 
 # Loop with the dataframe in the function to make the raincloud (raincloud_function)
@@ -228,7 +228,7 @@ def raincloud_function(dx, dy, signal, colors,n , ort, savefigs=True):
                      saturation=1, orient=ort)
 
     if savefigs:
-
+        os.chdir(save_dir)
         name_fig = f"raincloud_{n}.svg"
         fig.savefig(name_fig)
         fig.show()
