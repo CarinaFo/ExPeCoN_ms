@@ -16,8 +16,9 @@ import numpy as np
 import ptitprince as pt
 
 # Choose directory
-os.chdir('/Users/loukianov//Desktop/Berlin/Rainclouds/Plots')
-os.listdir('/Users/loukianov//Desktop/Berlin/Rainclouds/Plots')
+os.chdir("D:\expecon_ms\data\\behav")
+
+save_dir = "D:\expecon_ms\data\\behav\\plots"
 
 # Read dataframe
 data = pd.read_csv("clean_bb.csv")
@@ -141,8 +142,34 @@ def prepare_data():
 
     accuracy_condition = accuracy_condition.rename(columns={'Value': 'accuracy','Variable': 'condition'})
 
-    list_condition = [hitrate_condition, farate_condition, criterion_condition, d_prime_condition, accuracy_condition]
-    list_congruency = [confidence_congruency, accuracy_congruency]
+    # Prepare the data for reaction times
+    # By cue condition
+
+    RT_grouped_cue = data.groupby(['ID', 'cue']).mean()['respt1']
+
+    low_condition = RT_grouped_cue.unstack()[0.25].reset_index()
+    high_condition = RT_grouped_cue.unstack()[0.75].reset_index()
+
+    RT_cue_merge = pd.merge(low_condition,high_condition)
+    RT_condition = RT_cue_merge.melt(id_vars='ID', value_name='Value', var_name='Variable')
+
+    RT_condition = RT_condition.rename(columns={'Value': 'RT','Variable': 'condition'})
+
+    # By congruency
+
+    RT_grouped_congruency = data.groupby(['ID', 'congruency']).mean()['respt1']
+
+    low_condition = RT_grouped_congruency.unstack()[True].reset_index()
+    high_condition = RT_grouped_congruency.unstack()[False].reset_index()
+
+    RT_congruency_merge = pd.merge(low_condition,high_condition)
+    RT_congruency = RT_congruency_merge.melt(id_vars='ID', value_name='Value', var_name='Variable')
+
+    RT_congruency = RT_congruency.rename(columns={'Value': 'RT','Variable': 'congruency'})
+
+    list_condition = [hitrate_condition, farate_condition, criterion_condition, d_prime_condition, accuracy_condition, RT_condition]
+    list_congruency = [confidence_congruency, accuracy_congruency, RT_congruency]
+    
     return list_condition, list_congruency
 
 # Loop with the dataframe in the function to make the raincloud (raincloud_function)
@@ -150,7 +177,7 @@ def plot_condition(list_condition):
     """this function plots the raincloud with a loop that use the list (list_condition) and make the rainclouds with the set of colors read and blue.
     The rainclouds are saved in the directory. A wilcoxon test is also calculated for each and print the p and the t value"""
 
-    fig_names = ['hit_cue', 'fa_cue', 'crit_cue', 'dprime_cue', 'acc_cue']
+    fig_names = ['hit_cue', 'fa_cue', 'crit_cue', 'dprime_cue', 'acc_cue','RT_cue']
 
     for i, n in zip(list_condition, fig_names):
         dx = i.iloc[:, 1].astype(float)
@@ -170,7 +197,7 @@ def plot_congruency(list_congruency):
     """this function plots the raincloud with a loop that use the list (list_congruency) and make the rainclouds with the set of colors2 green and blue.
     The rainclouds are saved in the directory. A wilcoxon test is also calculated for each and print the p and the t value"""
 
-    fig_names = ['conf_cong', 'acc_cong']
+    fig_names = ['conf_cong', 'acc_cong', 'RT_cong']
 
     for i, n in zip(list_congruency, fig_names):
         dx = i.iloc[:, 1].astype(float)
