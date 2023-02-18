@@ -12,6 +12,7 @@ import os
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import numpy as np
+sns.set_style('white')
 
 import ptitprince as pt
 
@@ -213,11 +214,28 @@ def plot_congruency(list_congruency):
         result = scipy.stats.wilcoxon(x, y, zero_method='wilcox', correction=False, alternative='two-sided', axis=0)
         print(result)
 
-def raincloud_function(dx, dy, signal, colors,n , ort, savefigs=True):
+def raincloud_function(dx, dy, signal, colors,n , ort, savefigs=True, sigma=.5):
+
     """this function makes raincloud plots for each variable. The data is saved as a dataframe and stored
     as a svg file"""
 
+    f, ax = plt.subplots(figsize=(7, 5))
+
+    ax=pt.RainCloud(x = dx, y = dy, data = signal, palette = colors, bw = sigma,
+                 width_viol = .6, ax = ax, orient = ort,
+                 pointplot = True)
+
+    if savefigs:
+        os.chdir(save_dir)
+        name_fig = f"raincloud_{n}.svg"
+        plt.savefig(name_fig)
+        plt.show()
+
+
+def raincloud_old():
+
     [fig, ax] = plt.subplots()
+
     ax = pt.half_violinplot(x=dx, y=dy, data=signal, palette=colors,
                             scale="area", width=.6, inner=None, orient=ort, ax=ax)
     ax = sns.stripplot(x=dx, y=dy, data=signal, palette=colors, edgecolor="white",
@@ -226,9 +244,4 @@ def raincloud_function(dx, dy, signal, colors,n , ort, savefigs=True):
                      showcaps=True, boxprops={'facecolor': 'none', "zorder": 10},
                      showfliers=True, whiskerprops={'linewidth': 2, "zorder": 10},
                      saturation=1, orient=ort)
-
-    if savefigs:
-        os.chdir(save_dir)
-        name_fig = f"raincloud_{n}.svg"
-        fig.savefig(name_fig)
-        fig.show()
+    
