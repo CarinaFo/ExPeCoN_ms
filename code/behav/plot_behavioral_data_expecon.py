@@ -22,23 +22,19 @@ import scipy.stats as stats
 sns.color_palette("colorblind")[9]
 
 # Set the paths for the behavioral data and the save path
-behavpath = r'D:\expecon\data\behav_brain'
-savepath = r'D:\expecon_ms\figs\behavior'
+behavpath = 'D:\\expecon_ms\\data\\behav'
+savepath = 'D:\\expecon_ms\\figs\\behavior'
 
 # Load the behavioral data from the specified path
 data = []
 for root, dirs, files in os.walk(behavpath):
     for name in files:
-        if 'behav_brain_expecon_sensor_laplace.csv' in name:
+        if 'behav_cleaned_for_eeg.csv' in name:
             data = pd.read_csv(os.path.join(root, name))
 
-df = pd.read_csv(os.path.join(root, 'behav_brain_expecon_sensor_laplace.csv'))
-
 # Clean up the dataframe by dropping unneeded columns
-columns_to_drop = ["Unnamed: 0", 'X.1', 'X', 'Unnamed..0', 'Unnamed..0.1',
-                   'Unnamed..0.2', 'Unnamed..0.3', 'alpha_trial', 'beta_trial',
-                   'beta_scale_log', 'alpha_scale_log']
-data_clean = df.drop(columns_to_drop, axis=1)
+columns_to_drop = ["Unnamed: 0", 'X', 'Unnamed..0', 'Unnamed: 0.1']
+data_clean = data.drop(columns_to_drop, axis=1)
 data = data_clean
 
 # Change the block number for participant 7's block 3
@@ -57,6 +53,11 @@ data = data.drop(data[((data.ID == 32) & (data.block == 2))].index)
 data = data.drop(data[((data.ID == 32) & (data.block == 3))].index)
 data = data.drop(data[((data.ID == 39) & (data.block == 3))].index)
 
+# remove no response trials (respt1 == 2.5)
+data = data.drop(data[data.respt1 == 2.5].index)
+data = data.drop(data[data.respt1 < 0.1].index)
+
+os.chdir(behavpath)
 data.to_csv("clean_bb.csv")
 
 # Get the number of unique participants
