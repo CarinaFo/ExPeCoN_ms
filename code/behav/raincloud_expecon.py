@@ -14,14 +14,14 @@ import scipy.stats as stats
 import numpy as np
 sns.set_style('white')
 
-import ptitprince as pt
+import ptitprince as pt # for halfviolinplot
 
 # Choose directory
 os.chdir("D:\expecon_ms\data\\behav")
 
 save_dir = "D:\expecon_ms\data\\behav\\plots"
 
-# Read dataframe
+# Read clean dataframe
 data = pd.read_csv("clean_bb.csv")
 data = data.drop(data.columns[0], axis=1)
 
@@ -157,7 +157,6 @@ def prepare_data():
     RT_condition = RT_condition.rename(columns={'Value': 'RT','Variable': 'condition'})
 
     # By congruency
-
     RT_grouped_congruency = data.groupby(['ID', 'congruency']).mean()['respt1']
 
     low_condition = RT_grouped_congruency.unstack()[True].reset_index()
@@ -173,7 +172,8 @@ def prepare_data():
 
     return list_condition, list_congruency
 
-# Loop with the dataframe in the function to make the raincloud (raincloud_function)
+# loop over condition dataframes and plot rainclouds
+
 def plot_condition(list_condition):
     """this function plots the raincloud with a loop that use the list (list_condition) and make the rainclouds with the set of colors read and blue.
     The rainclouds are saved in the directory. A wilcoxon test is also calculated for each and print the p and the t value"""
@@ -184,8 +184,7 @@ def plot_condition(list_condition):
         dx = i.iloc[:, 1].astype(float)
         dy = i.iloc[:, 2]
 
-        raincloud_function(dx, dy, i, colors,n , "v", savefigs=True)
-
+        raincloud_function(dx, dy, i, colors, n, "v", savefigs=True)
         plt.show()
 
         x = i.iloc[:41, 2].astype(float)
@@ -193,6 +192,7 @@ def plot_condition(list_condition):
 
         result = scipy.stats.wilcoxon(x, y, zero_method='wilcox', correction=False, alternative='two-sided', axis=0)
         print(result)
+
 
 def plot_congruency(list_congruency):
     """this function plots the raincloud with a loop that use the list (list_congruency) and make the rainclouds with the set of colors2 green and blue.
@@ -205,7 +205,7 @@ def plot_congruency(list_congruency):
         dy = i.iloc[:, 2]
 
         raincloud_function(dx, dy, i, colors2, n, "v", savefigs=True)
-
+        
         plt.show()
 
         x = i.iloc[:41, 2].astype(float)
@@ -214,25 +214,8 @@ def plot_congruency(list_congruency):
         result = scipy.stats.wilcoxon(x, y, zero_method='wilcox', correction=False, alternative='two-sided', axis=0)
         print(result)
 
-def raincloud_function(dx, dy, signal, colors,n , ort, savefigs=True, sigma=.5):
 
-    """this function makes raincloud plots for each variable. The data is saved as a dataframe and stored
-    as a svg file"""
-
-    f, ax = plt.subplots(figsize=(7, 5))
-
-    ax=pt.RainCloud(x = dx, y = dy, data = signal, palette = colors, bw = sigma,
-                 width_viol = .6, ax = ax, orient = ort,
-                 pointplot = True)
-
-    if savefigs:
-        os.chdir(save_dir)
-        name_fig = f"raincloud_{n}.svg"
-        plt.savefig(name_fig)
-        plt.show()
-
-
-def raincloud_old():
+def raincloud_function(dx, dy, signal, colors,n , ort, savefigs=True):
 
     [fig, ax] = plt.subplots()
 
@@ -245,3 +228,9 @@ def raincloud_old():
                      showfliers=True, whiskerprops={'linewidth': 2, "zorder": 10},
                      saturation=1, orient=ort)
     
+    
+    if savefigs:
+        os.chdir(save_dir)
+        name_fig = f"raincloud_{n}.svg"
+        plt.savefig(name_fig)
+        plt.show()
