@@ -223,18 +223,7 @@ print('farate diff significant? p_value (non parametric): ' + str(p))
 
 # calculate SDT from hitrates and FA rates
 
-hitrate_low = signal_grouped.unstack()[0.25]
-farate_low = noise_grouped.unstack()[0.25]
-
-d_prime_low = [stats.norm.ppf(h) - stats.norm.ppf(f) for h,f in zip(hitrate_low, farate_low)]
-criterion_low = [-0.5 * (stats.norm.ppf(h) + stats.norm.ppf(f)) for h,f in zip(hitrate_low, farate_low)]
-
-hitrate_high = signal_grouped.unstack()[0.75]
-farate_high = noise_grouped.unstack()[0.75]
-
-d_prime_high = [stats.norm.ppf(h) - stats.norm.ppf(f) for h,f in zip(hitrate_high, farate_high)]
-criterion_high = [-0.5 * (stats.norm.ppf(h) + stats.norm.ppf(f)) for h,f in zip(hitrate_high, farate_high)]
-
+v
 # ### plot the criterion
 
 fig,ax = plt.subplots()
