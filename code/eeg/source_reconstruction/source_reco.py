@@ -1,16 +1,25 @@
+# script contains function that source reconstruct 62 channel EEG data
+# using MNE or beamforming for time-frequency
+# includes function for statistical analysis in source space: permutation, cluster permutation
+# also includes a function to plot contrasts in source space
+
+
+# Author: Carina Forster
+# last update: 28.02.2023
+
+# load packages
 import os.path as op
 import os
 import numpy as np
 import mne
+import scipy
+# freesurfer
 from mne.datasets import fetch_fsaverage
-from mne.time_frequency import csd_morlet
-from mne.beamformer import make_dics, apply_dics_csd
+# plotting
+import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-#mne.viz.set_3d_backend("notebook")
-print(__doc__)
-
-# Reading the raw data and creating epochs:
+# load source space files
 
 fs_dir = fetch_fsaverage(verbose=True)
 subjects_dir = op.dirname(fs_dir)
@@ -22,18 +31,26 @@ fwd_dir = op.join(subjects_dir, subject, 'bem', subject + '-oct' + _oct + '-fwd.
 src_fname = op.join(subjects_dir, subject, 'bem', subject + '-oct' + _oct + '-src.fif')
 
 # Read the source space and the forward solution
+
 src = mne.read_source_spaces(src_fname)
 fwd = mne.read_forward_solution(fwd_dir)
 
-save_dir_cluster_output = "D:\expecon_ms\data\eeg\cluster_test_output"
+save_dir_cluster_output = r"D:\expecon_ms\figs\eeg\sensor\cluster_permutation_output"
+savedir_epochs = 'D:/expecon/data/eeg/epochs_after_ica_cleaning'
 
-IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
-          '017', '018', '019', '020', '021', '022', '023', '024', '025', '026',
-          '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
-          '037', '038', '039', '040', '041', '042', '043', '044', '045', '046',
-          '047', '048', '049']
-          
-def run_source_reco(dics=0):
+
+IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
+          '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034','035', '036',
+          '037', '038', '039','040', '041', '042', '043', '044','045', '046', '047', '048', '049']
+
+
+def run_source_reco(dics=1):
+
+    """ run source reconstruction on epoched EEG data using eLoreta or DICS beamforming
+    for frequency source analysis
+    output: .stc files for each hemisphere that contain sourece reconstruction for 
+    each participant: shape: verticesxtimepoints
+    """
 
     trials_removed, all_trials = [], []
 
@@ -46,9 +63,10 @@ def run_source_reco(dics=0):
             continue
 
         # load cleaned epochs
-        os.chdir("D:\expecon_ms\data\eeg\prepro_ica\clean_epochs")
+        #os.chdir("D:\expecon_ms\data\eeg\prepro_ica\clean_epochs")
 
-        epochs = mne.read_epochs('P' + subj + '_epochs_after_ica-epo.fif')
+        #epochs = mne.read_epochs('P' + subj + '_epochs_after_ica-epo.fif')
+        epochs = mne.read_epochs(savedir_epochs + '\P' + subj + '_after_ica-epo.fif')
 
         # Remove 6 blocks with hitrates < 0.2 or > 0.8
 
@@ -70,6 +88,8 @@ def run_source_reco(dics=0):
         before_rt_removal = len(epochs.metadata)
         epochs = epochs[epochs.metadata.respt1 > 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
+        # some weird trigger stuff going on?
+        epochs = epochs[epochs.metadata.trial != 1]
 
         #save n trials per participant
         all_trials.append(len(epochs.metadata))
@@ -80,6 +100,10 @@ def run_source_reco(dics=0):
         epochs_high = epochs[epochs.metadata.cue == 0.75]
         epochs_low = epochs[epochs.metadata.cue == 0.25]
 
+        # hit vs. miss trials
+        #epochs_high = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1))]
+        #epochs_low = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0))]
+        
         #average and crop in prestimulus window
         evokeds_high = epochs_high.average().crop(-0.5,0)
         evokeds_low = epochs_low.average().crop(-0.5,0)
@@ -89,14 +113,14 @@ def run_source_reco(dics=0):
             # We are interested in the beta band. Define a range of frequencies, using a
             # log scale, from 12 to 30 Hz.
 
-            freqs = np.logspace(np.log10(15), np.log10(30), 9)
+            freqs = np.logspace(np.log10(7), np.log10(13), 5)
 
             # Computing the cross-spectral density matrix for the beta frequency band, for
             # different time intervals.
-            csd = csd_morlet(epochs, freqs, tmin=-1, tmax=1)
-            csd_a = csd_morlet(epochs_high, freqs, tmin=-0.5, tmax=0)
-            csd_b = csd_morlet(epochs_low, freqs, tmin=-0.5, tmax=0)
-            csd_baseline = csd_morlet(epochs, freqs, tmin=-1, tmax=-0.5)
+            csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=-0.5, tmax=0)
+            csd_a = mne.time_frequency.csd_morlet(epochs_high, freqs, tmin=-0.5, tmax=0)
+            csd_b = mne.time_frequency.csd_morlet(epochs_low, freqs, tmin=-0.5, tmax=0)
+            #csd_baseline = mne.time_frequency.csd_morlet(epochs, freqs, tmin=-1, tmax=-0.5)
 
             info = epochs.info
 
@@ -104,56 +128,63 @@ def run_source_reco(dics=0):
             # separately, we average the CSD objects across frequencies.
             csd_a = csd_a.mean()
             csd_b = csd_b.mean()
-            csd_baseline = csd_baseline.mean()
+            #csd_baseline = csd_baseline.mean()
 
             # Computing DICS spatial filters using the CSD that was computed on the entire
             # timecourse.
 
-            filters = make_dics(info, fwd, csd, noise_csd=csd_baseline,
+            filters = mne.beamformer.make_dics(info, fwd, csd, noise_csd=None,
                                 pick_ori='max-power', reduce_rank=True, real_filter=True)
 
             # Applying DICS spatial filters separately to the CSD computed using the
             # baseline and the CSD computed during the ERS activity.
 
-            source_power_a, freqs = apply_dics_csd(csd_a, filters)
-            source_power_b, freqs = apply_dics_csd(csd_b, filters)
+            source_power_a, freqs = mne.beamformer.apply_dics_csd(csd_a, filters)
+            source_power_b, freqs = mne.beamformer.apply_dics_csd(csd_b, filters)
 
-            os.chdir("D:\expecon_ms\data\eeg\source_dics\high_low_pre")
+            os.chdir("D:\expecon_ms\data\eeg\source\high_low_pre_beamformer")
 
-            source_power_a.save('high_' + subj)
-            source_power_b.save('low_' + subj)
+            source_power_a.save('high_alpha_olddata_' + subj)
+            source_power_b.save('low_alpha_olddata_' + subj)
 
         else:
 
             # create noise covariance with a bias of data length
+
             noise_cov = create_noise_cov(evokeds_high.data.shape, evokeds_high.info)
 
-            mne.write_cov('covariance_prestim.cov', noise_cov)
+            #mne.write_cov('covariance_prestim.cov', noise_cov)
 
-            inv_op = mne.minimum_norm.make_inverse_operator(evokeds_high.info, fwd, noise_cov,
-                                                                loose=1.0, fixed=False)
+            inv_op = mne.minimum_norm.make_inverse_operator(evokeds_high.info, fwd, noise_cov)
 
+            # loose=1.0, fixed=False
             evokeds_high.set_eeg_reference(projection=True)  # needed for inverse modeling
 
             conditiona_stc = mne.minimum_norm.apply_inverse(evokeds_high, inv_op, lambda2=0.05,
                                                             method='eLORETA', pick_ori='normal')
             
-            inv_op = mne.minimum_norm.make_inverse_operator(evokeds_low.info, fwd, noise_cov,
-                                                                loose=1.0, fixed=False)
+            inv_op = mne.minimum_norm.make_inverse_operator(evokeds_low.info, fwd, noise_cov)
 
-            evokeds_low.set_eeg_reference(projection=True)  # needed for inverse modeling
+            evokeds_low.set_eeg_reference(projection=True)  # needed for inverse modelingS
 
             conditionb_stc = mne.minimum_norm.apply_inverse(evokeds_low, inv_op, lambda2=0.05,
                                                             method='eLORETA', pick_ori='normal')
+            
             os.chdir("D:\expecon_ms\data\eeg\source\high_low_pre")
 
             conditiona_stc.save('high_' + subj, overwrite=True)
             conditionb_stc.save('low_' + subj, overwrite=True)
 
-def source_contrast():
+def create_source_contrast_array():
 
-            
-    stc_all = []
+    """function loads source estimates per participant and contrasts them, before
+    storing the contrast in a numpy array: 
+    shape participantsxverticesxtimepoints"""
+
+    # Get labels for FreeSurfer 'aparc' cortical parcellation with 75 labels/hemi
+    labels_parc = mne.read_labels_from_annot('fsaverage', parc='aparc.a2009s', subjects_dir=subjects_dir)
+
+    stc_all, stc_high_all, stc_low_all = [], [], []
 
     for idx, subj in enumerate(IDlist):
 
@@ -161,27 +192,48 @@ def source_contrast():
         if subj == '040' or subj == '045':
             continue
 
-        os.chdir("D:\expecon_ms\data\eeg\source\high_low_pre")
+        os.chdir("D:\expecon_ms\data\eeg\source\high_low_pre_eLoreta")
+        #os.chdir("D:\expecon_ms\data\eeg\source\high_low_pre_beamformer")
+        #os.chdir("D:\expecon_ms\data\eeg\source\hit_miss_pre_beamformer")
 
         stc_high = mne.read_source_estimate('high_' + subj)
         stc_low = mne.read_source_estimate('low_' + subj)
 
-        stc_diff = stc_high.data/stc_low.data
-        
-        #stc_diff = stc_high.data-stc_low.data
+        # extract activity in from source label
+        # S1
+        #postcentral_gyrus = mne.extract_label_time_course(
+         #   [stc], labels_parc[55], src, allow_empty=True)
+        # S2
+        #G_front_inf_Opercular_rh = mne.extract_label_time_course(
+          #  [stc], labels_parc[25], src, allow_empty=True)
+        # ACC
+        #G_cingul_Post_dorsal_rh = mne.extract_label_time_course(
+         #   [stc], labels_parc[19], src, allow_empty=True)
 
-        #stc_diff.save('diff_' + subj)
+        #stc_high = mne.read_source_estimate('high_fixed_' + subj)
+        #stc_low = mne.read_source_estimate('low_fixed_' + subj)
 
+        stc_diff = stc_high.data-stc_low.data
+
+        stc_high_all.append(stc_high.data)
+        stc_low_all.append(stc_low.data)
         stc_all.append(stc_diff)
 
+    stc_low = np.array(stc_low_all)
+    stc_high = np.array(stc_high_all)
     stc_array = np.array(stc_all)
 
-    stc_array.shape # participants x vertices x timepoints
+    data = stc_array
 
     return stc_array
 
-def spatio_temporal_source_test():
-        
+def spatio_temporal_source_test(data=None, n_perm=10000, jobs=10):
+    """function that runs a cluster based perutation test over space and time
+    data: 3D numpy array: participantsxspacextime
+    n_perm: how many permutations for cluster test
+    jobs: how many parallel GPUs should be used
+    out: cluster output"""
+
     print('Computing adjacency.')
 
     adjacency = mne.spatial_src_adjacency(src)
@@ -189,19 +241,26 @@ def spatio_temporal_source_test():
     # Note that X needs to be a multi-dimensional array of shape
     # observations (subjects) × time × space, so we permute dimensions
 
-    X = np.transpose(stc_array, [0, 2, 1])
+    X = np.transpose(data, [0, 2, 1])
 
-    X_mean = np.mean(X[:,100:,:], axis=1)
+    X_mean = np.mean(X[:,:,:], axis=1)
 
+    # mean over time and permutation test to get sign. vertices
     H,p,t = mne.stats.permutation_t_test(X_mean)
 
-    X_avg = np.mean(stc_array[:,:,100:], axis=(0,2))
+    # mean over time and participants and plot contrast in source space
+    X_avg = np.mean(X[:,:,:], axis=(0,1))
 
-    stc = mne.SourceEstimate(p, tmin=-0.5, tstep=0.0001, vertices = fsave_vertices)
+    # put contrast or p values in source space
+    fsave_vertices = [s['vertno'] for s in src]
+    stc = mne.SourceEstimate(p, tmin=-0.5, tstep=0.0001, vertices = fsave_vertices, subject='fsaverage')
 
     brain = stc.plot(
-        hemi='rh', views='lateral', subjects_dir=subjects_dir,
-        subject = 'fsaverage', time_viewer=False)
+        hemi='rh', views='medial', subjects_dir=subjects_dir,
+        subject = 'fsaverage', time_viewer=False,
+        background='grey')
+
+    brain.save_image(r"D:\expecon_ms\figs\eeg\source\avg_high_low_dics_perm_beta_rh_medial.png")
 
     # Here we set a cluster forming threshold based on a p-value for
     # the cluster based permutation test.
@@ -219,15 +278,16 @@ def spatio_temporal_source_test():
     T_obs, clusters, cluster_p_values, H0 = clu = \
         mne.stats.spatio_temporal_cluster_1samp_test(X[:,:,:], adjacency=adjacency, 
                                                      threshold=t_threshold,
-                                                     n_jobs=10, n_permutations=perm)
+                                                     n_jobs=jobs, n_permutations=n_perm)
 
-    return T_obs, clusters, cluster_p_values, H0
+    return clu
 
-def plot_cluster_output():
+def plot_cluster_output(clu=None):
         
     # Select the clusters that are statistically significant at p < 0.05
-    good_clusters_idx = np.where(cluster_p_values < 0.05)[0]
-    good_clusters = [clusters[idx] for idx in good_clusters_idx]
+    good_clusters_idx = np.where(clu[2] < 0.05)[0]
+    good_clusters = [clu[1][idx] for idx in good_clusters_idx]
+    print(min(cluster_p_values))
 
     print('Visualizing clusters.')
 
@@ -235,29 +295,37 @@ def plot_cluster_output():
     # cluster spatial maps are stacked in the time dimension of a SourceEstimate
     # object. This way by moving through the time dimension we will be able to see
     # subsequent cluster maps.
-    stc_all_cluster_vis = mne.stats.summarize_clusters_stc(clu, tstep=tstep,
+    fsave_vertices = [s['vertno'] for s in src]
+
+    stc_all_cluster_vis = mne.stats.summarize_clusters_stc(clu,
                                                 vertices=fsave_vertices,
                                                 subject='fsaverage', p_thresh=0.05)
-
+    
     # Let's actually plot the first "time point" in the SourceEstimate, which
     # shows all the clusters, weighted by duration.
 
-    fsave_vertices = [s['vertno'] for s in src]
     # blue blobs are for condition A < condition B, red for A > B
+
     brain = stc_all_cluster_vis.plot(
         hemi='rh', views='lateral', subjects_dir=subjects_dir,
         time_label='temporal extent (ms)', size=(800, 800),
-        smoothing_steps=5)
+        smoothing_steps=5, time_viewer=False,
+        background='white', transparent=True, colorbar=False)
+    
+    brain.save_image("D:\expecon_ms\data\eeg\source\cluster_rh_lateral.png")
 
-    # We could save this via the following:
-    # brain.save_image('clusters.png')
-    #message = 'DICS source power in the 12-30 Hz frequency band'
 
-    #brain = stc.plot(hemi='rh', views='axial', subjects_dir=subjects_dir,
-    #                subject=subject, time_label=message)
+def cluster_perm_space_time(perm=10000, tmin=-0.5, tmax=0):
 
-def cluster_perm_space_time(csp=0, perm=10000):
-        
+    """ this function runs a cluster permutation test over electrodes and timepoints
+    in sensor space and plots the output and saves it
+    input: perm: how many permutations for cluster test
+    tmin: crop the epochs at this time in seconds
+    tmax: crop the data until this time in seconds 
+    out: saves the cluster figures as svg and png files """
+
+    all_trials, trials_removed = [], []
+
     evokeds_low_all, evokeds_high_all = [], []
 
     for idx, subj in enumerate(IDlist):
@@ -272,21 +340,6 @@ def cluster_perm_space_time(csp=0, perm=10000):
         os.chdir("D:\expecon_ms\data\eeg\prepro_ica\clean_epochs")
 
         epochs = mne.read_epochs('P' + subj + '_epochs_after_ica-epo.fif')
-
-        if csp:
-
-            epochs.crop(-0.5,0)
-
-            labels = epochs.metadata.cue
-
-            csp = mne.decoding.CSP(n_components=2, reg=0.5, log=True, norm_trace=False)
-
-            # plot CSP patterns estimated on full data for visualization
-            csp.fit_transform(epochs.get_data(), labels)
-
-            csp.plot_patterns(epochs.info, ch_type='eeg', units='Patterns (AU)', size=1.5)
-
-        #epochs = epochs.filter(1,4)
 
         # Remove 7 blocks with hitrates < 0.2 or > 0.8
 
@@ -306,8 +359,10 @@ def cluster_perm_space_time(csp=0, perm=10000):
         
         # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
         before_rt_removal = len(epochs.metadata)
+
         epochs = epochs[epochs.metadata.respt1 > 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
+        # some weird trigger stuff going on?
         epochs = epochs[epochs.metadata.trial != 1]
         
         #save n trials per participant
@@ -320,8 +375,8 @@ def cluster_perm_space_time(csp=0, perm=10000):
         epochs_low = epochs[(epochs.metadata.cue == 0.25)]
 
         #average and crop in prestimulus window
-        evokeds_high = epochs_high.average().crop(-0.5,0)
-        evokeds_low = epochs_low.average().crop(-0.5,0)
+        evokeds_high = epochs_high.average().crop(tmin, tmax)
+        evokeds_low = epochs_low.average().crop(tmin, tmax)
 
         evokeds_high_all.append(evokeds_high)
         evokeds_low_all.append(evokeds_low)
@@ -331,33 +386,35 @@ def cluster_perm_space_time(csp=0, perm=10000):
     a_gra = mne.grand_average(evokeds_high_all)
     b_gra = mne.grand_average(evokeds_low_all)
 
+    high = np.array([h.data for h in evokeds_high_all])
+    low = np.array([l.data for l in evokeds_low_all])
+
     X = [h.data-l.data for h,l in zip(evokeds_high_all, evokeds_low_all)]
 
     X = np.transpose(X, [0, 2, 1])
 
     ch_adjacency,_ = mne.channels.find_ch_adjacency(epochs.info, ch_type='eeg')
 
-    threshold_tfce = dict(start=0, step=0.1)
-    
+    #threshold_tfce = dict(start=0, step=0.1)
+
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X[:,:,:], n_permutations=perm,
-                                                                                    adjacency=ch_adjacency)
+                                                                                    adjacency=ch_adjacency,
+                                                                                    )
 
     good_cluster_inds = np.where(cluster_p_values < 0.05)[0] # times where something significant happened
 
     print(len(good_cluster_inds))
     print(cluster_p_values)
 
-    # this seemed to work, now plot the significant cluster
-
+    # now plot the significant cluster(s)
     a = 'high'
     b= 'low'
 
     # configure variables for visualization
     colors = {a: "crimson", b: 'steelblue'}
-    #
-    # # organize data for plotting
-    #instead of grand average we use the evoked data per subject so that we can plot CIs
 
+    # organize data for plotting
+    # instead of grand average we could use the evoked data per subject so that we can plot CIs
     grand_average = {a: a_gra, b: b_gra}
 
     # # loop over clusters
@@ -416,7 +473,164 @@ def cluster_perm_space_time(csp=0, perm=10000):
         fig.subplots_adjust(bottom=.05)
         os.chdir(save_dir_cluster_output)
         plt.savefig('cluster' + str(i_clu) + '.svg')
+        plt.savefig('cluster' + str(i_clu) + '.png')
         plt.show()
+
+
+def extract_cluster_and_plot_source_contrast(clusters=None, good_cluster_inds=None,
+                                             evoked_dataa=None, evoked_datab=None,
+                                             evokeds=None):
+
+    """extract cluster timepoints and channels from cluster test in sensor space and put contrast into source space
+    using eLoreta"""
+
+    IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
+          '017', '018', '019', '020', '021', '022', '023', '024', '025', '026',
+          '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
+          '037', '038', '039', '041', '042', '043', '044', '046',
+          '047', '048', '049']
+
+    # extract cluster channels and timepoints from significant clusters in sensor space and store difference per participant
+    
+    cluster_zero = clusters[good_clusters_idx[1]] # TPJ
+    cluster_one = clusters[good_clusters_idx[2]] # ACC/frontal pole
+
+    # store unique timepoints and channels per cluster
+
+    timepoint_idx = np.unique(cluster_zero[0])
+    channel_idx = np.unique(cluster_zero[1])
+
+    timepoint_idx1 = np.unique(cluster_one[0])
+    channel_idx1 = np.unique(cluster_one[1])
+
+    # extract only significant timepoints from evoked data
+    high_zero = [h.data[:,timepoint_idx] for h in evoked_dataa]
+    low_zero = [h.data[:,timepoint_idx] for h in evoked_datab]
+    # calculate difference for both conditions
+    diff_zero = [h-l for h,l in zip(high_zero, low_zero)]
+
+    high_one = [h.data[:,timepoint_idx1] for h in evoked_dataa]
+    low_one = [h.data[:,timepoint_idx1] for h in evoked_datab]
+
+    diff_one = [h-l for h,l in zip(high_one, low_one)]
+
+    # convert back to EvokedArray for source reconstruction for both cluster
+    diff_evo_zero = [mne.EvokedArray(z, evokeds.info) for z in diff_zero]
+    diff_evo_one = [mne.EvokedArray(z, evokeds.info) for z in diff_one]
+
+    # source reconstruct the contrast
+
+    for idx, subj in enumerate(IDlist):
+
+        noise_cov = mne.read_cov('D:\expecon_ms\data\eeg\source\cluster_source\covariance_prestim.cov')
+
+        inv_op = mne.minimum_norm.make_inverse_operator(diff_evo_zero[0].info, fwd, noise_cov)
+
+        diff_evo_zero[idx].set_eeg_reference(projection=True)  # needed for inverse modeling
+
+        cluster_0 = mne.minimum_norm.apply_inverse(diff_evo_zero[idx], inv_op, lambda2=0.05,
+                                                    method='eLORETA', pick_ori='normal')
+    
+        os.chdir("D:\expecon_ms\data\eeg\source\cluster_source")
+
+        cluster_0.save('cluster0_' + subj)
+    
+    # load and plot the stc contrast
+
+    stc_all = []
+
+    for idx, subj in enumerate(IDlist):
+
+        os.chdir("D:\expecon_ms\data\eeg\source\cluster_source")
+
+        conditiona_stc = mne.read_source_estimate('cluster1_' + subj)
+
+        stc_all.append(conditiona_stc)
+
+    stc_array = np.array([np.array(s.data) for s in stc_all])
+
+    # average over time and participants
+    X_avg = np.mean(stc_array[:,:,:], axis=(0))
+
+    fsave_vertices = [s['vertno'] for s in src]
+
+    # create source estimate
+
+    stc = mne.SourceEstimate(X_avg, tmin=-0.5, tstep=0.0001, vertices = fsave_vertices)
+
+    pos, latency = stc.get_peak(hemi='rh', vert_as_index=True, time_as_index=True)
+
+    peak_vertex_surf = stc.rh_vertno[pos]
+
+    # plot source contrast
+    brain = stc.plot(
+        hemi='both', views='medial', subjects_dir=subjects_dir,
+        subject = 'fsaverage', time_viewer=False, background='white')
+    # save source contrast image
+    brain.save_image()
+
+
+def extract_diff_per_sub():
+
+    # extract cluster channels and timepoints from significant clusters in sensor space and store difference per participant
+
+    cluster_zero = clusters[good_cluster_inds[0]]
+    cluster_one = clusters[good_cluster_inds[1]]
+
+    # store unique timepoints and channels per cluster
+
+    timepoint_idx = np.unique(cluster_zero[0])
+    channel_idx = np.unique(cluster_zero[1])
+
+    timepoint_idx1 = np.unique(cluster_one[0])
+    channel_idx1 = np.unique(cluster_one[1])
+
+    # extract data only from evokeds
+
+    high = [h.data for h in evokeds_high_all]
+    low = [h.data for h in evokeds_low_all]
+
+    high_czero = [h[channel_idx,:] for h in high]
+    low_czero = [h[channel_idx,:] for h in low]
+
+    high_zero = [h[:,timepoint_idx] for h in high_czero]
+    low_zero = [h[:,timepoint_idx] for h in low_czero]
+
+    # calculate difference for both conditions
+    diff_zero = [h-l for h,l in zip(high_zero, low_zero)]
+
+    high_cone = [h[channel_idx1,:] for h in high]
+    low_cone = [h[channel_idx1,:] for h in low]
+
+    high_one = [h[:,timepoint_idx1] for h in high_cone]
+    low_one = [h[:,timepoint_idx1] for h in low_cone]
+
+    diff_one = [h[:,:]-l[:,:] for h,l in zip(high_one, low_one)]
+
+    alpha_one = mne.filter.filter_data(diff_one, 250, 7, 13)
+    beta_one = mne.filter.filter_data(diff_one, 250, 30, 39)
+
+    alpha_zero = mne.filter.filter_data(diff_zero, 250, 7, 13)
+    beta_zero = mne.filter.filter_data(diff_zero, 250, 15, 25)
+
+    diff_zero_sub = np.mean(np.array(diff_zero), axis=(1,2))
+    diff_one_sub = np.mean(np.array(diff_one), axis=(1,2))
+    
+    diff_a_one = np.mean(np.array(alpha_one**2), axis=(1,2))
+    diff_b_one = np.mean(np.array(beta_one**2), axis=(1,2))
+
+    diff_a_zero = np.mean(np.array(alpha_zero**2), axis=(1,2))
+    diff_b_zero = np.mean(np.array(beta_zero**2), axis=(1,2))
+
+    # read in criterion difference
+
+    c_diff = pd.read_csv('D:\\expecon_ms\\data\\behav\\diff_c.csv')
+
+    # calculate TFR for alpha and beta band in both clusters and store difference per participant
+
+    scipy.stats.pearsonr(diff_one, c_diff.iloc[:,1])
+
+    # correlate with delta criterion per participant (positive correlation?)
 
 
 def create_noise_cov(data_size, data_info):
@@ -432,105 +646,3 @@ def create_noise_cov(data_size, data_info):
     raw1 = mne.io.RawArray(data1, data_info)
 
     return mne.compute_raw_covariance(raw1, tmin=0, tmax=None)
-
-
-def extract_cluster_and_plot_source_contrast():
-
-    """extract cluster timepoints and channels from cluster test in sensor space and put contrast into source space
-    using eLoreta"""
-
-    IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
-          '017', '018', '019', '020', '021', '022', '023', '024', '025', '026',
-          '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
-          '037', '038', '039', '041', '042', '043', '044', '046',
-          '047', '048', '049']
-
-    # extract cluster channels and timepoints from significant clusters in sensor space and store difference per participant
-
-    cluster_zero = clusters[good_cluster_inds[0]]
-    cluster_one = clusters[good_cluster_inds[1]]
-
-    # store unique timepoints and channels per cluster
-
-    timepoint_idx = np.unique(cluster_zero[0])
-    channel_idx = np.unique(cluster_zero[1])
-
-    timepoint_idx1 = np.unique(cluster_one[0])
-    channel_idx1 = np.unique(cluster_one[1])
-
-    # extract only significant timepoints from evoked data
-    high_zero = [h.data[:,timepoint_idx] for h in evokeds_high_all]
-    low_zero = [h.data[:,timepoint_idx] for h in evokeds_low_all]
-    # calculate difference for both conditions
-    diff_zero = [h-l for h,l in zip(high_zero, low_zero)]
-
-    high_one = [h.data[:,timepoint_idx1] for h in evokeds_high_all]
-    low_one = [h.data[:,timepoint_idx1] for h in evokeds_low_all]
-
-    diff_one = [h-l for h,l in zip(high_one, low_one)]
-    # convert back to EvokedArray for source reconstruction for both cluster
-    diff_evo_zero = [mne.EvokedArray(z, evokeds_high.info) for z in diff_zero]
-    diff_evo_one = [mne.EvokedArray(z, evokeds_high.info) for z in diff_one]
-
-    # source reconstruct the contrast
-
-    for idx, subj in enumerate(IDlist):
-
-        noise_cov = mne.read_cov('covariance_prestim.cov')
-
-        inv_op = mne.minimum_norm.make_inverse_operator(diff_evo_one[0].info, fwd, noise_cov)
-
-        #inv_op = mne.minimum_norm.make_inverse_operator(diff_evo_one[0].info, fwd, noise_cov, loose=1.0, fixed=False)
-
-        diff_evo_one[idx].set_eeg_reference(projection=True)  # needed for inverse modeling
-
-        cluster_1 = mne.minimum_norm.apply_inverse(diff_evo_one[idx], inv_op, lambda2=0.05,
-                                                    method='eLORETA', pick_ori='normal')
-    
-        os.chdir("D:\expecon_ms\data\eeg\source\cluster_source")
-
-        cluster_1.save('cluster1_loose_' + subj)
-    
-    # source reconstruct the contrast
-
-    stc_all = []
-
-    for idx, subj in enumerate(IDlist):
-
-        conditiona_stc = mne.read_source_estimate('cluster1_loose_' + subj)
-
-        stc_all.append(conditiona_stc)
-
-    stc_array = np.array([np.array(s.data) for s in stc_all])
-
-    # average over time and participants
-    X_avg = np.mean(stc_array[:,:,:], axis=(0))
-
-    # create source estimate
-    stc = mne.SourceEstimate(X_avg, tmin=-0.5, tstep=0.0001, vertices = fsave_vertices)
-    # plot source contrast
-    brain = stc.plot(
-        hemi='rh', views='lateral', subjects_dir=subjects_dir,
-        subject = 'fsaverage', time_viewer=True)
-
-    # now extract only cluster channel and timepoints per epoch
-
-    high_zero = [h.data[:,timepoint_idx] for h in evokeds_high_all]
-    high_one = [h.data[clusters[good_cluster_inds[1]][1],clusters[good_cluster_inds[1]][0]] for h in evokeds_high_all]
-
-
-    low_one = [h[ch_cluster_zero,:] for h in evokeds_low_all]
-    low_zero = [h[ch_cluster_zero,:] for h in evokeds_low_all]
-
-    # calculate TFR for alpha and beta band in both clusters and store difference per participant
-
-
-    # correlate with delta criterion per participant (positive correlation?)
-
-
-
-def extract_cluster_per_trial():
-
-    # extract cluster in timeseries and power per trial and store per participant for mixed model analys
-
-    
