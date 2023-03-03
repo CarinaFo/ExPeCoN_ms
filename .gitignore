@@ -1,0 +1,4 @@
+.idea
+.DS_Store
+*.egg*
+__pycache__

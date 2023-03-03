@@ -1,0 +1,6 @@
+# SIMON COMMENT: Use either this (not tested myself)
+# pip install pipreqs
+# pipreqs .
+# OR within your virtual environment OR conda environment
+# pip freeze > requirements.txt
+# OR fill manually
