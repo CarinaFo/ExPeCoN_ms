@@ -4,11 +4,14 @@ import matplotlib.gridspec as gridspec
 import os
 import pandas as pd
 import scipy.stats as stats
+import seaborn as sns
+import statsmodels.api as sm
 
 
 ## Data
 behavpath = 'D:\\expecon_ms\\data\\behav'
 savepath = 'D:\\expecon_ms\\figs\\behavior'
+
 os.chdir(behavpath)
 data = pd.read_csv("clean_bb.csv")
 
@@ -50,6 +53,7 @@ criterion_low = [-0.5 * (stats.norm.ppf(h) + stats.norm.ppf(f)) for h,f in zip(h
 
 hitrate_high = signal_grouped.unstack()[0.75]
 farate_high = noise_grouped.unstack()[0.75]
+farate_high[16] =  0.00001
 
 d_prime_high = [stats.norm.ppf(h) - stats.norm.ppf(f) for h,f in zip(hitrate_high, farate_high)]
 criterion_high = [-0.5 * (stats.norm.ppf(h) + stats.norm.ppf(f)) for h,f in zip(hitrate_high, farate_high)]
@@ -57,13 +61,37 @@ criterion_high = [-0.5 * (stats.norm.ppf(h) + stats.norm.ppf(f)) for h,f in zip(
 data_grouped = data.groupby(['ID', 'cue']).mean()["conf"]
 data_grouped.head()
 
-
-
 low_condition_conf = data_grouped.unstack()[0.25].reset_index()
 high_condition_conf = data_grouped.unstack()[0.75].reset_index()
 
+d_diff = np.array(d_prime_low) - np.array(d_prime_high)
+c_diff = np.array(criterion_low) - np.array(criterion_high)
+
+# load choice bias
+choice = pd.read_csv("D:\expecon_ms\data\behav\choice_para.csv")
+
+choice = choice.choice_para
+
+
+np.corrcoef(c_diff, d_diff)
+
+robust_model = sm.RLM(c_diff, sm.add_constant(d_diff), M=sm.robust.norms.HuberT())
+robust_results = robust_model.fit()
+
+# Plot regplot 
+
+sns.regplot(x=d_diff[choice<0], y=choice[choice<0], color='black', scatter_kws={'s': 50}, robust=True, fit_reg=True)
+plt.xlabel('criterion difference', fontname="Arial", fontsize=14)
+plt.ylabel('choice bias for Alternator', fontname="Arial", fontsize=14)
+
+# Show the plot
+plt.show()
+
+# Print robust regression results
+print(robust_results.summary())
 
 ## Figure
+
 fig = plt.figure(figsize=(8,10),tight_layout=True)#original working was 10,12
 gs = gridspec.GridSpec(6, 4)
 
@@ -96,7 +124,7 @@ for patch, color in zip(hr_box['boxes'], colors):
 for patch, color in zip(hr_box['medians'], medcolor):
     patch.set_color(color)
     
-hr_ax.set_ylabel('Hit rate', fontname="Arial", fontsize=14)
+hr_ax.set_ylabel('hit rate', fontname="Arial", fontsize=14)
 hr_ax.set_yticklabels(['0','0.5','1.0'], fontname="Arial", fontsize=12)
 hr_ax.text(1.3,1,'***',verticalalignment='center',fontname='Arial',fontsize='18')
 
@@ -120,13 +148,13 @@ for patch, color in zip(fa_box['boxes'], colors):
 for patch, color in zip(fa_box['medians'], medcolor):
     patch.set_color(color)
 
-fa_ax.set_ylabel('FA rate', fontname="Arial", fontsize=14)
+fa_ax.set_ylabel('fa rate', fontname="Arial", fontsize=14)
 fa_ax.set_yticklabels(['0','0.5','1.0'], fontname="Arial", fontsize=12)
 fa_ax.text(1.3,1,'***',verticalalignment='center',fontname='Arial',fontsize='18')
 
 
 crit_ax = fig.add_subplot(gs[4:,1])
-crit_ax .set_ylabel('Criterion', fontname="Arial", fontsize=14)
+crit_ax .set_ylabel('c', fontname="Arial", fontsize=14)
 crit_ax.text(1.3,1.5,'***',verticalalignment='center',fontname='Arial',fontsize='18')
 
 crit_ax.set_ylim(-0.5,1.5)
@@ -155,7 +183,7 @@ for patch, color in zip(crit_box['medians'], medcolor):
     patch.set_color(color)
 
 dprime_ax = fig.add_subplot(gs[4:,2])
-dprime_ax .set_ylabel('Dprime', fontname="Arial", fontsize=14)
+dprime_ax .set_ylabel('dprime', fontname="Arial", fontsize=14)
 dprime_ax.text(1.4,3,'n.s',verticalalignment='center',fontname='Arial',fontsize='13')
 
 dprime_ax.set_ylim(0,3)
@@ -184,7 +212,7 @@ for patch, color in zip(dprime_box['medians'], medcolor):
 
 
 conf_ax = fig.add_subplot(gs[4:,3])
-conf_ax .set_ylabel('Confidence', fontname="Arial", fontsize=14)
+conf_ax .set_ylabel('mean confidence', fontname="Arial", fontsize=14)
 conf_ax.set_yticklabels(['0','0.5','1.0'], fontname="Arial", fontsize=12)
 conf_ax.text(1.3,1,'***',verticalalignment='center',fontname='Arial',fontsize='18')
 
@@ -222,9 +250,9 @@ for plots in [hr_ax,fa_ax,crit_ax,dprime_ax,conf_ax]:
     plots.set_xticklabels(['',''])
     if plots != hr_ax:
         plots.set_xticklabels(['0.25','0.75'], fontname="Arial", fontsize=12)
-        plots.set_xlabel('Stimulus (P)', fontname="Arial", fontsize=14)
+        plots.set_xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
     if plots == conf_ax:
-        plots.set_xticklabels(['Congruent', 'Incongruent'], fontname="Arial", fontsize=12,rotation=30)
+        plots.set_xticklabels(['congruent', 'incongruent'], fontname="Arial", fontsize=12,rotation=30)
         plots.set_xlabel('')
 
 
