@@ -1,0 +1,9 @@
+.idea
+.DS_Store
+*.egg*
+__pycache__
+*.fif
+*.csv
+*.png
+*.svg
+data/

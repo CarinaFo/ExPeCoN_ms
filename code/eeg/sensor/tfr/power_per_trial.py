@@ -1,11 +1,18 @@
+#################################################################################################
+# investigate pre-stimulus power
+##################################################################################################
+
+
 import os
 import mne
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
+import scipy
 import seaborn as sns
+import matplotlib.pyplot as plt
 
-####################################extract power per trial and save it as a .csv file######################
+# set font to Arial and font size to 22
+plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
 
 # datapath
 
@@ -13,19 +20,16 @@ savepath_epochs = r'D:\expecon_EEG_112021\epochs_conditions'
 savepath_TF = r'D:\expecon_EEG_112021\power_conditions'
 savepath_power_trial = r'D:\expecon_EEG\power_trial'
 savedir_epochs = 'D:/expecon/data/eeg/epochs_after_ica_cleaning'
-
+dir_cleanepochs = r"D:\expecon_ms\data\eeg\prepro_ica\clean_epochs"
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
           '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
-#################################################################################################
-# investigate pre-stimulus power
-##################################################################################################
 
-def extract_power(a="all", idlist=IDlist, baseline=0, base_interval=(-0.8,-0.5), frequency_list=['alpha', 'beta'],
-                   tmin=-0.5,
-                    tmax=0, channels=['CP4', 'CP6'], fmin=7, fmax=30, ncycles=4.0, zero_pad=1):
+def extract_power(baseline=0, base_interval=(-0.8,-0.5),
+                    tmin=-0.5, induced=True,
+                    tmax=0, channels=['CP4', 'CP6'], fmin=7, fmax=35, ncycles=3.0, zero_pad=1):
 
     '''calculate prestimulus alpha power per trial (should be positive and rather small)
     baseline correction can be applied. takes the mean over prestimulus period and alpha range in electrode CP4.
@@ -35,11 +39,11 @@ def extract_power(a="all", idlist=IDlist, baseline=0, base_interval=(-0.8,-0.5),
     freqs = np.arange(fmin, fmax + 1, 1)
     n_cycles = freqs / ncycles  # different number of cycle per frequency
 
-    alpha_power, beta_power = [], []
+    alpha_power, low_beta_power, high_beta_power = [], [], []
     metadata_list = []
     drop_log = []
 
-    for idx, subj in enumerate(idlist):
+    for idx, subj in enumerate(IDlist):
 
         # print participant ID
         print('Analyzing ' + subj)
@@ -47,9 +51,11 @@ def extract_power(a="all", idlist=IDlist, baseline=0, base_interval=(-0.8,-0.5),
         # skip those participants
         if subj == '040' or subj == '045':
             continue
+        
+        os.chdir(dir_cleanepochs)
 
-        #epochs = mne.read_epochs('P' + subj + '_epochs_after_ica-epo.fif')
-        epochs = mne.read_epochs(savedir_epochs + '\P' + subj + '_after_ica-epo.fif')
+        epochs = mne.read_epochs('P' + subj + '_epochs_after_ica-epo.fif')
+        #epochs = mne.read_epochs(savedir_epochs + '\P' + subj + '_after_ica-epo.fif')
 
         # Remove 6 blocks with hitrates < 0.2 or > 0.8
 
@@ -74,10 +80,14 @@ def extract_power(a="all", idlist=IDlist, baseline=0, base_interval=(-0.8,-0.5),
         # some weird trigger stuff going on?
         epochs = epochs[epochs.metadata.trial != 1]
 
+        if induced == 1:
+
+            # subtract evoked response
+            epochs = epochs.subtract_evoked()
+
         # add metadata per subject
 
         metadata_list.append(epochs.metadata)
-
 
         # crop the data in the pre-stimulus window
 
@@ -86,14 +96,6 @@ def extract_power(a="all", idlist=IDlist, baseline=0, base_interval=(-0.8,-0.5),
         # zero pad the data on both sides to avoid leakage and edge artifacts
 
         data = epochs.get_data()
-
-        # change the time info
-
-        time_window = len(epochs.times)
-        before = np.linspace(-2, -1, time_window)
-        after = np.linspace(0, 1, time_window)
-
-        times = [*before, *epochs.times, *after]
 
         if zero_pad == 1:
 
@@ -113,41 +115,67 @@ def extract_power(a="all", idlist=IDlist, baseline=0, base_interval=(-0.8,-0.5),
 
         # get prestimulus power
 
-        for f in frequency_list:
+        power,itc = mne.time_frequency.tfr_multitaper(epochs, n_cycles=ncycles, freqs=freqs, return_itc=True,
+                                                n_jobs=15, average=False)
+        
+        os.chdir(r"D:\expecon_ms\data\eeg\sensor\tfr_morlet\single_trial_power")
 
-            if f == 'alpha':
+        mne.time_frequency.write_tfrs(f"{subj}_power_per_trial-tfr.h5", power)
 
-                power = mne.time_frequency.tfr_multitaper(epochs, n_cycles=ncycles, freqs=freqs, return_itc=False,
-                                                          n_jobs=15, average=False)
-                if baseline == 1:
-                    power.apply_baseline(base_interval, mode='zscore')
+        mne.time_frequency.write_tfrs(f"{subj}_itc_per_trial-tfr.h5", itc)
 
-                range = (7, 14)
-                power.crop(-0.1, 0, range[0], range[1]).pick_channels(channels)
-                alpha_power.append(power.data[:, :, :, :])  # epochsxchannelsxfrequenciesxtimepoints
+def average_over_freq_bands():
+    
+    for f in frequency_list:
+
+        if f == 'alpha':
+
+            power = mne.time_frequency.tfr_multitaper(epochs, n_cycles=ncycles, freqs=freqs, return_itc=False,
+                                                        n_jobs=15, average=False)
+            if baseline == 1:
+                power.apply_baseline(base_interval, mode='zscore')
+
+            range = (7, 14)
+            power.crop(-0.5, 0, range[0], range[1]).pick_channels(channels)
+            alpha_power.append(power.data[:, :, :, :])  # epochsxchannelsxfrequenciesxtimepoints
 
 
-            else:
-                power = mne.time_frequency.tfr_multitaper(epochs, n_cycles=ncycles, freqs=freqs, return_itc=False,
-                                                          n_jobs=15, average=False)
-                if baseline == 1:
-                    power.apply_baseline(base_interval, mode='zscore')
+        elif f == 'low_beta':
+            power = mne.time_frequency.tfr_multitaper(epochs, n_cycles=ncycles, freqs=freqs, return_itc=False,
+                                                        n_jobs=15, average=False)
+            if baseline == 1:
+                power.apply_baseline(base_interval, mode='zscore')
 
-                range = (15, 31)
-                power.crop(-0.1, 0, range[0], range[1]).pick_channels(channels)
-                beta_power.append(power.data[:,:,:,:])
+            range = (15, 21)
+            power.crop(-0.5, 0, range[0], range[1]).pick_channels(channels)
+            low_beta_power.append(power.data[:,:,:,:])
+
+        elif f == 'high_beta':
+            power = mne.time_frequency.tfr_multitaper(epochs, n_cycles=ncycles, freqs=freqs, return_itc=False,
+                                                        n_jobs=15, average=False)
+            if baseline == 1:
+                power.apply_baseline(base_interval, mode='zscore')
+
+            range = (22, 35)
+            power.crop(-0.5, 0, range[0], range[1]).pick_channels(channels)
+            high_beta_power.append(power.data[:,:,:,:])
+                
 
     #calculate mean over time and frequencies
 
     mean_alpha = [np.mean(a, axis=(1, 2, 3)) for a in alpha_power]
 
-    mean_alpha_v = np.concatenate(mean_alpha)
+    mean_alpha = np.concatenate(mean_alpha)
 
-    mean_beta = [np.mean(a, axis=(1, 2, 3)) for a in beta_power]
+    mean_low_beta = [np.mean(a, axis=(1, 2, 3)) for a in low_beta_power]
 
-    mean_beta_v = np.concatenate(mean_beta)
+    mean_beta_low = np.concatenate(mean_low_beta)
+    
+    mean_high_beta = [np.mean(a, axis=(1, 2, 3)) for a in high_beta_power]
 
-    return metadata_list, mean_alpha_v, mean_beta_v
+    mean_beta_high = np.concatenate(mean_high_beta)
+
+    return metadata_list, mean_alpha, mean_beta_low, mean_beta_high
 
 def power_criterion_corr():
 
@@ -156,16 +184,16 @@ def power_criterion_corr():
     """
     df = pd.concat(metadata_list)
 
-    df['alpha'] = mean_alpha_v
-    df['beta'] = mean_beta_v
-
+    df['alpha'] = mean_alpha
+    df['low_beta'] = mean_beta_low
+    df['high_beta'] = mean_beta_high
     #save as .csv dataframe for statistical analysis
 
     os.chdir(savepath_power_trial)
 
-    df.to_csv('single_trial_' + frequency_list[0] + '_' + frequency_list[1] + '_' + str(abs(tmin)) + 'to' + str(abs(tmax)) + '.csv')
+    df.to_csv('single_trial_power_' + str(abs(tmin)) + 'to' + str(abs(tmax)) + '.csv')
 
-    freqs = ['alpha', 'beta']
+    freqs = ['alpha', 'low_beta', 'high_beta']
 
     diff_p_list, diff_s_list = [], []
 
@@ -201,20 +229,18 @@ def power_criterion_corr():
 
         diff_s_list.append(diff)
 
-    for p in diff_p_list:
-        for s in diff_s_list:
+    for p in diff_p_list: # loop over the power difference
+        for s in diff_s_list: # loop over the criterion and dprime difference
 
             print(scipy.stats.pearsonr(s, p))
 
             fig = sns.regplot(s, p)
+            
+            os.chdir(r"D:\expecon_ms\figs\brain_behavior")
 
             fig.figure.savefig(f'{keys}_.svg')
 
             plt.show()
-
-
-
-
 
     return df
 

@@ -29,7 +29,7 @@
 # somatosensory detection task? Does the low-level previous choice prior interact with the top-down
 # prior?
 
-# written by Carina Forster
+# written by Carina Forster (2023)
 
 # please report bugs:
 
@@ -48,6 +48,7 @@ library(lmerTest) # pvalues for lmer models
 # load brain behavior dataframe that contains single trial power in spec. frequency bands in sensor space
 
 power = read.csv('D:\\expecon\\data\\behav_brain\\power_per_trial_alpha_beta_sensor_laplace.csv')
+# TODO SIMON COMMENT: "I would suggest to use relative paths, assuming you start from the root of the repo."
 
 # add variables for later analysis before data cleaning
 
@@ -139,3 +140,4 @@ if (check == 1){
 # remove unnecessary variables 
 
 write.csv(power_copy, 'D:\\expecon\\data\\behav_brain\\behav_brain_expecon_sensor_laplace.csv')
+# TODO SIMON COMMENT: "Same as above."

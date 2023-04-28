@@ -1,27 +1,32 @@
-# Plot behavioral data expecon study
-# 
-# last update: 06.02.2023
-#
-# this script produces data for Figure 1 Part II and III
-# 
-# written by Carina Forster 
-# please report bugs: forster@cbs.mpg.de
+# !/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Plot behavioral data of expecon study
+
+This script produces data for Figure 1 Part II and III.
+
+please report bugs to:
+
+Author:  Carina Forster
+Contact: forster@cbs.mpg.de
+Years:   Feb 06, 2023
+"""
 
 # TODO:
+#  - change colors for congruency and accuracy plots
 
-# - change colors for congruency and accuracy plots
-
-import numpy as np
+# %% Import
+import numpy as np  # TODO SIMON COMMENT: numpy is not used
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import seaborn as sns
 import scipy.stats as stats
 
-# Set the color palette for seaborn
-sns.color_palette("colorblind")[9]
+# %% Set global vars & paths  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # Set the paths for the behavioral data and the save path
+<<<<<<< HEAD
 behavpath = 'D:\\expecon_ms\\data\\behav'
 savepath = 'D:\\expecon_ms\\figs\\behavior'
 
@@ -61,684 +66,743 @@ data = data.drop(data[data.trial == 1].index)
 
 os.chdir(behavpath)
 data.to_csv("clean_bb.csv")
+=======
+behavpath = r'D:\expecon\data\behav_brain'
+savepath = r'D:\expecon_ms\figs\behavior'
+# TODO SIMON COMMENT: "preferably use relative paths, such that code can be run on other machines, too."
+#  Moreover you could use Pathlib to make usable on all OSs '\' is windows only
 
-# Get the number of unique participants
-n_subs = len(data.ID.unique())
+# Set the color palette for seaborn
+sns.color_palette("colorblind")[9]
 
-# Prepare the data for hitrate calculation
+# %% Functions  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+pass
 
-signal = data[data.isyes == 1]
-signal_grouped = signal.groupby(['ID', 'cue']).mean()['sayyes']
-signal_grouped.head()
+# %% __main__ o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-# now we plot the hitrate per participant between conditions: boxplot and single subject data points
+if __name__ == "__main__":
 
-# Define colors for the plot
-blue = '#2a95ffff'
-pink = '#ff2a2aff'
-colors = [blue, pink]
-medcolor = ['black','black']
+    # Load the behavioral data from the specified path
+    data = []
+    for root, dirs, files in os.walk(behavpath):
+        for name in files:
+            if 'behav_brain_expecon_sensor_laplace.csv' in name:
+                data = pd.read_csv(os.path.join(root, name))
 
-# Get the lower and upper quartile values for the signal
-low_condition = signal_grouped.unstack()[0.25].reset_index()
-high_condition = signal_grouped.unstack()[0.75].reset_index()
+    df = pd.read_csv(os.path.join(root, 'behav_brain_expecon_sensor_laplace.csv'))
 
-# Create a figure and set the limits and labels for x and y axis
-fig, ax = plt.subplots()
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    # Clean up the dataframe by dropping unneeded columns
+    columns_to_drop = ["Unnamed: 0", 'X.1', 'X', 'Unnamed..0', 'Unnamed..0.1',
+                       'Unnamed..0.2', 'Unnamed..0.3', 'alpha_trial', 'beta_trial',
+                       'beta_scale_log', 'alpha_scale_log']
+    data_clean = df.drop(columns_to_drop, axis=1)
+    data = data_clean
 
-ax.set_xlim(0.5, 2.5)
-ax.set_xticks([1, 2])
-ax.set_xticklabels(['Low', 'High'])
+    # Change the block number for participant 7's block 3
+    data.loc[(144 * 2):(144 * 3), 'block'] = 4
 
-ax.set_ylim(0, 1)
-ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
-ax.set_yticklabels(['0', '.25', '0.5', '0.75', '1'], fontsize=12)
+    # Drop participants 40 and 45
+    data = data.drop(data[data.ID == 40].index)
+    data = data.drop(data[data.ID == 45].index)
 
-# Plot the box plot for both conditions
-confbox = ax.boxplot([low_condition.iloc[:,1], high_condition.iloc[:,1]], patch_artist=True)
+    # Remove blocks with hitrates < 0.2 or > 0.8
+    data = data.drop(data[((data.ID == 10) & (data.block == 6))].index)
+    data = data.drop(data[((data.ID == 12) & (data.block == 6))].index)
+    data = data.drop(data[((data.ID == 26) & (data.block == 4))].index)
+    data = data.drop(data[((data.ID == 30) & (data.block == 3))].index)
+    data = data.drop(data[((data.ID == 32) & (data.block == 2))].index)
+    data = data.drop(data[((data.ID == 32) & (data.block == 3))].index)
+    data = data.drop(data[((data.ID == 39) & (data.block == 3))].index)
 
-# Plot individual data points 
-for index in range(len(low_condition)):
-    ax.plot(1, low_condition.iloc[index,1],
-            marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
-    ax.plot(2, high_condition.iloc[index,1],
-            marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
-    ax.plot([1, 2], [low_condition.iloc[index,1], high_condition.iloc[index,1]],
-            marker='', markersize=0, color='gray', alpha=.25)
+    data.to_csv("clean_bb.csv")
 
-# Set the face color and alpha for the boxes in the plot
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
+    # Get the number of unique participants
+    n_subs = len(data.ID.unique())
 
-# Set the color for the medians in the plot
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
+    # Prepare the data for hitrate calculation
 
-# Set the x axis labels
-ax.set_xticks([1, 2])
-ax.set_xticklabels(['Low', 'High'], fontsize=14)
-ax.set_ylabel('Hit rate', fontsize=14)
+    signal = data[data.isyes == 1]
+    signal_grouped = signal.groupby(['ID', 'cue']).mean()['sayyes']
+    signal_grouped.head()
 
-# Save the figure
-fig.savefig(savepath + "\hitrate.svg", bbox_inches='tight', format='svg')
-plt.show()
+    # now we plot the hit rate per participant between conditions: boxplot and single subject data points
 
-# Violinplot ? 
+    # Define colors for the plot
+    blue = '#2a95ffff'
+    pink = '#ff2a2aff'
+    colors = [blue, pink]
+    medcolor = ['black', 'black']
 
-# Define colors for the plot
-blue = '#2a95ffff'
-pink = '#ff2a2aff'
-alpha = 0.5
-colors = [blue, pink]
-medcolor = ['black','black']
+    # Get the lower and upper quartile values for the signal
+    low_condition = signal_grouped.unstack()[0.25].reset_index()
+    high_condition = signal_grouped.unstack()[0.75].reset_index()
 
-# Plot the violin plot
-sns.violinplot(data=[low_condition.iloc[:,1], high_condition.iloc[:,1]], palette=colors)
+    # Create a figure and set the limits and labels for x and y axis
+    fig, ax = plt.subplots()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
-# Set the y-axis limit and ticks
-plt.ylim(0,1)
-plt.yticks([0,.25,.5,.75,1], ['0','.25','0.5','0.75','1'], fontsize=12)
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'])
 
-# Set the x and y axis labels
-plt.xlabel('Condition', fontsize=14)
-plt.ylabel('Hit rate', fontsize=14)
+    ax.set_ylim(0, 1)
+    ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
+    ax.set_yticklabels(['0', '.25', '0.5', '0.75', '1'], fontsize=12)
 
-# Save the plot
-plt.savefig(savepath + "\\violin_hitrate.svg", bbox_inches='tight', format='svg')
-plt.show()
+    # Plot the box plot for both conditions
+    confbox = ax.boxplot([low_condition.iloc[:, 1], high_condition.iloc[:, 1]], patch_artist=True)
 
-# sign. difference in hitrates ? 
+    # Plot individual data points
+    for index in range(len(low_condition)):
+        ax.plot(1, low_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, high_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [low_condition.iloc[index, 1], high_condition.iloc[index, 1]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
-# non parametric
+    # Set the face color and alpha for the boxes in the plot
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-t,p = stats.wilcoxon(low_condition.iloc[:,1], high_condition.iloc[:,1])
+    # Set the color for the medians in the plot
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
 
-print('hitrate diff significant? p_value (non parametric): ' + str(p))
+    # Set the x axis labels
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'], fontsize=14)
+    ax.set_ylabel('Hit rate', fontsize=14)
+>>>>>>> 29ccb096e09ed083deab3c1ebe0ace54ea043e49
 
-# Check false alarm rate
+    # Save the figure
+    fig.savefig(os.path.join(savepath, "hitrate.svg"), bbox_inches='tight', format='svg')
+    plt.show()
 
-#Prepare data
+    # Violinplot ?
 
-noise = data[data.isyes==0]
-noise_grouped = noise.groupby(['ID', 'cue']).mean()['sayyes']
-noise_grouped.head()
+    # Define colors for the plot
+    blue = '#2a95ffff'
+    pink = '#ff2a2aff'
+    alpha = 0.5
+    colors = [blue, pink]
+    medcolor = ['black', 'black']
 
-blue= '#2a95ffff'
-pink = '#ff2a2aff'
-alpha = 0.5
-colors = [blue, pink]
-medcolor = ['black','black']
-#fontsize
-fs=12
+    # Plot the violin plot
+    sns.violinplot(data=[low_condition.iloc[:, 1], high_condition.iloc[:, 1]], palette=colors)
 
-low_condition = noise_grouped.unstack()[0.25].reset_index()
-high_condition = noise_grouped.unstack()[0.75].reset_index()
+    # Set the y-axis limit and ticks
+    plt.ylim(0, 1)
+    plt.yticks([0, .25, .5, .75, 1], ['0', '.25', '0.5', '0.75', '1'], fontsize=12)
 
-fig,ax = plt.subplots()
+    # Set the x and y axis labels
+    plt.xlabel('Condition', fontsize=14)
+    plt.ylabel('Hit rate', fontsize=14)
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    # Save the plot
+    plt.savefig(savepath + "\\violin_hitrate.svg", bbox_inches='tight', format='svg')
+    # TODO SIMON COMMENT: "use os.path.join instead of \\, otherwise it will not work on linux or mac"
+    plt.show()
 
-ax.set_xlim(0.5,2.5)
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Low','High'])
+    # sign. difference in hit rates ?
 
-ax.set_ylim(0,0.6)
-ax.set_yticks([0, 0.25, .5])
-ax.set_yticklabels(['0', '.25', '0.5'],fontsize=12)
+    # non parametric
 
-confbox = ax.boxplot([low_condition.iloc[:,1],high_condition.iloc[:,1]],
-                    patch_artist=True)
+    t, p = stats.wilcoxon(low_condition.iloc[:, 1], high_condition.iloc[:, 1])
 
-for index in range(len(low_condition)):
-    ax.plot(1,low_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0],alpha=alpha)
-    ax.plot(2,high_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=alpha)
-    ax.plot([1,2],[low_condition.iloc[index,1],high_condition.iloc[index,1]],
-           marker='',markersize=0,color='gray',alpha=alpha/2)
-    
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(alpha)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Low','High'],fontsize=fs)
-ax.set_ylabel('False alarm rate', fontsize=fs)
+    print('hitrate diff significant? p_value (non parametric): ' + str(p))
 
-fig.savefig(savepath + "\FArate.svg", bbox_inches='tight', format='svg')
+    # Check false alarm rate
 
-# sign. difference in farates ? 
+    # Prepare data
 
-# non parametric
-t,p = stats.wilcoxon(low_condition.iloc[:,1], high_condition.iloc[:,1])
+    noise = data[data.isyes == 0]
+    noise_grouped = noise.groupby(['ID', 'cue']).mean()['sayyes']
+    noise_grouped.head()
 
-print('farate diff significant? p_value (non parametric): ' + str(p))
+    blue = '#2a95ffff'
+    pink = '#ff2a2aff'
+    alpha = 0.5
+    colors = [blue, pink]
+    medcolor = ['black', 'black']
+    # fontsize
+    fs = 12
 
-# Now we plot SDT parameters
+    low_condition = noise_grouped.unstack()[0.25].reset_index()
+    high_condition = noise_grouped.unstack()[0.75].reset_index()
 
-# calculate SDT from hitrates and FA rates
+    fig, ax = plt.subplots()
 
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'])
+
+    ax.set_ylim(0, 0.6)
+    ax.set_yticks([0, 0.25, .5])
+    ax.set_yticklabels(['0', '.25', '0.5'], fontsize=12)
+
+    confbox = ax.boxplot([low_condition.iloc[:, 1], high_condition.iloc[:, 1]],
+                         patch_artist=True)
+
+    for index in range(len(low_condition)):
+        ax.plot(1, low_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=alpha)
+        ax.plot(2, high_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=alpha)
+        ax.plot([1, 2], [low_condition.iloc[index, 1], high_condition.iloc[index, 1]],
+                marker='', markersize=0, color='gray', alpha=alpha / 2)
+
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(alpha)
+
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
+
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'], fontsize=fs)
+    ax.set_ylabel('False alarm rate', fontsize=fs)
+
+    fig.savefig(os.path.join(savepath, "FArate.svg"), bbox_inches='tight', format='svg')
+
+    # sign. difference in FA rates ?
+
+    # non parametric
+    t, p = stats.wilcoxon(low_condition.iloc[:, 1], high_condition.iloc[:, 1])
+
+    print('farate diff significant? p_value (non parametric): ' + str(p))
+
+    # Now we plot SDT parameters
+
+    # calculate SDT from hit rates and FA rates
+
+    hitrate_low = signal_grouped.unstack()[0.25]
+    farate_low = noise_grouped.unstack()[0.25]
+
+    d_prime_low = [stats.norm.ppf(h) - stats.norm.ppf(f) for h, f in zip(hitrate_low, farate_low)]
+    criterion_low = [-0.5 * (stats.norm.ppf(h) + stats.norm.ppf(f)) for h, f in zip(hitrate_low, farate_low)]
+
+    hitrate_high = signal_grouped.unstack()[0.75]
+    farate_high = noise_grouped.unstack()[0.75]
+
+    d_prime_high = [stats.norm.ppf(h) - stats.norm.ppf(f) for h, f in zip(hitrate_high, farate_high)]
+    criterion_high = [-0.5 * (stats.norm.ppf(h) + stats.norm.ppf(f)) for h, f in zip(hitrate_high, farate_high)]
+
+    # ### plot the criterion
+
+    fig, ax = plt.subplots()
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'])
+
+<<<<<<< HEAD
 # ### plot the criterion
+=======
+    # ax.set_ylim(0,1)
+    ax.set_yticks([-0.5, 0, .5, 1, 1.5])
+    ax.set_yticklabels(['-0.5', '0.0', '.5', '1.0', '1.5'], fontsize=12)
 
-fig,ax = plt.subplots()
+    confbox = ax.boxplot([criterion_low, criterion_high],
+                         patch_artist=True)
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    for index in range(len(criterion_low)):
+        ax.plot(1, criterion_low[index],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, criterion_high[index],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [criterion_low[index], criterion_high[index]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-ax.set_xlim(0.5,2.5)
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Low','High'])
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
+>>>>>>> 29ccb096e09ed083deab3c1ebe0ace54ea043e49
 
-#ax.set_ylim(0,1)
-ax.set_yticks([-0.5,0,.5,1,1.5])
-ax.set_yticklabels(['-0.5', '0.0','.5','1.0','1.5'],fontsize=12)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'], fontsize=12)
+    ax.set_ylabel('Criterion', fontsize=12)
 
-confbox = ax.boxplot([criterion_low, criterion_high],
-                    patch_artist=True)
+    fig.savefig(os.path.join(savepath, "criterion.svg"), bbox_inches='tight', format='svg')
 
-for index in range(len(criterion_low)):
-    ax.plot(1,criterion_low[index],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0],alpha=.5)
-    ax.plot(2,criterion_high[index],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=.5)
-    ax.plot([1,2],[criterion_low[index],criterion_high[index]],
-           marker='',markersize=0,color='gray',alpha=.25)
-    
+    # stats
 
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Low','High'],fontsize=12)
-ax.set_ylabel('Criterion', fontsize=12)
+    # sign. difference in c ?
 
-fig.savefig(savepath + "\criterion.svg", bbox_inches='tight', format='svg')
+    # non parametric
+    t, p = stats.wilcoxon(criterion_high, criterion_low)
 
-# stats
+    print('c diff significant? p_value (non parametric): ' + str(p))
 
-# sign. difference in c ? 
+    # now we plot sensitivity (dprime)
 
-# non parametric
-t,p = stats.wilcoxon(criterion_high, criterion_low)
+    fig, ax = plt.subplots()
 
-print('c diff significant? p_value (non parametric): ' + str(p))
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
-# now we plot sensitivity (dprime)
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'])
 
-fig,ax = plt.subplots()
+    ax.set_ylim(0.0, 3.0)
+    ax.set_yticks([0.0, 1.5, 3.0])
+    # ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    confbox = ax.boxplot([d_prime_low, d_prime_high],
+                         patch_artist=True)
 
+    for index in range(len(d_prime_low)):
+        ax.plot(1, d_prime_low[index],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, d_prime_high[index],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [d_prime_low[index], d_prime_high[index]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
-ax.set_xlim(0.5,2.5)
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Low','High'])
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-ax.set_ylim(0.0,3.0)
-ax.set_yticks([0.0,1.5,3.0])
-#ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
 
-confbox = ax.boxplot([d_prime_low,d_prime_high],
-                    patch_artist=True)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'], fontsize=12)
+    ax.set_ylabel('Sensitivity', fontsize=12)
 
+    fig.savefig(os.path.join(savepath, "sensitivity.svg"), bbox_inches='tight', format='svg')
 
-for index in range(len(d_prime_low)):
-    ax.plot(1,d_prime_low[index],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0],alpha=.5)
-    ax.plot(2,d_prime_high[index],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=.5)
-    ax.plot([1,2],[d_prime_low[index],d_prime_high[index]],
-           marker='',markersize=0,color='gray',alpha=.25)
+    # sign. difference in hit rates ?
 
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Low','High'],fontsize=12)
-ax.set_ylabel('Sensitivity', fontsize=12)
+    # non parametric
+    t, p = stats.wilcoxon(d_prime_high, d_prime_low)
 
-fig.savefig(savepath + "\sensitivity.svg", bbox_inches='tight', format='svg')
+    print('d_prime diff significant? p_value (non parametric): ' + str(p))
 
-# sign. difference in hitrates ? 
+    # now we look at confidence ratings
 
-# non parametric
-t,p = stats.wilcoxon(d_prime_high, d_prime_low)
+    data_grouped = data.groupby(['ID', 'cue']).mean()["conf"]
+    data_grouped.head()
 
-print('dprime diff significant? p_value (non parametric): ' + str(p))
+    low_condition = data_grouped.unstack()[0.25].reset_index()
+    high_condition = data_grouped.unstack()[0.75].reset_index()
 
-# now we look at confidence ratings
+    low_condition.head()
 
-data_grouped = data.groupby(['ID', 'cue']).mean()["conf"]
-data_grouped.head()
+    fig, ax = plt.subplots()
 
-low_condition = data_grouped.unstack()[0.25].reset_index()
-high_condition = data_grouped.unstack()[0.75].reset_index()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
-low_condition.head()
+    ax.set_xticklabels(['Low', 'High'])
 
-fig,ax = plt.subplots()
+    ax.set_ylim(0, 1)
+    ax.set_yticks([0, .5, 1])
+    ax.set_yticklabels(['0.0', '.5', '1.0'], fontsize=12)
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    confbox = ax.boxplot([low_condition.iloc[:, 1], high_condition.iloc[:, 1]],
+                         patch_artist=True)
 
+    for index in range(len(low_condition)):
+        ax.plot(1, low_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, high_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [low_condition.iloc[index, 1], high_condition.iloc[index, 1]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
-ax.set_xticklabels(['Low','High'])
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-ax.set_ylim(0,1)
-ax.set_yticks([0,.5,1])
-ax.set_yticklabels(['0.0', '.5','1.0'],fontsize=12)
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
 
-confbox = ax.boxplot([low_condition.iloc[:,1],high_condition.iloc[:,1]],
-                    patch_artist=True)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'], fontsize=12)
+    ax.set_ylabel('mean confidence', fontsize=12)
 
-for index in range(len(low_condition)):
-    ax.plot(1,low_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0],alpha=.5)
-    ax.plot(2,high_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=.5)
-    ax.plot([1,2],[low_condition.iloc[index,1],high_condition.iloc[index,1]],
-           marker='',markersize=0,color='gray',alpha=.25)
+    fig.savefig(os.path.join(savepath, "confidence_cue.svg"), bbox_inches='tight', format='svg')
 
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Low','High'],fontsize=12)
-ax.set_ylabel('mean confidence', fontsize=12)
+    # non parametric
 
-fig.savefig(savepath + "\confidence_cue.svg", bbox_inches='tight', format='svg')
+    t, p = stats.wilcoxon(low_condition.iloc[:, 1], high_condition.iloc[:, 1])
 
-# non parametric
+    print('confidence cue diff significant? p_value (non parametric): ' + str(p))
 
-t,p = stats.wilcoxon(low_condition.iloc[:,1], high_condition.iloc[:,1])
+    # ### now we look at congruency effects on confidence
 
-print('confidence cue diff significant? p_value (non parametric): ' + str(p))
+    data['congruency'] = ((data.cue == 0.25) & (data.sayyes == 0) | (data.cue == 0.75) & (data.sayyes == 1))
 
-# ### now we look at congruency effects on confidence
+    data_grouped = data.groupby(['ID', 'congruency']).mean()['conf']
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
 
-data['congruency'] = ((data.cue == 0.25) & (data.sayyes == 0) | (data.cue == 0.75) & (data.sayyes == 1))
+    green = '#2aff95'
+    purple = '#2a2aff'
 
-data_grouped = data.groupby(['ID', 'congruency']).mean()['conf']
-con_condition = data_grouped.unstack()[1].reset_index()
-incon_condition = data_grouped.unstack()[0].reset_index()
+    colors = [purple, green]
 
-green = '#2aff95'
-purple = '#2a2aff'
+    fig, ax = plt.subplots()
 
-colors = [purple, green]
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
+    orange = (0.8352941176470589, 0.3686274509803922, 0.0)
+    blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
 
-fig,ax = plt.subplots()
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Congruent', 'Incongruent'])
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    ax.set_ylim(0, 1)
+    ax.set_yticks([0, 0.5, 1.0])
+    # ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
 
-orange = (0.8352941176470589, 0.3686274509803922, 0.0)
-blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
+    confbox = ax.boxplot([con_condition.iloc[:, 1], incon_condition.iloc[:, 1]],
+                         patch_artist=True)
 
-ax.set_xlim(0.5,2.5)
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Congruent','Incongruent'])
+    for index in range(len(con_condition)):
+        ax.plot(1, con_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, incon_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [con_condition.iloc[index, 1], incon_condition.iloc[index, 1]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
-ax.set_ylim(0,1)
-ax.set_yticks([0,0.5,1.0])
-#ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-confbox = ax.boxplot([con_condition.iloc[:,1],incon_condition.iloc[:,1]],
-                    patch_artist=True)
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
 
-for index in range(len(con_condition)):
-    ax.plot(1,con_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0], alpha=.5)
-    ax.plot(2,incon_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=.5)
-    ax.plot([1,2],[con_condition.iloc[index,1],incon_condition.iloc[index,1]],
-           marker='',markersize=0,color='gray',alpha=.25)
-    
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Congruent', 'Incongruent'], fontsize=12)
+    ax.set_ylabel('Mean confidence', fontsize=12)
 
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Congruent','Incongruent'],fontsize=12)
-ax.set_ylabel('Mean confidence', fontsize=12)
+    fig.savefig(os.path.join(savepath, "confidence_congruency.svg"), bbox_inches='tight', format='svg')
 
-fig.savefig(savepath + "\confidence_congruency.svg", bbox_inches='tight', format='svg')
+    t, p = stats.wilcoxon(con_condition.iloc[:, 1], incon_condition.iloc[:, 1])
 
-t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+    print('confidence congruency diff significant? p_value (non parametric): ' + str(p))
 
-print('confidence congruency diff significant? p_value (non parametric): ' + str(p))
+    # Finally let's check overall accuraccy
 
-# Finally let's check overall accuraccy
+    data['correct'] = ((data.isyes == 1) & (data.sayyes == 1) | (data.isyes == 0) & (data.sayyes == 0))
 
-data['correct'] = ((data.isyes == 1) & (data.sayyes == 1) | (data.isyes == 0) & (data.sayyes == 0))
+    data.head()
 
-data.head()
+    data_grouped = data.groupby(['ID', 'cue']).mean()['correct']
 
-data_grouped = data.groupby(['ID', 'cue']).mean()['correct']
+    data_grouped
+    # TODO SIMON COMMENT: "this should have no effect -> print(data_grouped)?!"
 
-data_grouped
+    con_condition = data_grouped.unstack()[0.25].reset_index()
+    incon_condition = data_grouped.unstack()[0.75].reset_index()
 
-con_condition = data_grouped.unstack()[0.25].reset_index()
-incon_condition = data_grouped.unstack()[0.75].reset_index()
+    con_condition
+    # TODO SIMON COMMENT: "same as above"
 
-con_condition
+    green = '#2aff95'
+    purple = '#2a2aff'
 
-green = '#2aff95'
-purple = '#2a2aff'
+    colors = [purple, green]
 
-colors = [purple, green]
+    fig, ax = plt.subplots()
 
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
-fig,ax = plt.subplots()
+    orange = (0.8352941176470589, 0.3686274509803922, 0.0)
+    blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(["Low", 'High'])
 
-orange = (0.8352941176470589, 0.3686274509803922, 0.0)
-blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
+    ax.set_ylim(0.5, 1)
+    ax.set_yticks([0.5, 0.75, 1])
+    # ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
 
-ax.set_xlim(0.5,2.5)
-ax.set_xticks([1,2])
-ax.set_xticklabels(["Low",'High'])
+    confbox = ax.boxplot([con_condition.iloc[:, 1], incon_condition.iloc[:, 1]],
+                         patch_artist=True)
 
-ax.set_ylim(0.5,1)
-ax.set_yticks([0.5,0.75, 1])
-#ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
+    for index in range(len(con_condition)):
+        ax.plot(1, con_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, incon_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [con_condition.iloc[index, 1], incon_condition.iloc[index, 1]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
-confbox = ax.boxplot([con_condition.iloc[:,1],incon_condition.iloc[:,1]],
-                    patch_artist=True)
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-for index in range(len(con_condition)):
-    ax.plot(1,con_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0], alpha=.5)
-    ax.plot(2,incon_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=.5)
-    ax.plot([1,2],[con_condition.iloc[index,1],incon_condition.iloc[index,1]],
-           marker='',markersize=0,color='gray',alpha=.25)
-    
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Low','High'],fontsize=12)
-ax.set_ylabel('Mean correct', fontsize=12)
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
 
-fig.savefig(savepath + "\cue_correct.svg", bbox_inches='tight', format='svg')
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'], fontsize=12)
+    ax.set_ylabel('Mean correct', fontsize=12)
 
-t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+    fig.savefig(os.path.join(savepath, "cue_correct.svg"), bbox_inches='tight', format='svg')
 
-print('accuracy cue diff significant? p_value (non parametric): ' + str(p))
+    t, p = stats.wilcoxon(con_condition.iloc[:, 1], incon_condition.iloc[:, 1])
 
-# accuraccy depending on congruency?
+    print('accuracy cue diff significant? p_value (non parametric): ' + str(p))
 
-data_grouped = data.groupby(['ID', 'congruency']).mean()['correct']
+    # accuracy depending on congruency?
 
-con_condition = data_grouped.unstack()[1].reset_index()
-incon_condition = data_grouped.unstack()[0].reset_index()
+    data_grouped = data.groupby(['ID', 'congruency']).mean()['correct']
 
-green = '#2aff95'
-purple = '#2a2aff'
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
 
-colors = [purple, green]
+    green = '#2aff95'
+    purple = '#2a2aff'
 
+    colors = [purple, green]
 
-fig,ax = plt.subplots()
+    fig, ax = plt.subplots()
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
-orange = (0.8352941176470589, 0.3686274509803922, 0.0)
-blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
+    orange = (0.8352941176470589, 0.3686274509803922, 0.0)
+    blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
 
-ax.set_xlim(0.5,2.5)
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Congruent','Incongruent'])
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Congruent', 'Incongruent'])
 
-ax.set_ylim(0.4,1)
-ax.set_yticks([0.5, 0.75, 1.0])
-ax.set_yticklabels(['.5','0.75','1'],fontsize=12)
+    ax.set_ylim(0.4, 1)
+    ax.set_yticks([0.5, 0.75, 1.0])
+    ax.set_yticklabels(['.5', '0.75', '1'], fontsize=12)
 
-confbox = ax.boxplot([con_condition.iloc[:,1],incon_condition.iloc[:,1]],
-                    patch_artist=True)
+    confbox = ax.boxplot([con_condition.iloc[:, 1], incon_condition.iloc[:, 1]],
+                         patch_artist=True)
 
-for index in range(len(con_condition)):
-    ax.plot(1,con_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0], alpha=.5)
-    ax.plot(2,incon_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=.5)
-    ax.plot([1,2],[con_condition.iloc[index,1],incon_condition.iloc[index,1]],
-           marker='',markersize=0,color='gray',alpha=.25)
-    
+    for index in range(len(con_condition)):
+        ax.plot(1, con_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, incon_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [con_condition.iloc[index, 1], incon_condition.iloc[index, 1]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Congruent','Incongruent'],fontsize=12)
-ax.set_ylabel('Mean correct', fontsize=12)
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-fig.savefig(savepath + "\correct_congruency.svg", bbox_inches='tight', format='svg')
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
 
-# non parametric
-t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Congruent', 'Incongruent'], fontsize=12)
+    ax.set_ylabel('Mean correct', fontsize=12)
 
-print('accuracy congruency diff significant? p_value (non parametric): ' + str(p))
+    fig.savefig(os.path.join(savepath, "correct_congruency.svg"), bbox_inches='tight', format='svg')
 
-# reaction times 
+    # non parametric
+    t, p = stats.wilcoxon(con_condition.iloc[:, 1], incon_condition.iloc[:, 1])
 
-data_grouped = data.groupby(['ID', 'cue']).mean()['respt1']
+    print('accuracy congruency diff significant? p_value (non parametric): ' + str(p))
 
-data_grouped
+    # reaction times
 
-con_condition = data_grouped.unstack()[0.25].reset_index()
-incon_condition = data_grouped.unstack()[0.75].reset_index()
+    data_grouped = data.groupby(['ID', 'cue']).mean()['respt1']
 
-con_condition
+    data_grouped
+    # TODO SIMON COMMENT: "this should have no effect -> print(data_grouped)?!"
 
-green = '#2aff95'
-purple = '#2a2aff'
+    con_condition = data_grouped.unstack()[0.25].reset_index()
+    incon_condition = data_grouped.unstack()[0.75].reset_index()
 
-colors = [purple, green]
+    con_condition
+    # TODO SIMON COMMENT: "same as above"
 
+    green = '#2aff95'
+    purple = '#2a2aff'
 
-fig,ax = plt.subplots()
+    colors = [purple, green]
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    fig, ax = plt.subplots()
 
-orange = (0.8352941176470589, 0.3686274509803922, 0.0)
-blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
-ax.set_xlim(0.5,2.5)
-ax.set_xticks([1,2])
-ax.set_xticklabels(["Low",'High'])
+    orange = (0.8352941176470589, 0.3686274509803922, 0.0)
+    blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
 
-#ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(["Low", 'High'])
 
-confbox = ax.boxplot([con_condition.iloc[:,1],incon_condition.iloc[:,1]],
-                    patch_artist=True)
+    # ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
 
-for index in range(len(con_condition)):
-    ax.plot(1,con_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0], alpha=.5)
-    ax.plot(2,incon_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=.5)
-    ax.plot([1,2],[con_condition.iloc[index,1],incon_condition.iloc[index,1]],
-           marker='',markersize=0,color='gray',alpha=.25)
-    
+    confbox = ax.boxplot([con_condition.iloc[:, 1], incon_condition.iloc[:, 1]],
+                         patch_artist=True)
 
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Low','High'],fontsize=12)
-ax.set_ylabel('Reaction times detection', fontsize=12)
+    for index in range(len(con_condition)):
+        ax.plot(1, con_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, incon_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [con_condition.iloc[index, 1], incon_condition.iloc[index, 1]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
-fig.savefig(savepath + "\cue_rt1.svg", bbox_inches='tight', format='svg')
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-# non parametric
-t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
 
-print('reaction time cue diff significant? p_value (non parametric): ' + str(p))
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Low', 'High'], fontsize=12)
+    ax.set_ylabel('Reaction times detection', fontsize=12)
 
-# congruency on rts
+    fig.savefig(os.path.join(savepath, "cue_rt1.svg"), bbox_inches='tight', format='svg')
 
-data_grouped = data.groupby(['ID', 'congruency']).mean()['respt1']
+    # non parametric
+    t, p = stats.wilcoxon(con_condition.iloc[:, 1], incon_condition.iloc[:, 1])
 
-data_grouped
+    print('reaction time cue diff significant? p_value (non parametric): ' + str(p))
 
-con_condition = data_grouped.unstack()[1].reset_index()
-incon_condition = data_grouped.unstack()[0].reset_index()
+    # congruency on rts
 
-con_condition
+    data_grouped = data.groupby(['ID', 'congruency']).mean()['respt1']
 
-green = '#2aff95'
-purple = '#2a2aff'
+    data_grouped
+    # TODO SIMON COMMENT: "this should have no effect -> print(data_grouped)?!"
 
-colors = [purple, green]
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
 
+    con_condition
+    # TODO SIMON COMMENT: "same as above"
 
-fig,ax = plt.subplots()
+    green = '#2aff95'
+    purple = '#2a2aff'
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    colors = [purple, green]
 
-orange = (0.8352941176470589, 0.3686274509803922, 0.0)
-blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
+    fig, ax = plt.subplots()
 
-ax.set_xlim(0.5,2.5)
-ax.set_xticks([1,2])
-ax.set_xticklabels(["Low",'High'])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
+    orange = (0.8352941176470589, 0.3686274509803922, 0.0)
+    blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
 
-#ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(["Low", 'High'])
 
-confbox = ax.boxplot([con_condition.iloc[:,1],incon_condition.iloc[:,1]],
-                    patch_artist=True)
+    # ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
 
-for index in range(len(con_condition)):
-    ax.plot(1,con_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0], alpha=.5)
-    ax.plot(2,incon_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=.5)
-    ax.plot([1,2],[con_condition.iloc[index,1],incon_condition.iloc[index,1]],
-           marker='',markersize=0,color='gray',alpha=.25)
-    
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Congruent','Incongruent'],fontsize=12)
-ax.set_ylabel('Reaction times detection', fontsize=12)
+    confbox = ax.boxplot([con_condition.iloc[:, 1], incon_condition.iloc[:, 1]],
+                         patch_artist=True)
 
-fig.savefig(savepath + "\cue_rt1.svg", bbox_inches='tight', format='svg')
+    for index in range(len(con_condition)):
+        ax.plot(1, con_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, incon_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [con_condition.iloc[index, 1], incon_condition.iloc[index, 1]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
-# non parametric
-t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-print('reaction time congruency diff significant? p_value (non parametric): ' + str(p))
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
 
-# accuraccy on rts
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Congruent', 'Incongruent'], fontsize=12)
+    ax.set_ylabel('Reaction times detection', fontsize=12)
 
-data_grouped = data.groupby(['ID', 'correct']).mean()['respt1']
+    fig.savefig(os.path.join(savepath, "cue_rt1.svg"), bbox_inches='tight', format='svg')
 
-data_grouped
+    # non parametric
+    t, p = stats.wilcoxon(con_condition.iloc[:, 1], incon_condition.iloc[:, 1])
 
-con_condition = data_grouped.unstack()[1].reset_index()
-incon_condition = data_grouped.unstack()[0].reset_index()
+    print('reaction time congruency diff significant? p_value (non parametric): ' + str(p))
 
-con_condition
+    # accuracy on rts
 
-green = '#2aff95'
-purple = '#2a2aff'
+    data_grouped = data.groupby(['ID', 'correct']).mean()['respt1']
 
-colors = [purple, green]
+    data_grouped
+    # TODO SIMON COMMENT: "this should have no effect -> print(data_grouped)?!"
 
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
 
-fig,ax = plt.subplots()
+    con_condition
+    # TODO SIMON COMMENT: "same as above"
 
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
+    green = '#2aff95'
+    purple = '#2a2aff'
 
-orange = (0.8352941176470589, 0.3686274509803922, 0.0)
-blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
+    colors = [purple, green]
 
-ax.set_xlim(0.5,2.5)
-ax.set_xticks([1,2])
-ax.set_xticklabels(["Low",'High'])
+    fig, ax = plt.subplots()
 
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
-#ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
+    orange = (0.8352941176470589, 0.3686274509803922, 0.0)
+    blue = (0.33725490196078434, 0.7058823529411765, 0.9137254901960784)
 
-confbox = ax.boxplot([con_condition.iloc[:,1],incon_condition.iloc[:,1]],
-                    patch_artist=True)
+    ax.set_xlim(0.5, 2.5)
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(["Low", 'High'])
 
-for index in range(len(con_condition)):
-    ax.plot(1,con_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[0],markeredgecolor=colors[0], alpha=.5)
-    ax.plot(2,incon_condition.iloc[index,1],
-           marker='o',markersize=8,color=colors[1],markeredgecolor=colors[1],alpha=.5)
-    ax.plot([1,2],[con_condition.iloc[index,1],incon_condition.iloc[index,1]],
-           marker='',markersize=0,color='gray',alpha=.25)
-    
+    # ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
 
-for patch, color in zip(confbox['boxes'], colors):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.5)
-    
-for patch, color in zip(confbox['medians'], medcolor):
-    patch.set_color(color)
-    
-ax.set_xticks([1,2])
-ax.set_xticklabels(['Correct','Incorrect'],fontsize=12)
-ax.set_ylabel('Reaction times detection', fontsize=12)
+    confbox = ax.boxplot([con_condition.iloc[:, 1], incon_condition.iloc[:, 1]],
+                         patch_artist=True)
 
-fig.savefig(savepath + "\correct_rt1.svg", bbox_inches='tight', format='svg')
+    for index in range(len(con_condition)):
+        ax.plot(1, con_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=.5)
+        ax.plot(2, incon_condition.iloc[index, 1],
+                marker='o', markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=.5)
+        ax.plot([1, 2], [con_condition.iloc[index, 1], incon_condition.iloc[index, 1]],
+                marker='', markersize=0, color='gray', alpha=.25)
 
-# non parametric
-t,p = stats.wilcoxon(con_condition.iloc[:,1], incon_condition.iloc[:,1])
+    for patch, color in zip(confbox['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.5)
 
-print('reaction time accuracy diff significant? p_value (non parametric): ' + str(p))
+    for patch, color in zip(confbox['medians'], medcolor):
+        patch.set_color(color)
 
+    ax.set_xticks([1, 2])
+    ax.set_xticklabels(['Correct', 'Incorrect'], fontsize=12)
+    ax.set_ylabel('Reaction times detection', fontsize=12)
+
+    fig.savefig(os.path.join(savepath, "correct_rt1.svg"), bbox_inches='tight', format='svg')
+
+    # non parametric
+    t, p = stats.wilcoxon(con_condition.iloc[:, 1], incon_condition.iloc[:, 1])
+
+    print('reaction time accuracy diff significant? p_value (non parametric): ' + str(p))
+
+#  o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END

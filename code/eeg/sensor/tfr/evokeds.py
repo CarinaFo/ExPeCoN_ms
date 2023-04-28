@@ -15,6 +15,7 @@
 import mne
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 import os
 import pandas as pd
 
@@ -23,12 +24,9 @@ plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-se
 
 # set paths
 dir_cleanepochs = r"D:\expecon_ms\data\eeg\prepro_ica\clean_epochs"
-#dir_cleanepochs = r'D:/expecon/data/eeg/epochs_after_ica_cleaning'
-savepath_tfr_morlet = r"D:\expecon_ms\data\eeg\sensor\tfr_morlet"
-savepath_tfr_multitaper = r"D:\expecon_ms\data\eeg\sensor\tfr_morlet"
 
 # save cluster figures as svg and png files
-save_dir_cluster_output = r"D:\expecon_ms\data\eeg\sensor\evokeds_cluster_output"
+save_dir_cluster_output = r"D:\expecon_ms\figs\eeg\sensor\evokeds"
 
 # participant index
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
@@ -36,8 +34,7 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-
-def create_contrast(perm=10000, tmin=-0.5, tmax=0, cond='highlow', cond_a=
+def create_contrast(perm=10000, tmin=0, tmax=0.5, cond='highsignal', cond_a=
                             'high', cond_b='low', laplace=True):
 
     """ this function runs a cluster permutation test over electrodes and timepoints
@@ -62,15 +59,13 @@ def create_contrast(perm=10000, tmin=-0.5, tmax=0, cond='highlow', cond_a=
         # print participant ID
         print('Analyzing ' + subj)
         # skip those participants
-        if subj == '040' or subj == '045':
+        if subj == '040' or subj == '045' or subj == '032':
             continue
 
         # load cleaned epochs
         epochs = mne.read_epochs(f"{dir_cleanepochs}/P{subj}_epochs_after_ica-epo.fif")
 
-        #epochs = mne.read_epochs(f"{dir_cleanepochs}/P{subj}_after_ica-epo.fif")
-
-        # Remove 7 blocks with hitrates < 0.2 or > 0.8
+        # Remove 5 blocks with hitrates < 0.2 or > 0.8
 
         if subj == '010':
             epochs = epochs[epochs.metadata.block != 6]
@@ -80,21 +75,18 @@ def create_contrast(perm=10000, tmin=-0.5, tmax=0, cond='highlow', cond_a=
             epochs = epochs[epochs.metadata.block != 4]
         if subj == '030':
             epochs = epochs[epochs.metadata.block != 3]
-        if subj == '032':
-            epochs = epochs[epochs.metadata.block != 2]
-            epochs = epochs[epochs.metadata.block != 3]
         if subj == '039':
             epochs = epochs[epochs.metadata.block != 3]
         
         # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
         before_rt_removal = len(epochs.metadata)
-
         epochs = epochs[epochs.metadata.respt1 > 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
-        # some weird trigger stuff going on?
+
+        # remove first trial of each block (trigger delays)
         epochs = epochs[epochs.metadata.trial != 1]
         
-        #save n trials per participant
+        #save n_trials per participant
         all_trials.append(len(epochs.metadata))
 
         trials_removed.append(before_rt_removal - len(epochs.metadata))
@@ -124,11 +116,16 @@ def create_contrast(perm=10000, tmin=-0.5, tmax=0, cond='highlow', cond_a=
 
         evokeds_a_all.append(evokeds_a)
         evokeds_b_all.append(evokeds_b)
+        
+        # save trial number and trials removed to csv file
 
-    return evokeds_a_all, evokeds_b_all, all_trials, trials_removed
+        pd.DataFrame(trials_removed).to_csv('trials_removed.csv')
+        pd.DataFrame(all_trials).to_csv('trials_per_subject.csv')
 
-def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all, all_trials, trials_removed, 
-                                 cond_a, cond_b, perm=10000, tmin=-0.5, tmax=0.5, cond='highsignal', laplace=True):
+    return evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b
+
+def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all,
+                                 cond_a, cond_b, perm=10000, tmin=-0.5, tmax=0, cond='highsignal', laplace=True):
 
     # get grand average over all subjects for plotting the results later
 
@@ -166,7 +163,7 @@ def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all, all_trials, trial
     b= cond_b
 
     # configure variables for visualization
-    colors = {a: "crimson", b: 'steelblue'}
+    colors = {a: "#ff2a2aff", b: '#2a95ffff'}
 
     # organize data for plotting
     # instead of grand average we could use the evoked data per subject so that we can plot CIs
@@ -227,6 +224,6 @@ def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all, all_trials, trial
         mne.viz.tight_layout(fig=fig)
         fig.subplots_adjust(bottom=.05)
         os.chdir(save_dir_cluster_output)
-        plt.savefig('cluster' + str(i_clu) + '.svg')
-        plt.savefig('cluster' + str(i_clu) + '.png')
+        plt.savefig('cluster_highnoise_post_' + str(i_clu) + '.svg')
+        plt.savefig('cluster_highnoise_post_' + str(i_clu) + '.png')
         plt.show()
