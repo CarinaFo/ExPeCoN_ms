@@ -1,17 +1,3 @@
-# expecon_ms
-
-<<<<<<< HEAD
-author: Carina Forster
-report bugs: forster@cbs.mpg.de
-
-scripts for the manuscript expecon (Expectation Perception Confidence Neural Correlates)
-behav: behavioral data analysis
-eeg: eeg analysis including preprocessing scripts
-source: source reconstruction using eLoreta and dics beamforming
-=======
-***
->>>>>>> 29ccb096e09ed083deab3c1ebe0ace54ea043e49
-
 Author(s): Carina Forster et al. (2023) <br>
 Status: Code is not yet reviewed
 
