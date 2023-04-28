@@ -40,22 +40,24 @@ data = data_clean
 # Change the block number for participant 7's block 3
 data.loc[(144*2):(144*3), 'block'] = 4
 
-# Drop participants 40 and 45
+# Drop participants 32, 40 and 45
+
+data = data.drop(data[data.ID == 32].index)
 data = data.drop(data[data.ID == 40].index)
 data = data.drop(data[data.ID == 45].index)
+data = data.drop(data[data.ID == 16].index)
 
 # Remove blocks with hitrates < 0.2 or > 0.8
 data = data.drop(data[((data.ID == 10) & (data.block == 6))].index)
 data = data.drop(data[((data.ID == 12) & (data.block == 6))].index)
 data = data.drop(data[((data.ID == 26) & (data.block == 4))].index)
 data = data.drop(data[((data.ID == 30) & (data.block == 3))].index)
-data = data.drop(data[((data.ID == 32) & (data.block == 2))].index)
-data = data.drop(data[((data.ID == 32) & (data.block == 3))].index)
 data = data.drop(data[((data.ID == 39) & (data.block == 3))].index)
 
 # remove no response trials (respt1 == 2.5)
 data = data.drop(data[data.respt1 == 2.5].index)
 data = data.drop(data[data.respt1 < 0.1].index)
+data = data.drop(data[data.trial == 1].index)
 
 os.chdir(behavpath)
 data.to_csv("clean_bb.csv")
@@ -223,7 +225,6 @@ print('farate diff significant? p_value (non parametric): ' + str(p))
 
 # calculate SDT from hitrates and FA rates
 
-v
 # ### plot the criterion
 
 fig,ax = plt.subplots()
