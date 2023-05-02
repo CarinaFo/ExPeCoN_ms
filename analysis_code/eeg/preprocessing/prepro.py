@@ -103,16 +103,22 @@ def concatenate():
                 raw_4 = mne.io.read_raw_brainvision(raw_fname4)
                 raw_5 = mne.io.read_raw_brainvision(raw_fname5)
 
-                events_1, event_dict = mne.events_from_annotations(raw_1, regexp='Stimulus/S  2')
-                events_2, event_dict = mne.events_from_annotations(raw_2, regexp='Stimulus/S  2')
-                events_3, event_dict = mne.events_from_annotations(raw_3, regexp='Stimulus/S  2')
-                events_4, event_dict = mne.events_from_annotations(raw_4, regexp='Stimulus/S  2')
-                events_5, event_dict = mne.events_from_annotations(raw_5, regexp='Stimulus/S  2')
+                events_1, event_dict = mne.events_from_annotations(raw_1,
+                                                                   regexp='Stimulus/S  2')
+                events_2, event_dict = mne.events_from_annotations(raw_2,
+                                                                   regexp='Stimulus/S  2')
+                events_3, event_dict = mne.events_from_annotations(raw_3,
+                                                                   regexp='Stimulus/S  2')
+                events_4, event_dict = mne.events_from_annotations(raw_4,
+                                                                   regexp='Stimulus/S  2')
+                events_5, event_dict = mne.events_from_annotations(raw_5,
+                                                                   regexp='Stimulus/S  2')
 
                 # check if we have 144 trigger per block (trials)
                 # if not I forgot to turn on the EEG recording (or turned it on too late)
 
-            print(len(events_1), len(events_2), len(events_3), len(events_4), len(events_5))
+            print(len(events_1), len(events_2), len(events_3), len(events_4),
+                  len(events_5))
 
             raw = mne.concatenate_raws([raw_1, raw_2, raw_3, raw_4, raw_5])
 
@@ -124,7 +130,7 @@ def concatenate():
 
             print('Participant' + i + 'already analyzed')
 
-def remove_trials(filename='updated_behav.csv'):  
+def remove_trials(filename='raw_behav_data.csv'):  
 
     """this function drops trials from the behavioral data that do not
     have a matching trigger in the EEG recording due to human error
@@ -142,45 +148,30 @@ def remove_trials(filename='updated_behav.csv'):
     # remove trials where I started the EEG recording too late
     # (38 trials in total, 35 trials without Tilmans toe data)
 
-    df.drop(
-        df.index[(df["ID"] == 7) & (df["block"] == 2) & (df["trial"] == 1)],
-        inplace=True)
-    df.drop(
-        df.index[(df["ID"] == 8) & (df["block"] == 3) & (df["trial"] == 1)],
-        inplace=True)
-    df.drop(
-        df.index[(df["ID"] == 9) & (df["block"] == 5) & (df["trial"] == 1)],
-        inplace=True)
-    df.drop(df.index[(df["ID"] == 10) & (df["block"] == 4) & (
-        df["trial"].isin([1, 2, 3, 4, 5]))], inplace=True)
-    df.drop(df.index[(df["ID"] == 12) & (df["block"] == 2) & (
-        df["trial"].isin([1, 2, 3])) | (df["ID"] == 12) &
-                     (df["block"] == 6) & (df["trial"].isin([1, 2]))],
-            inplace=True)
-    df.drop(df.index[(df["ID"] == 16) & (df["block"] == 3) & (
-        df["trial"].isin([1])) | (df["ID"] == 16) &
-                     (df["block"] == 5) & (df["trial"].isin([1, 2]))],
-            inplace=True)
-    df.drop(df.index[(df["ID"] == 18) & (df["block"] == 5) & (
-        df["trial"].isin([1, 2, 3]))], inplace=True)
-    df.drop(df.index[(df["ID"] == 20) & (df["block"] == 3) & (
-        df["trial"].isin([1]))], inplace=True)
-    df.drop(df.index[(df["ID"] == 22) & (df["block"] == 3) & (
-        df["trial"].isin([1, 2, 3]))], inplace=True)
-    df.drop(df.index[(df["ID"] == 24) & (df["block"] == 3) & (
-        df["trial"].isin([1])) | (df["ID"] == 24) &
-                     (df["block"] == 4) & (df["trial"].isin([1, 2, 3, 4])) | (
-                                 df["ID"] == 24) & (
-                             df["block"] == 5) &
-                     (df["trial"].isin([1, 2, 3])) | (df["ID"] == 24) & (
-                                 df["block"] == 6) & (
-                         df["trial"].isin([1]))], inplace=True)
-    df.drop(df.index[(df["ID"] == 28) & (df["block"] == 5) & (
-        df["trial"].isin([1]))], inplace=True)
-    df.drop(df.index[(df["ID"] == 35) & (df["block"] == 2) & (
-        df["trial"].isin([1]))], inplace=True)
-    df.drop(df.index[(df["ID"] == 42) & (df["block"] == 5) & (
-        df["trial"].isin([1]))], inplace=True)
+    # Create a list of tuples to store each condition
+    conditions = [(7, 2, [1]),
+                  (8, 3, [1]),
+                  (9, 5, [1]),
+                  (10, 4, [1, 2, 3, 4, 5]),
+                  (12, 2, [1, 2, 3]),
+                  (12, 6, [1, 2]),
+                  (16, 3, [1]),
+                  (16, 5, [1, 2]),
+                  (18, 5, [1, 2, 3]),
+                  (20, 3, [1]),
+                  (22, 3, [1, 2, 3]),
+                  (24, 3, [1]),
+                  (24, 4, [1, 2, 3, 4]),
+                  (24, 5, [1, 2, 3]),
+                  (24, 6, [1]),
+                  (28, 5, [1]),
+                  (35, 2, [1]),
+                  (42, 5, [1])]
+
+    # Iterate over the list of conditions and drop the rows for each condition
+    for cond in conditions:
+        df.drop(df.index[(df["ID"] == cond[0]) & (df["block"] == cond[1]) &
+                         (df["trial"].isin(cond[2]))], inplace=True)
 
     df.to_csv('behav_cleaned_for_eeg.csv')
 
