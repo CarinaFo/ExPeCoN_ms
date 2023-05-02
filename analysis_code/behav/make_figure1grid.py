@@ -7,68 +7,143 @@ import matplotlib.gridspec as gridspec
 import seaborn as sns
 import numpy as np
 
-# Set up data paths
-behavpath = 'D:\\expecon_ms\\data\\behav'
-savepath = 'D:\\expecon_ms\\figs\\behavior'
 
-# Load data
-data = pd.read_csv(behavpath + '\\clean_bb.csv')
+def prepro_behavioral_data():
 
-# Add a 'congruency' column
-data['congruency'] = ((data.cue == 0.25) & (data.sayyes == 0)) | ...
-((data.cue == 0.75) & (data.sayyes == 1))
+    """ This function preprocesses the behavioral data.
+    It removes participants/blocks with excessively high/low hitrates,
+    removes trials with no response or super fast responses,
+    and removes the first trial from each block (weird trigger behavior).
+    It also adds columns for lagged variables.
+    Returns:
+    data: pandas dataframe containing the preprocessed behavioral data
+    """
+    behavpath = 'D:\\expecon_ms\\data\\behav'
 
-# add lagged variables
-data['lagsayyes'] = data['sayyes'].shift(1)
-data['lagcue'] = data['cue'].shift(1)
-data['lagisyes'] = data['isyes'].shift(1)
-data['lagcorrect'] = data['correct'].shift(1)
+    # Load the behavioral data from the specified path
+    data = []
+    for root, dirs, files in os.walk(behavpath):
+        for name in files:
+            if 'behav_cleaned_for_eeg.csv' in name:
+                data = pd.read_csv(os.path.join(root, name))
 
-# Calculate hit rates by participant and cue condition
-signal = data[data.isyes == 1]
-signal_grouped = signal.groupby(['ID', 'cue']).mean()['sayyes']
+    # Clean up the dataframe by dropping unneeded columns
+    columns_to_drop = ["Unnamed: 0.2", 'Unnamed: 0.1', 'Unnamed: 0']
+    data_clean = data.drop(columns_to_drop, axis=1)
+    data = data_clean
 
-# Calculate noise rates by participant and cue condition
-noise = data[data.isyes == 0]
-noise_grouped = noise.groupby(['ID', 'cue']).mean()['sayyes']
+    # Change the block number for participant 7's block 3
+    data.loc[(144*2):(144*3), 'block'] = 4
 
-# Calculate d prime and criterion scores
-def calc_dprime(hitrate, farate):
-    return stats.norm.ppf(hitrate) - stats.norm.ppf(farate)
+    # Drop participants because of excessively high/low hitrates
+    drop_participants = [16, 32, 40, 45]
+    data = data.drop(data[data.ID.isin(drop_participants)].index)
 
-def calc_criterion(hitrate, farate):
-    return -0.5 * (stats.norm.ppf(hitrate) + stats.norm.ppf(farate))
+    # add a column that indicates correct responses
+    data['correct'] = data.sayyes == data.isyes
+    # Add a 'congruency' column
+    data['congruency'] = ((data.cue == 0.25) & (data.sayyes == 0)) | ((data.cue == 0.75) & (data.sayyes == 1))
 
-hitrate_low = signal_grouped.unstack()[0.25]
-farate_low = noise_grouped.unstack()[0.25]
-d_prime_low = [calc_dprime(h, f) for h, f in zip(hitrate_low, farate_low)]
-criterion_low = [calc_criterion(h, f) for h, f in zip(hitrate_low, farate_low)]
+    # add lagged variables
+    data['prevsayyes'] = data['sayyes'].shift(1)
+    data['prevcue'] = data['cue'].shift(1)
+    data['previsyes'] = data['isyes'].shift(1)
+    data['prevcorrect'] = data['correct'].shift(1)
 
-hitrate_high = signal_grouped.unstack()[0.75]
-farate_high = noise_grouped.unstack()[0.75]
-d_prime_high = [calc_dprime(h, f) for h, f in zip(hitrate_high, farate_high)]
-criterion_high = [calc_criterion(h, f) for h, f in zip(hitrate_high, farate_high)]
+    # Remove blocks with hitrates < 0.2 or > 0.8
+    drop_blocks = [(10, 6), (12, 6), (26, 4), (30, 3), (39, 3)]
+    for participant, block in drop_blocks:
+        data = data.drop(data[((data.ID == participant) &
+                               (data.block == block))].index)
 
-# Filter for correct trials only
-correct_only = data[data.correct == 1]
+    # remove no response trials or super fast responses
+    data = data.drop(data[data.respt1 == 2.5].index)
+    data = data.drop(data[data.respt1 < 0.1].index)
+    # remove the first trial from each block (weird trigger behavior)
+    data = data.drop(data[data.trial == 1].index)
 
-# Calculate mean confidence for each participant and congruency condition
-data_grouped = correct_only.groupby(['ID', 'congruency']).mean()['conf']
-con_condition = data_grouped.unstack()[1].reset_index()
-incon_condition = data_grouped.unstack()[0].reset_index()
-
-# Calculate the difference in d-prime and criterion between the high and low condition
-d_diff = np.array(d_prime_low) - np.array(d_prime_high)
-c_diff = np.array(criterion_low) - np.array(criterion_high)
-
-# Define colors for the plot
-blue = '#2a95ffff'
-pink = '#ff2a2aff'
-
-# Define a function to plot the figure
+    # save the preprocessing data
+    os.chdir(behavpath)
+    data.to_csv("prepro_behav_data.csv")
 
 
-def plot_figure1_grid(colors=[blue, pink], medcolor=['black', 'black']):
+def prepare_behav_data():
+    """
+    This function prepares the behavioral data for the figure 1 grid.
+    It calculates hit rates, false alarm rates, d-prime, and criterion
+    for each participant and cue condition.
+    It also calculates mean confidence for each participant and congruency
+    condition.
+    Returns:
+    c_cond: list of dataframes containing mean confidence for each participant
+    and congruency condition
+    d_cond: list of dataframes containing d-prime for each participant and
+    cue condition
+    fa_cond: list of dataframes containing false alarm rates for each
+    participant and cue condition
+    hit_cond: list of dataframes containing hit rates for each participant
+    and cue condition
+    conf_con: list of dataframes containing mean confidence
+    and congruency condition
+    """
+
+    # Set up data path
+    behavpath = 'D:\\expecon_ms\\data\\behav'
+
+    # Load data
+    data = pd.read_csv(behavpath + '\\prepro_behav_data.csv')
+
+    # Calculate hit rates by participant and cue condition
+    signal = data[data.isyes == 1]
+    signal_grouped = signal.groupby(['ID', 'cue']).mean()['sayyes']
+
+    # Calculate noise rates by participant and cue condition
+    noise = data[data.isyes == 0]
+    noise_grouped = noise.groupby(['ID', 'cue']).mean()['sayyes']
+
+    # Calculate d prime and criterion scores
+    def calc_dprime(hitrate, farate):
+        return stats.norm.ppf(hitrate) - stats.norm.ppf(farate)
+
+    def calc_criterion(hitrate, farate):
+        return -0.5 * (stats.norm.ppf(hitrate) + stats.norm.ppf(farate))
+
+    hitrate_low = signal_grouped.unstack()[0.25]
+    farate_low = noise_grouped.unstack()[0.25]
+    d_prime_low = [calc_dprime(h, f) for h, f in zip(hitrate_low, farate_low)]
+    criterion_low = [calc_criterion(h, f) for h, f in zip(hitrate_low,
+                                                          farate_low)]
+
+    hitrate_high = signal_grouped.unstack()[0.75]
+    farate_high = noise_grouped.unstack()[0.75]
+    d_prime_high = [calc_dprime(h, f) for h, f in zip(hitrate_high,
+                                                      farate_high)]
+    criterion_high = [calc_criterion(h, f) for h, f in zip(hitrate_high,
+                                                           farate_high)]
+    c_cond = [criterion_low, criterion_high]
+    d_cond = [d_prime_low, d_prime_high]
+    fa_cond = [farate_low, farate_high]
+    hit_cond = [hitrate_low, hitrate_high]
+
+    # Filter for correct trials only
+    correct_only = data[data.correct == 1]
+
+    # Calculate mean confidence for each participant and congruency condition
+    data_grouped = correct_only.groupby(['ID', 'congruency']).mean()['conf']
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
+    conf_con = [con_condition, incon_condition]
+
+    # Calculate the difference in d-prime and c between the high/low condition
+    d_diff = np.array(d_prime_low) - np.array(d_prime_high)
+    c_diff = np.array(criterion_low) - np.array(criterion_high)
+
+    return d_diff, c_diff, conf_con, d_cond, c_cond, fa_cond, hit_cond
+
+
+def plot_figure1_grid(blue='#2a95ffff', pink='#ff2a2aff',
+                      medcolor=['black', 'black'],
+                      savepath_fig1='D:\\expecon_ms\\figs\\behavior'):
 
     """Plot the figure 1 grid and the behavioral data
     Parameters
@@ -78,6 +153,8 @@ def plot_figure1_grid(colors=[blue, pink], medcolor=['black', 'black']):
             medcolor : list of strings
             The colors to use for the median lines in the boxplots
             """
+
+    colors=[blue, pink]
 
     fig = plt.figure(figsize=(8, 10), tight_layout=True)  # original working was 10,12
     gs = gridspec.GridSpec(6, 4)
@@ -92,17 +169,17 @@ def plot_figure1_grid(colors=[blue, pink], medcolor=['black', 'black']):
 
     hr_ax = fig.add_subplot(gs[4, 0])
     # Plot individual data points 
-    for index in range(len(hitrate_low)):
-        hr_ax.plot(1, hitrate_low.iloc[index],
+    for index in range(len(hit_cond[0])):
+        hr_ax.plot(1, hit_cond[0].iloc[index],
                    marker='', markersize=8, color=colors[0], 
                    markeredgecolor=colors[0], alpha=.5)
-        hr_ax.plot(2, hitrate_high.iloc[index],
+        hr_ax.plot(2, hit_cond[1].iloc[index],
                    marker='', markersize=8, color=colors[1], 
                    markeredgecolor=colors[1], alpha=.5)
-        hr_ax.plot([1, 2], [hitrate_low.iloc[index], hitrate_high.iloc[index]],
+        hr_ax.plot([1, 2], [hit_cond[0].iloc[index], hit_cond[1].iloc[index]],
                    marker='', markersize=0, color='gray', alpha=.25)
 
-    hr_box = hr_ax.boxplot([hitrate_low, hitrate_high], patch_artist=True)
+    hr_box = hr_ax.boxplot([hit_cond[0], hit_cond[1]], patch_artist=True)
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(hr_box['boxes'], colors):
@@ -115,20 +192,21 @@ def plot_figure1_grid(colors=[blue, pink], medcolor=['black', 'black']):
         
     hr_ax.set_ylabel('hit rate', fontname="Arial", fontsize=14)
     hr_ax.set_yticklabels(['0', '0.5', '1.0'], fontname="Arial", fontsize=12)
-    hr_ax.text(1.3, 1, '***', verticalalignment='center', fontname='Arial', fontsize='18')
+    hr_ax.text(1.3, 1, '***', verticalalignment='center', fontname='Arial',
+               fontsize='18')
 
     fa_ax = fig.add_subplot(gs[5, 0])
-    for index in range(len(farate_high)):
-        fa_ax.plot(1, farate_low.iloc[index],
+    for index in range(len(fa_cond[0])):
+        fa_ax.plot(1, fa_cond[0].iloc[index],
                    marker='', markersize=8, color=colors[0], 
                    markeredgecolor=colors[0], alpha=.5)
-        fa_ax.plot(2, farate_high.iloc[index],
+        fa_ax.plot(2, fa_cond[1].iloc[index],
                    marker='', markersize=8, color=colors[1], 
                    markeredgecolor=colors[1], alpha=.5)
-        fa_ax.plot([1, 2], [farate_low.iloc[index], farate_high.iloc[index]],
+        fa_ax.plot([1, 2], [fa_cond[0].iloc[index], fa_cond[1].iloc[index]],
                    marker='', markersize=0, color='gray', alpha=.25)
 
-    fa_box = fa_ax.boxplot([farate_low, farate_high], patch_artist=True)
+    fa_box = fa_ax.boxplot([fa_cond[0], fa_cond[1]], patch_artist=True)
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(fa_box['boxes'], colors):
         patch.set_facecolor(color)
@@ -153,17 +231,17 @@ def plot_figure1_grid(colors=[blue, pink], medcolor=['black', 'black']):
     crit_ax.set_yticklabels(['-0.5', '0.5', '1.5'], fontname="Arial", 
                             fontsize=12)
 
-    for index in range(len(criterion_low)):
-        crit_ax.plot(1, criterion_low[index],
+    for index in range(len(c_cond[0])):
+        crit_ax.plot(1, c_cond[0][index],
                      marker='o', markersize=0, color=colors[0], 
                      markeredgecolor=colors[0], alpha=.5)
-        crit_ax.plot(2, criterion_high[index],
+        crit_ax.plot(2, c_cond[1][index],
                      marker='o', markersize=0, color=colors[1],
                      markeredgecolor=colors[1], alpha=.5)
-        crit_ax.plot([1, 2], [criterion_low[index], criterion_high[index]],
+        crit_ax.plot([1, 2], [c_cond[0][index], c_cond[1][index]],
                      marker='', markersize=0, color='gray', alpha=.25)
         
-    crit_box = crit_ax.boxplot([criterion_low, criterion_high],
+    crit_box = crit_ax.boxplot([c_cond[0], c_cond[1]],
                                patch_artist=True)  # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(crit_box['boxes'], colors):
         patch.set_facecolor(color)
@@ -183,17 +261,17 @@ def plot_figure1_grid(colors=[blue, pink], medcolor=['black', 'black']):
     dprime_ax.set_yticklabels(['0', '1.5', '3.0'], fontname="Arial", 
                               fontsize=12)
 
-    for index in range(len(d_prime_low)):
-        dprime_ax.plot(1, d_prime_low[index],
+    for index in range(len(d_cond[0])):
+        dprime_ax.plot(1, d_cond[0][index],
                        marker='o',markersize=0, color=colors[0], 
                        markeredgecolor=colors[0], alpha=.5)
-        dprime_ax.plot(2, d_prime_high[index],
+        dprime_ax.plot(2, d_cond[1][index],
                        marker='o', markersize=0, color=colors[1], 
                        markeredgecolor=colors[1], alpha=.5)
-        dprime_ax.plot([1, 2], [d_prime_low[index], d_prime_high[index]],
+        dprime_ax.plot([1, 2], [d_cond[0][index], d_cond[1][index]],
                        marker='', markersize=0, color='gray', alpha=.25)
         
-    dprime_box = dprime_ax.boxplot([d_prime_low, d_prime_high],
+    dprime_box = dprime_ax.boxplot([d_cond[0], d_cond[1]],
                                    patch_artist=True)  # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(dprime_box['boxes'], colors):
         patch.set_facecolor(color)
@@ -210,18 +288,18 @@ def plot_figure1_grid(colors=[blue, pink], medcolor=['black', 'black']):
                  fontsize='18')
 
     # Plot individual data points 
-    for index in range(len(hitrate_high)):
-        conf_ax.plot(1, con_condition.iloc[index, 1],
+    for index in range(len(conf_con[0])):
+        conf_ax.plot(1, conf_con[0].iloc[index, 1],
                      marker='', markersize=8, color=colors[0],
                      markeredgecolor=colors[0], alpha=.5)
-        conf_ax.plot(2, incon_condition.iloc[index, 1],
+        conf_ax.plot(2, conf_con[1].iloc[index, 1],
                      marker='', markersize=8, color=colors[1],
                      markeredgecolor=colors[1], alpha=.5)
-        conf_ax.plot([1, 2], [con_condition.iloc[index, 1], 
-                             incon_condition.iloc[index, 1]],
+        conf_ax.plot([1, 2], [conf_con[0].iloc[index, 1], 
+                             conf_con[1].iloc[index, 1]],
                      marker='', markersize=0, color='gray', alpha=.25)
 
-    conf_box = conf_ax.boxplot([con_condition.iloc[:, 1], incon_condition.iloc[:, 1]],
+    conf_box = conf_ax.boxplot([conf_con[0].iloc[:, 1], conf_con[1].iloc[:, 1]],
                                patch_artist=True)
 
     # Set the face color and alpha for the boxes in the plot
@@ -255,7 +333,7 @@ def plot_figure1_grid(colors=[blue, pink], medcolor=['black', 'black']):
                                   rotation=30)
             plots.set_xlabel('')
 
-    fig.savefig(savepath + "\\figure1.svg",dpi=300, bbox_inches='tight',
+    fig.savefig(savepath_fig1 + "\\figure1.svg",dpi=300, bbox_inches='tight',
                 format='svg')
     plt.show()
 
@@ -268,19 +346,19 @@ def stats_figure1():
     None.
     """
     # non parametric
-    t, p = stats.wilcoxon(criterion_high, criterion_low)
+    t, p = stats.wilcoxon(c_cond[0], c_cond[1])
     print(f'c: {p}')
 
-    t, p = stats.wilcoxon(d_prime_high, d_prime_low)
+    t, p = stats.wilcoxon(d_cond[0], d_cond[1])
     print(f'dprime: {p}')
 
-    t, p = stats.wilcoxon(hitrate_high, hitrate_low)
+    t, p = stats.wilcoxon(hit_cond[0], hit_cond[1])
     print(f'hitrate: {p}')
 
-    t, p = stats.wilcoxon(farate_high, farate_low)
+    t, p = stats.wilcoxon(fa_cond[0], fa_cond[1])
     print(f'farate: {p}')
 
-    t, p = stats.wilcoxon(con_condition.iloc[:, 1], incon_condition.iloc[:, 1])
+    t, p = stats.wilcoxon(conf_con[0].iloc[:, 1], conf_con[1].iloc[:, 1])
     print(f'confidence in correct trials only: {p}')
 
 # Figure 2 is not cleaned up yet
