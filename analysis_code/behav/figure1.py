@@ -18,6 +18,7 @@ def prepro_behavioral_data():
     Returns:
     data: pandas dataframe containing the preprocessed behavioral data
     """
+
     behavpath = 'D:\\expecon_ms\\data\\behav'
 
     # Load the behavioral data from the specified path
@@ -67,13 +68,15 @@ def prepro_behavioral_data():
     data.to_csv("prepro_behav_data.csv")
 
 
-def prepare_behav_data():
+def prepare_behav_data(exclude_high_fa=False):
     """
     This function prepares the behavioral data for the figure 1 grid.
     It calculates hit rates, false alarm rates, d-prime, and criterion
     for each participant and cue condition.
     It also calculates mean confidence for each participant and congruency
     condition.
+    Parameters:
+    exclude_high_fa: Boolean Yes/No (exclude participants with fa rate > 0.4)
     Returns:
     c_cond: list of dataframes containing mean confidence for each participant
     and congruency condition
@@ -88,10 +91,15 @@ def prepare_behav_data():
     """
 
     # Set up data path
-    behavpath = 'D:\\expecon_ms\\data\\behav'
+    behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
     # Load data
     data = pd.read_csv(behavpath + '\\prepro_behav_data.csv')
+
+    # Drop participants because of excessively high fa rates in high cue condition
+    if exclude_high_fa:
+        mask = data['ID'].isin([15, 43, 46])
+        data = data[~mask]
 
     # Calculate hit rates by participant and cue condition
     signal = data[data.isyes == 1]
@@ -120,8 +128,12 @@ def prepare_behav_data():
                                                       farate_high)]
     criterion_high = [calc_criterion(h, f) for h, f in zip(hitrate_high,
                                                            farate_high)]
-    c_cond = [criterion_low, criterion_high]
-    d_cond = [d_prime_low, d_prime_high]
+
+    # create boolean mask for participants with very high farates
+    faratehigh_indices = np.where(farate_high > 0.4)  # 3 participants with fa rates > 0.4
+
+    c_cond = pd.DataFrame([criterion_low, criterion_high]).T
+    d_cond = pd.DataFrame([d_prime_low, d_prime_high]).T
     fa_cond = [farate_low, farate_high]
     hit_cond = [hitrate_low, hitrate_high]
 
@@ -134,6 +146,12 @@ def prepare_behav_data():
     incon_condition = data_grouped.unstack()[0].reset_index()
     conf_con = [con_condition, incon_condition]
 
+    # Calculate mean accuracy for each participant and ce condition
+    data_grouped = data.groupby(['ID', 'cue']).mean()['correct']
+    acc_high = data_grouped.unstack()[0.75].reset_index()
+    acc_low = data_grouped.unstack()[0.25].reset_index()
+    acc_cue = [acc_low, acc_high]
+
     # Calculate the difference in d-prime and c between the high/low condition
     d_diff = np.array(d_prime_low) - np.array(d_prime_high)
     c_diff = np.array(criterion_low) - np.array(criterion_high)
@@ -145,7 +163,7 @@ def plot_figure1_grid(blue='#2a95ffff', pink='#ff2a2aff',
                       medcolor=['black', 'black'],
                       savepath_fig1='D:\\expecon_ms\\figs\\behavior'):
 
-    """Plot the figure 1 grid and the behavioral data
+    """Plot the figure 1 grid and the behavioral data, including accuracy plot
     Parameters
     ----------
         colors : list of strings
@@ -333,7 +351,32 @@ def plot_figure1_grid(blue='#2a95ffff', pink='#ff2a2aff',
                                   rotation=30)
             plots.set_xlabel('')
 
-    fig.savefig(savepath_fig1 + "\\figure1.svg",dpi=300, bbox_inches='tight',
+    fig.savefig(savepath_fig1 + "\\figure1_exclhighfa.svg",dpi=300, bbox_inches='tight',
+                format='svg')
+    plt.show()
+
+    # save accuracy plot for supplementary material
+
+    # Plot individual data points 
+    for index in range(len(acc_cue[0])):
+        plt.plot(1, acc_cue[0].iloc[index, 1],
+                 marker='', markersize=8, color=colors[0],
+                 markeredgecolor=colors[0], alpha=.5)
+        plt.plot(2, acc_cue[1].iloc[index, 1],
+                 marker='', markersize=8, color=colors[1],
+                 markeredgecolor=colors[1], alpha=.5)
+        plt.plot([1, 2], [acc_cue[0].iloc[index, 1],
+                 acc_cue[1].iloc[index, 1]],
+                 marker='', markersize=0, color='gray', alpha=.25)
+
+    hr_box = plt.boxplot([acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1]], 
+                         patch_artist=True)
+
+    hr_ax.set_ylabel('accuracy', fontname="Arial", fontsize=14)
+    hr_ax.set_yticklabels(['0', '0.5', '1.0'], fontname="Arial", fontsize=12)
+    hr_ax.text(1.3, 1, '***', verticalalignment='center', fontname='Arial',
+               fontsize='18')
+    plt.savefig(savepath_fig1 + "\\acc_cue.svg", dpi=300, bbox_inches='tight',
                 format='svg')
     plt.show()
 
