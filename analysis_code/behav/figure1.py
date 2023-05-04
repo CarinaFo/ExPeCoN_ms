@@ -404,6 +404,9 @@ def stats_figure1():
     t, p = stats.wilcoxon(conf_con[0].iloc[:, 1], conf_con[1].iloc[:, 1])
     print(f'confidence in correct trials only: {p}')
 
+    t, p = stats.wilcoxon(acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1])
+    print(f'accuracy between conditions: {p}')
+
 # Figure 2 is not cleaned up yet
 
 
