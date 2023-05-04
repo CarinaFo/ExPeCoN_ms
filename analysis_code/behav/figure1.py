@@ -19,7 +19,7 @@ def prepro_behavioral_data():
     data: pandas dataframe containing the preprocessed behavioral data
     """
 
-    behavpath = 'D:\\expecon_ms\\data\\behav'
+    behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
     # Load the behavioral data from the specified path
     data = []
@@ -30,8 +30,7 @@ def prepro_behavioral_data():
 
     # Clean up the dataframe by dropping unneeded columns
     columns_to_drop = ["Unnamed: 0.2", 'Unnamed: 0.1', 'Unnamed: 0']
-    data_clean = data.drop(columns_to_drop, axis=1)
-    data = data_clean
+    data = data.drop(columns_to_drop, axis=1)
 
     # Change the block number for participant 7's block 3
     data.loc[(144*2):(144*3), 'block'] = 4
@@ -40,16 +39,29 @@ def prepro_behavioral_data():
     drop_participants = [16, 32, 40, 45]
     data = data.drop(data[data.ID.isin(drop_participants)].index)
 
-    # add a column that indicates correct responses
+    # add a column that indicates correct responses & congruency
     data['correct'] = data.sayyes == data.isyes
     # Add a 'congruency' column
-    data['congruency'] = ((data.cue == 0.25) & (data.sayyes == 0)) | ((data.cue == 0.75) & (data.sayyes == 1))
+    data['congruency'] = ((data.cue == 0.25) & (data.sayyes == 0)) | ((
+                          data.cue == 0.75) & (data.sayyes == 1))
+    
+    data = data.reset_index()
+
+    # add a column that combines the confidence ratings and the detection response
+
+    conf_resp = [4 if data.loc[i, 'sayyes'] == 1 and data.loc[i, 'conf'] == 1 else
+                 3 if data.loc[i, 'sayyes'] == 0 and data.loc[i, 'conf'] == 1 else
+                 2 if data.loc[i, 'sayyes'] == 1 and data.loc[i, 'conf'] == 0 else
+                 1 for i in range(len(data))]
+    
+    data['conf_resp'] = conf_resp
 
     # add lagged variables
     data['prevsayyes'] = data['sayyes'].shift(1)
     data['prevcue'] = data['cue'].shift(1)
     data['previsyes'] = data['isyes'].shift(1)
     data['prevcorrect'] = data['correct'].shift(1)
+    data['prevconf'] = data['conf'].shift(1)
 
     # Remove blocks with hitrates < 0.2 or > 0.8
     drop_blocks = [(10, 6), (12, 6), (26, 4), (30, 3), (39, 3)]
