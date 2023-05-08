@@ -62,6 +62,7 @@ def prepro_behavioral_data():
     data['previsyes'] = data['isyes'].shift(1)
     data['prevcorrect'] = data['correct'].shift(1)
     data['prevconf'] = data['conf'].shift(1)
+    data['prevconf_resp'] = data['conf_resp'].shift(1)
 
     # Remove blocks with hitrates < 0.2 or > 0.8
     drop_blocks = [(10, 6), (12, 6), (26, 4), (30, 3), (39, 3)]
