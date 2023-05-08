@@ -10,3 +10,4 @@ data/
 figs/
 experimental_code\expeco\instr\
 analysis_code\behav\linear_mixed_models\
+*.rda
