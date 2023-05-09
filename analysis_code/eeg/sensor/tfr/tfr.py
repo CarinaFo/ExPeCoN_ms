@@ -23,6 +23,7 @@ import os
 import mne
 import numpy as np
 import scipy.stats
+import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 from scipy import stats
@@ -30,7 +31,7 @@ import scipy.ndimage as ndimage
 import seaborn as sns
 
 # set matplotlib backend to qt
-# %matplotlib qt
+%matplotlib qt
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
@@ -38,11 +39,11 @@ plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-se
 # set paths
 dir_cleanepochs = r"D:\expecon_ms\data\eeg\prepro_ica\clean_epochs"
 dir_droplog =  r"D:\expecon_ms\data\eeg\prepro_ica\droplog"
-savepath_tfr_morlet = r"D:\expecon_ms\data\eeg\sensor\evoked_tfr\tfr_morlet"
-savepath_tfr_multitaper = r"D:\expecon_ms\data\eeg\sensor\evoked_tfr\tfr_multitaper"
+savepath_tfr_multitaper = r"D:\expecon_ms\data\eeg\sensor\induced_tfr\tfr_multitaper"
 
 # savepath figures
 savepath_figs = r"D:\expecon_ms\figs\eeg\sensor\tfr"
+behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
 # participant index
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
@@ -105,8 +106,21 @@ def prepare_tfcontrasts(tmin=-1, tmax=1, ncycles=3.0, fmin=7, fmax=30,
         # some weird trigger stuff going on?
         epochs = epochs[epochs.metadata.trial != 1]
 
-        # drop bad epochs
+        # load behavioral data
+        os.chdir(behavpath)
 
+        data = pd.read_csv("prepro_behav_data.csv")
+
+        subj_data = data[data.ID == counter+7]
+
+        if ((counter == 5) or (counter == 13) or (counter == 21) or (counter == 28)):  # first epoch has no data
+            epochs.metadata = subj_data.iloc[1:, :]
+        elif counter == 17:
+            epochs.metadata = subj_data.iloc[3:, :]
+        else:
+            epochs.metadata = subj_data
+
+        # drop bad epochs
         epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
 
         if savedropfig == 1:
@@ -119,12 +133,7 @@ def prepare_tfcontrasts(tmin=-1, tmax=1, ncycles=3.0, fmin=7, fmax=30,
         if laplace == 1:
 
             epochs = mne.preprocessing.compute_current_source_density(epochs)
-         
-        # create lag variables
-
-        epochs.metadata['lag1r'] = epochs.metadata.sayyes.shift(1)
-        epochs.metadata['lag1s'] = epochs.metadata.isyes.shift(1)
-        #epochs.metadata['lag1a'] = epochs.metadata.correct.shift(1)
+        
 
         # create experimental conditions
         if cond == "hitmiss":
@@ -230,7 +239,7 @@ def prepare_tfcontrasts(tmin=-1, tmax=1, ncycles=3.0, fmin=7, fmax=30,
     return all_tfr_a, all_tfr_b, fmin, fmax, freqs, tmin, tmax, cond_a, cond_b, epochs_a, epochs_b, method
 
 
-def run_ttest(channel_names = ['CP4', 'CP6', 'P4', 'P6']):
+def run_ttest(channel_names = ['CP4', 'CP6', 'C4', 'C6']):
 
     """run a simple t test between conditions without correcting for multiple comparisions and plot the values"""
 
@@ -245,7 +254,7 @@ def run_ttest(channel_names = ['CP4', 'CP6', 'P4', 'P6']):
     acrop = [ax.copy().crop(tmin, tmax) for ax in a]
     bcrop = [bx.copy().crop(tmin, tmax) for bx in b]
 
-    channel_names = [epochs_a_padded[0].pick_types(eeg=True).ch_names[ch] for ch in channels]
+    channel_names = [epochs_a_padded[0].pick_types(eeg=True).ch_names[ch] for ch in channel_names]
 
     # baseline correction of TF data
 
@@ -325,7 +334,7 @@ def cluster_time_frequency(a=None, b=None, jobs=15, n_perm=10000):
 
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(
         X[:,:,:],
-        n_jobs=-1, n_permutations=n_perm,  tail=0, seed=1, threshold=threshold_tfce)
+        n_jobs=-1, n_permutations=n_perm,  tail=0, seed=1) # threshold=threshold_tfce)
     
     # 3D cluster test
 
@@ -346,26 +355,26 @@ def cluster_time_frequency(a=None, b=None, jobs=15, n_perm=10000):
     X = np.transpose(X, [0, 3, 2, 1])
 
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(
-        X[:,:,:,:], adjacency=adjacency, threshold=threshold_tfce,
+        X[:,:,:,:], adjacency=adjacency, 
         n_jobs=-1, n_permutations=n_perm,  tail=0)
 
     cluster_p = cluster_p_values.reshape(X.shape[1],X[:,:,:].shape[2])
 
     # Apply the mask to the image
     masked_img = T_obs.copy()
-    masked_img[np.where(cluster_p > 0.05)] = 0
+    masked_img[np.where(cluster_p_values > 0.05)] = 0
 
     vmax = np.max(T_obs)
     vmin = np.min(T_obs)
 
-    cnorm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)  # min, center & max ERDS
+    #cnorm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)  # min, center & max ERDS
     
     # add time on the x axis 
-    x = np.linspace(-1,0.1,276)
-    y = np.arange(7,31,1)
+    x = np.linspace(-1,1,501)
+    y = np.arange(7,35,1)
 
     # Plot the original image with lower transparency
-    fig = plt.imshow(T_obs, origin='lower', cnorm=cnorm, extent=[x.min(), x.max(), y.min(), y.max()], aspect='auto',
+    fig = plt.imshow(T_obs, origin='lower', extent=[x.min(), x.max(), y.min(), y.max()], aspect='auto',
     vmin=vmin, vmax=vmax, cmap='viridis')
     plt.colorbar()
     # Plot the masked image on top
