@@ -24,6 +24,7 @@ plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-se
 
 # set paths
 dir_cleanepochs = r"D:\expecon_ms\data\eeg\prepro_ica\clean_epochs"
+behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
 # save cluster figures as svg and png files
 save_dir_cluster_output = r"D:\expecon_ms\figs\eeg\sensor\evokeds"
@@ -34,8 +35,8 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(perm=10000, tmin=-1, tmax=1, cond='highlowhit', cond_a=
-                            'high', cond_b='low', laplace=True):
+def create_contrast(tmin=0, tmax=0.5, cond='signalnoise', cond_a='hit',
+                    cond_b='miss', laplace=True):
 
     """ this function runs a cluster permutation test over electrodes and timepoints
     in sensor space and plots the output and saves it
@@ -80,28 +81,42 @@ def create_contrast(perm=10000, tmin=-1, tmax=1, cond='highlowhit', cond_a=
         
         # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
         before_rt_removal = len(epochs.metadata)
-        epochs = epochs[epochs.metadata.respt1 > 0.1]
+        epochs = epochs[epochs.metadata.respt1 >= 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
 
         # remove first trial of each block (trigger delays)
         epochs = epochs[epochs.metadata.trial != 1]
         
-        #save n_trials per participant
+        # save n_trials per participant
         all_trials.append(len(epochs.metadata))
 
         trials_removed.append(before_rt_removal - len(epochs.metadata))
 
         if laplace == True:
-            epochs = mne.preprocessing.compute_current_source_density(epochs)                      
-                              
-         #high vs. low condition
+            epochs = mne.preprocessing.compute_current_source_density(epochs)
+
+        # load behavioral data
+        os.chdir(behavpath)
+
+        data = pd.read_csv("prepro_behav_data.csv")
+        subj_data = data[data.ID == idx+7]
+
+        if ((idx == 5) or (idx == 13) or (idx == 21) or (idx == 28)):  # first epoch has no data
+            epochs.metadata = subj_data.iloc[1:, :]
+        elif idx == 17:
+            epochs.metadata = subj_data.iloc[3:, :]
+        else:
+            epochs.metadata = subj_data
 
         if cond == 'highlow':
             epochs_a = epochs[(epochs.metadata.cue == 0.75)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-        if cond == 'highlowhit':
-            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1))]
-            epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1))]
+        if cond == 'high_prevchoice':
+            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.prevsayyes == 1))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.prevsayyes == 0))]
+        if cond == 'low_prevchoice':
+            epochs_a = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.prevsayyes == 1))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.prevsayyes == 0))]
         elif cond == 'signalnoise':
             epochs_a = epochs[(epochs.metadata.isyes == 1)]
             epochs_b = epochs[(epochs.metadata.isyes == 0)]
@@ -111,10 +126,14 @@ def create_contrast(perm=10000, tmin=-1, tmax=1, cond='highlowhit', cond_a=
         elif cond == 'highnoise':
             epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 0))]
             epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.isyes == 0))]
+        elif cond == 'hitmiss':
+            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0))]
+
 
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
-        #average and crop in prestimulus window
+        # average and crop in prestimulus window
         evokeds_a = epochs_a.average().crop(tmin, tmax)
         evokeds_b = epochs_b.average().crop(tmin, tmax)
 
@@ -128,18 +147,25 @@ def create_contrast(perm=10000, tmin=-1, tmax=1, cond='highlowhit', cond_a=
 
     return evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b
 
-def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all,
-                                 cond_a, cond_b, perm=10000, tmin=-0.5, tmax=0, cond='highsignal', laplace=True):
+def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
+
+    evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b = create_contrast()
 
     # get grand average over all subjects for plotting the results later
 
-    a = [ax.copy().crop(0,0.1) for ax in evokeds_a_all]
-    b = [bx.copy().crop(0,0.1) for bx in evokeds_b_all]
+    a = [ax.copy().crop(tmin, tmax) for ax in evokeds_a_all]
+    b = [bx.copy().crop(tmin, tmax) for bx in evokeds_b_all]
 
     a_gra = mne.grand_average(a)
     b_gra = mne.grand_average(b)
 
     X = np.array([ax.data-bx.data for ax,bx in zip(a,b)])
+
+    jointplot = X.crop(tmin, tmax).plot_joint([0.02, 0.05, 0.12])
+    topo = X.plot_topo()
+
+    topo.savefig(f'topo_{contrast}.svg')
+    jointplot.savefig(f'jointplot_{contrast}.svg')
 
     X = np.transpose(X, [0, 2, 1])
 
@@ -149,15 +175,13 @@ def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all,
 
     ch_adjacency,_ = mne.channels.find_ch_adjacency(epochs.info, ch_type='eeg')
 
-    threshold_tfce = dict(start=0, step=0.1)
-
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X[:,:,:], n_permutations=perm,
                                                                                     adjacency=ch_adjacency, 
                                                                                     #threshold=threshold_tfce, 
                                                                                     tail=0, n_jobs=-1
                                                                                     )
 
-    good_cluster_inds = np.where(cluster_p_values < 0.05)[0] # times where something significant happened
+    good_cluster_inds = np.where(cluster_p_values < 0.001)[0] # times where something significant happened
 
     print(len(good_cluster_inds))
     print(cluster_p_values)
@@ -228,6 +252,6 @@ def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all,
         mne.viz.tight_layout(fig=fig)
         fig.subplots_adjust(bottom=.05)
         os.chdir(save_dir_cluster_output)
-        plt.savefig('cluster_highlow_post' + str(i_clu) + '.svg')
-        plt.savefig('cluster_highlow_post' + str(i_clu) + '.png')
+        plt.savefig('cluster_highlow_pre' + str(i_clu) + '.svg')
+        plt.savefig('cluster_highlow_pre' + str(i_clu) + '.png')
         plt.show()
