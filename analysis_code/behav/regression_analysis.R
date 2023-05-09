@@ -212,6 +212,14 @@ cue_prevconf = glmer(sayyes ~ isyes*cue + prevconf*cue + (isyes*cue+prevconf*cue
 
 save(cue_prevconf, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevconf.rda")
 
+
+cue_prevconf_resp = glmer(sayyes ~ isyes*cue + prevconf_resp*cue + (isyes*cue+prevconf_resp*cue|ID), 
+                     data=behav, family=binomial(link='probit'),
+                     control=glmerControl(optimizer="bobyqa",
+                                          optCtrl=list(maxfun=2e5)))
+
+# model doesn't converge
+
 ###########################################Metacognition############################################
 
 resp_conf = glmer(conf ~ sayyes + (sayyes|ID), data=behav, family=binomial(link='probit'))

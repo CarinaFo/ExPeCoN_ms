@@ -4,7 +4,6 @@ import scipy.stats as stats
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import seaborn as sns
 import numpy as np
 
 
