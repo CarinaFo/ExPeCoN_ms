@@ -2,7 +2,7 @@
 # investigate pre-stimulus power
 ##################################################################################################
 
-
+# import packages
 import os
 import mne
 import numpy as np
@@ -10,54 +10,46 @@ import pandas as pd
 import scipy
 import seaborn as sns
 import matplotlib.pyplot as plt
+import random
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
 
-# datapath
-
-savepath_epochs = r'D:\expecon_EEG_112021\epochs_conditions'
-savepath_TF = r'D:\expecon_EEG_112021\power_conditions'
-savepath_power_trial = r'D:\expecon_EEG\power_trial'
-savedir_epochs = 'D:/expecon/data/eeg/epochs_after_ica_cleaning'
-dir_cleanepochs = r"D:\expecon_ms\data\eeg\prepro_ica\clean_epochs"
+# datapaths
+tfr_single_trial_power_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\single_trial_power"
+dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs"
+behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
           '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
-
-def extract_power(baseline=0, base_interval=(-0.8,-0.5),
-                    tmin=-0.5, induced=True,
-                    tmax=0, channels=['CP4', 'CP6'], fmin=7, fmax=35, ncycles=3.0, zero_pad=1):
+def calculate_power_per_trial(tmin=-0.5, tmax=0,
+                              zero_pad=1, reject_criteria=dict(eeg=200e-6),
+                              flat_criteria=dict(eeg=1e-6)):
 
     '''calculate prestimulus alpha power per trial (should be positive and rather small)
     baseline correction can be applied. takes the mean over prestimulus period and alpha range in electrode CP4.
     Stats analysis in power_per_trial.R
     return: .csv file with behavioral columns and prestimulus alpha power per trial for further analysis in R'''
 
-    freqs = np.arange(fmin, fmax + 1, 1)
-    n_cycles = freqs / ncycles  # different number of cycle per frequency
+    freqs = np.logspace(*np.log10([6, 35]), num=12)
+    n_cycles = freqs / 2.0  # different number of cycle per frequency
 
-    alpha_power, low_beta_power, high_beta_power = [], [], []
     metadata_list = []
-    drop_log = []
 
-    for idx, subj in enumerate(IDlist):
+    for counter, subj in enumerate(IDlist):
 
         # print participant ID
         print('Analyzing ' + subj)
-
         # skip those participants
-        if subj == '040' or subj == '045':
+        if subj == '040' or subj == '045' or subj == '032' or subj == '016':
             continue
-        
-        os.chdir(dir_cleanepochs)
 
-        epochs = mne.read_epochs('P' + subj + '_epochs_after_ica-epo.fif')
-        #epochs = mne.read_epochs(savedir_epochs + '\P' + subj + '_after_ica-epo.fif')
+        # load cleaned epochs
+        epochs = mne.read_epochs(f"{dir_cleanepochs}/P{subj}_epochs_after_ica-epo.fif")
 
-        # Remove 6 blocks with hitrates < 0.2 or > 0.8
+        # Remove 5 blocks with hitrates < 0.2 or > 0.8
 
         if subj == '010':
             epochs = epochs[epochs.metadata.block != 6]
@@ -67,23 +59,37 @@ def extract_power(baseline=0, base_interval=(-0.8,-0.5),
             epochs = epochs[epochs.metadata.block != 4]
         if subj == '030':
             epochs = epochs[epochs.metadata.block != 3]
-        if subj == '032':
-            epochs = epochs[epochs.metadata.block != 2]
-            epochs = epochs[epochs.metadata.block != 3]
         if subj == '039':
             epochs = epochs[epochs.metadata.block != 3]
         
         # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
-        before_rt_removal = len(epochs.metadata)
+    
         epochs = epochs[epochs.metadata.respt1 > 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
-        # some weird trigger stuff going on?
+
+        # remove first trial of each block (trigger delays)
         epochs = epochs[epochs.metadata.trial != 1]
 
-        if induced == 1:
+        # subtract evoked response
+        epochs = epochs.subtract_evoked()
 
-            # subtract evoked response
-            epochs = epochs.subtract_evoked()
+        # load behavioral data
+
+        os.chdir(behavpath)
+
+        data = pd.read_csv("prepro_behav_data.csv")
+
+        subj_data = data[data.ID == counter+7]
+
+        if ((counter == 5) or (counter == 13) or (counter == 21) or (counter == 28)):  # first epoch has no data
+            epochs.metadata = subj_data.iloc[1:, :]
+        elif counter == 17:
+            epochs.metadata = subj_data.iloc[3:, :]
+        else:
+            epochs.metadata = subj_data
+
+        # drop bad epochs
+        epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
 
         # add metadata per subject
 
@@ -105,27 +111,134 @@ def extract_power(baseline=0, base_interval=(-0.8,-0.5),
 
             epochs = mne.EpochsArray(data, epochs.info, tmin=tmin * 2)
 
-        #how many epochs got rejected per participant?
-
-        count = sum(1 for e in epochs.drop_log if e)
-
-        #kick out ID14 and 36 (> 100 epochs rejected)
-
-        drop_log.append(count)
-
         # get prestimulus power
 
-        power,itc = mne.time_frequency.tfr_multitaper(epochs, n_cycles=ncycles, freqs=freqs, return_itc=True,
-                                                n_jobs=15, average=False)
+        power = mne.time_frequency.tfr_multitaper(epochs, n_cycles=n_cycles, freqs=freqs, return_itc=False,
+                                                  n_jobs=-1, average=False)
         
-        os.chdir(r"D:\expecon_ms\data\eeg\sensor\tfr_morlet\single_trial_power")
+        os.chdir(tfr_single_trial_power_dir)
 
         mne.time_frequency.write_tfrs(f"{subj}_power_per_trial-tfr.h5", power)
 
-        mne.time_frequency.write_tfrs(f"{subj}_itc_per_trial-tfr.h5", itc)
 
-def average_over_freq_bands():
+def contrast_conditions():
     
+    diff_all_subs, diff_all_subs_hitmiss = [], []
+
+    # load behavioral data
+
+    os.chdir(behavpath)
+
+    data = pd.read_csv("prepro_behav_data_after_rejectepochs.csv")
+
+    for counter, subj in enumerate(IDlist):
+
+        # skip those participants
+        if subj == '040' or subj == '045' or subj == '032' or subj == '016':
+            continue
+
+        power = mne.time_frequency.read_tfrs(f"{tfr_single_trial_power_dir}\\{subj}_power_per_trial-tfr.h5")[0]
+        # add metadata
+        subj_data = data[data.ID == counter+7]
+
+        power.metadata = subj_data
+
+        power_high = power[((power.metadata.cue == 0.75) &
+                           (power.metadata.isyes == 0) &
+                           (power.metadata.sayyes == 0))]
+        power_low = power[((power.metadata.cue == 0.25) &
+                          (power.metadata.isyes == 0) &
+                          (power.metadata.sayyes == 0))]
+
+        # randomly sample from low power trials to match number of trials in high power condition
+
+        random_sample = power_high.data.shape[0]
+        idx_list = list(range(power_low.data.shape[0]))
+
+        power_low_idx = random.sample(idx_list, random_sample)
+
+        power_low.data = power_low.data[power_low_idx, :, :, :]
+
+        power_hit = power[((power.metadata.isyes == 1) &
+                          (power.metadata.sayyes == 1))]
+        power_miss = power[((power.metadata.isyes == 1) &
+                           (power.metadata.sayyes == 0))]
+
+        evoked_power_hit = power_hit.average()
+        evoked_power_miss = power_miss.average()
+
+        evoked_power_high = power_high.average()
+        evoked_power_low = power_low.average()
+
+        diff = evoked_power_high - evoked_power_low
+
+        diff_hitmiss = evoked_power_hit - evoked_power_miss
+
+        diff_all_subs.append(diff)
+        diff_all_subs_hitmiss.append(diff_hitmiss)
+
+def plot_grand_average(data=None, cond='hitmiss'):
+
+    diff_gra = mne.grand_average(data)
+
+    diff_gra.crop(-0.5, 0).plot_joint()
+
+    topo = diff_gra.crop(-0.5, 0).plot_topo()
+
+    tfr = diff_gra.crop(-0.5, 0).plot(picks='CP4')[0]
+
+    topo.savefig(f'D:\\expecon_ms\\figs\\'
+                 f'manuscript_figures\\Figure4\\{cond}_topo.svg')
+    tfr.savefig(f'D:\\expecon_ms\\figs\\'
+                f'manuscript_figures\\Figure4\\{cond}_tfr.svg')
+
+def run_3D_cluster_perm_test(contrast_data=None):
+
+    X = np.array([d.crop(-0.5, 0).data for d in contrast_data])
+
+    # run 3D cluster permutation test
+    # definde adjaceny matrix for cluster permutation test
+   
+    ch_adjacency = mne.channels.find_ch_adjacency(contrast_data[0].info,
+                                                  ch_type='eeg')
+    # frequency, time and channel adjacency
+    com_adjacency = mne.stats.combine_adjacency(X.shape[2],
+                                                X.shape[3], ch_adjacency[0])
+    
+    # change axes to match the format of the function
+    X = np.transpose(X, [0, 3, 2, 1])
+
+    # threshold free cluster enhancement
+    threshold_tfce = dict(start=0, step=0.1)
+
+    cluster_out = mne.stats.permutation_cluster_1samp_test(X,
+                                                           n_permutations=1000,
+                                                           adjacency=com_adjacency,
+                                                           threshold=threshold_tfce,
+                                                           n_jobs=-1)
+
+def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4',
+                                       'C6', 'P4', 'P6', 'P2', 'CP2', 'C2'],
+                                       contrast_data=None):
+    spec_channel_list = []
+
+    for i, channel in enumerate(channel_names):
+        spec_channel_list.append(contrast_data[15].ch_names.index(channel))
+    spec_channel_list
+
+    mean_over_channels = np.mean(X[:, spec_channel_list, :, :], axis=1)
+
+    threshold_tfce = dict(start=0, step=0.1)
+
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(
+                            mean_over_channels,
+                            n_jobs=-1, 
+                            n_permutations=n_perm,
+                            tail=0, 
+                            seed=1) # threshold=threshold_tfce)
+    
+# average over specific frequency bands
+
     for f in frequency_list:
 
         if f == 'alpha':
