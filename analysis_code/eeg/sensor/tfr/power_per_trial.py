@@ -17,6 +17,7 @@ plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-se
 
 # datapaths
 tfr_single_trial_power_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\single_trial_power"
+savedir_figure4 = 'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4'
 dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs"
 behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
@@ -177,20 +178,19 @@ def contrast_conditions():
         diff_all_subs.append(diff)
         diff_all_subs_hitmiss.append(diff_hitmiss)
 
-def plot_grand_average(data=None, cond='hitmiss'):
+def plot_grand_average(contrast_data=None, cond='hitmiss'):
 
-    diff_gra = mne.grand_average(data)
+    diff_gra = mne.grand_average(contrast_data).apply_baseline(baseline=(-1, -0.8))
 
     diff_gra.crop(-0.5, 0).plot_joint()
 
     topo = diff_gra.crop(-0.5, 0).plot_topo()
 
-    tfr = diff_gra.crop(-0.5, 0).plot(picks='CP4')[0]
+    tfr = diff_gra.crop(-0.5, 0).plot(picks=['CP4', 'CP6', 'C4', 'C6', 'P4', 'CP6'], combine='mean')[0]
 
-    topo.savefig(f'D:\\expecon_ms\\figs\\'
-                 f'manuscript_figures\\Figure4\\{cond}_topo.svg')
-    tfr.savefig(f'D:\\expecon_ms\\figs\\'
-                f'manuscript_figures\\Figure4\\{cond}_tfr.svg')
+    topo.savefig(f'{savedir_figure4}//{cond}_topo.svg')
+    
+    tfr.savefig(f'{savedir_figure4}//{cond}_tfr.svg')
 
 def run_3D_cluster_perm_test(contrast_data=None):
 
@@ -217,14 +217,15 @@ def run_3D_cluster_perm_test(contrast_data=None):
                                                            threshold=threshold_tfce,
                                                            n_jobs=-1)
 
-def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4',
-                                       'C6', 'P4', 'P6', 'P2', 'CP2', 'C2'],
-                                       contrast_data=None):
+def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6', 'P4', 'CP6'],
+                                             contrast_data=None):
     spec_channel_list = []
 
     for i, channel in enumerate(channel_names):
         spec_channel_list.append(contrast_data[15].ch_names.index(channel))
     spec_channel_list
+
+    X = np.array([d.crop(-0.5, 0).data for d in contrast_data])
 
     mean_over_channels = np.mean(X[:, spec_channel_list, :, :], axis=1)
 
@@ -234,9 +235,48 @@ def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4',
                             mean_over_channels,
                             n_jobs=-1, 
                             n_permutations=n_perm,
+                            threshold=threshold_tfce,
                             tail=0, 
                             seed=1) # threshold=threshold_tfce)
     
+def plot2D_cluster_output(cond='hitmiss'):
+
+    cluster_p_values = cluster_p_values.reshape(mean_over_channels.shape[1]
+                                                ,mean_over_channels.shape[2])
+
+    # Apply the mask to the image
+    masked_img = T_obs.copy()
+    masked_img[np.where(cluster_p_values > 0.05)] = 0
+
+    vmax = np.max(T_obs)
+    vmin = np.min(T_obs)
+
+    #cnorm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)  # min, center & max ERDS
+    
+    # add time on the x axis 
+    x = np.linspace(-0.5, 0, 126)
+    y = np.logspace(*np.log10([6, 35]), num=12)
+
+    # Plot the original image with lower transparency
+    fig = plt.imshow(T_obs, origin='lower', extent=[x.min(), x.max(), y.min(), y.max()], aspect='auto',
+    vmin=vmin, vmax=vmax, cmap='viridis')
+    plt.colorbar()
+    # Plot the masked image on top
+    fig = plt.imshow(masked_img, alpha=0.3, origin='lower', extent=[x.min(), x.max(), y.min(), y.max()],
+    aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
+
+    # Add x and y labels
+    plt.xlabel('Time (s)')
+    plt.ylabel('Freq (Hz)')
+
+    # save figure
+    os.chdir(savedir_figure4)
+
+    fig.figure.savefig(f"cluster_perm_{cond_a}_{cond_b}_{str(tmin)}_{str(tmax)}.svg")
+
+    # Show the plot
+    plt.show()
+
 # average over specific frequency bands
 
     for f in frequency_list:
