@@ -182,11 +182,11 @@ def plot_grand_average(contrast_data=None, cond='hitmiss'):
 
     diff_gra = mne.grand_average(contrast_data).apply_baseline(baseline=(-1, -0.8))
 
-    diff_gra.crop(-0.5, 0).plot_joint()
+    diff_gra.copy().crop(-0.5, 0).plot_joint()
 
-    topo = diff_gra.crop(-0.5, 0).plot_topo()
+    topo = diff_gra.copy().crop(-0.5, 0).plot_topo()
 
-    tfr = diff_gra.crop(-0.5, 0).plot(picks=['CP4', 'CP6', 'C4', 'C6', 'P4', 'CP6'], combine='mean')[0]
+    tfr = diff_gra.copy().crop(-0.5, 0).plot(picks=['CP4', 'CP6', 'C4', 'C6', 'P4', 'CP6'], combine='mean')[0]
 
     topo.savefig(f'{savedir_figure4}//{cond}_topo.svg')
     
@@ -241,6 +241,8 @@ def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6', 'P4', 'CP6
     
 def plot2D_cluster_output(cond='hitmiss'):
 
+    min(cluster_p_values)
+    
     cluster_p_values = cluster_p_values.reshape(mean_over_channels.shape[1]
                                                 ,mean_over_channels.shape[2])
 
@@ -248,7 +250,7 @@ def plot2D_cluster_output(cond='hitmiss'):
     masked_img = T_obs.copy()
     masked_img[np.where(cluster_p_values > 0.05)] = 0
 
-    vmax = np.max(T_obs)
+    vmax = np.max(0)
     vmin = np.min(T_obs)
 
     #cnorm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)  # min, center & max ERDS
@@ -272,7 +274,7 @@ def plot2D_cluster_output(cond='hitmiss'):
     # save figure
     os.chdir(savedir_figure4)
 
-    fig.figure.savefig(f"cluster_perm_{cond_a}_{cond_b}_{str(tmin)}_{str(tmax)}.svg")
+    fig.figure.savefig(f"cluster_perm_{cond}_{str(tmin)}_{str(tmax)}.svg")
 
     # Show the plot
     plt.show()
