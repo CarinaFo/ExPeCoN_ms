@@ -50,13 +50,12 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
-
 # Functions
 
 def prepare_tfcontrasts(tmin=-1, tmax=1, ncycles=3.0, fmin=7, fmax=30,
                         baseline=0, baseline_interval=(-0.8, -0.5), induced=1,
                         mode='mean', sfreq=250,
-                        save=1, laplace=1, method='multitaper', cond="highlow", zero_pad=0,
+                        save=1, laplace=1, method='multitaper', cond="highlow_prevno", zero_pad=0,
                         reject_criteria=dict(eeg=200e-6),  # 200 µV
                         flat_criteria=dict(eeg=1e-6), savedropfig=0):
 
@@ -144,13 +143,29 @@ def prepare_tfcontrasts(tmin=-1, tmax=1, ncycles=3.0, fmin=7, fmax=30,
             cond_a = "hit"
             cond_b = "miss"
 
+        elif cond == "prev_choice":
+
+            epochs_a = epochs[epochs.metadata.prevsayyes == 1]
+            epochs_b = epochs[epochs.metadata.prevsayyes == 0]
+
+            cond_a = "prev_yes"
+            cond_b = "prev_no"
+
         elif cond == "highlow_prevyes":
 
-            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.lag1r == 1))]
-            epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.lag1r == 1))]
+            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.prevsayyes == 1))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.prevsayyes == 1))]
 
-            cond_a = "high"
-            cond_b = "low"
+            cond_a = "high_yes"
+            cond_b = "low_yes"
+
+        elif cond == "highlow_prevno":
+
+            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.prevsayyes== 0))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.prevsayyes == 0))]
+
+            cond_a = "high_no"
+            cond_b = "low_no"
 
         elif cond == "highlow":
         
@@ -246,7 +261,7 @@ def run_ttest(channel_names = ['CP4', 'CP6', 'C4', 'C6']):
     a, b, fmin, fmax, freqs, tmin, tmax, cond_a, cond_b, epochs_a_padded, epochs_b_padded, tf_method = prepare_tfcontrasts()
     a, b, fmin, fmax, freqs, tmin, tmax, cond_a, cond_b, epochs_a_padded, epochs_b_padded, tf_method = out
 
-    os.chdir(r"D:\expecon_ms\data\eeg\sensor\induced_tfr\tfr_multitaper")
+    os.chdir("D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\tfr_multitaper")
   
     a = mne.time_frequency.read_tfrs(f"{method}_{cond_a}-tfr.h5")
     b = mne.time_frequency.read_tfrs(f"{method}_{cond_b}-tfr.h5")
@@ -355,7 +370,7 @@ def cluster_time_frequency(a=None, b=None, jobs=15, n_perm=10000):
     X = np.transpose(X, [0, 3, 2, 1])
 
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(
-        X[:,:,:,:], adjacency=adjacency, 
+        X[:,:,:,:], adjacency=adjacency, threshold=3,
         n_jobs=-1, n_permutations=n_perm,  tail=0)
 
     cluster_p = cluster_p_values.reshape(X.shape[1],X[:,:,:].shape[2])
@@ -370,15 +385,15 @@ def cluster_time_frequency(a=None, b=None, jobs=15, n_perm=10000):
     #cnorm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)  # min, center & max ERDS
     
     # add time on the x axis 
-    x = np.linspace(-1,1,501)
-    y = np.arange(7,35,1)
+    x = np.linspace(-0.5,0,126)
+    y = np.arange(7,31,1)
 
     # Plot the original image with lower transparency
     fig = plt.imshow(T_obs, origin='lower', extent=[x.min(), x.max(), y.min(), y.max()], aspect='auto',
     vmin=vmin, vmax=vmax, cmap='viridis')
     plt.colorbar()
     # Plot the masked image on top
-    fig = plt.imshow(masked_img, alpha=0.3, origin='lower', extent=[x.min(), x.max(), y.min(), y.max()],
+    fig = plt.imshow(masked_img, alpha=0.5, origin='lower', extent=[x.min(), x.max(), y.min(), y.max()],
     aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
 
     # Add x and y labels
