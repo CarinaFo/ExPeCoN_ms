@@ -9,12 +9,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import random
+import pickle
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
 
 # datapaths
 tfr_single_trial_power_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\single_trial_power"
+tfr_contrast_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\condition_contrasts"
 savedir_figure4 = 'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4'
 dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs"
 behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
@@ -135,7 +137,7 @@ def contrast_conditions():
     list containing the difference between conditions for each subject
     '''
 
-    diff_all_subs, diff_all_subs_hitmiss = [], []
+    diff_all_subs_highlow, diff_all_subs_hitmiss = [], []
 
     # load behavioral data 
     # (make sure has the same amount of trials as epochs)
@@ -193,20 +195,26 @@ def contrast_conditions():
         diff_hitmiss = evoked_power_hit - evoked_power_miss
 
         # save the difference between conditions for each subject
-        diff_all_subs.append(diff_highlow)
+        diff_all_subs_highlow.append(diff_highlow)
         diff_all_subs_hitmiss.append(diff_hitmiss)
 
-    return diff_all_subs, diff_all_subs_hitmiss
+    # Save the list to a file
+    with open(f'{tfr_contrast_dir}//diff_all_subs_highlow.pickle', 'wb') as file:
+        pickle.dump(diff_all_subs_highlow, file)
+        
+    with open(f'{tfr_contrast_dir}//diff_all_subs_hitmiss.pickle', 'wb') as file:
+        pickle.dump(diff_all_subs_hitmiss, file)
 
-def plot_grand_average(contrast_data=None, cond='hitmiss',
-                       tmin=-0.5, tmax=0, 
-                       channels=['CP4', 'CP6', 'C4', 'C6', 'P4', 'CP6']):
+    return diff_all_subs_highlow, diff_all_subs_hitmiss
+
+def plot_grand_average(cond='hitmiss',
+                       tmin=-0.5, tmax=0,
+                       channel_names=['CP4', 'CP6', 'C4', 'C6']):
 
     '''plot the grand average of the difference between conditions
+    after loading the contrast data using pickle
     Parameters
     ----------
-    contrast_data : list
-        list containing the difference between conditions for each subject
     cond : str
         condition to plot (hitmiss or highlow)
     tmin : float
@@ -217,22 +225,27 @@ def plot_grand_average(contrast_data=None, cond='hitmiss',
     None
     '''
 
-    diff_gra = mne.grand_average(contrast_data).apply_baseline(baseline=(-1, -0.8))
+    # Load the list from the file
+    with open(f'{tfr_contrast_dir}\\'
+              f'diff_all_subs_{cond}.pickle', 'rb') as file:
+        contrast_data = pickle.load(file)
+
+    diff_gra = mne.grand_average(contrast_data).apply_baseline(
+                                 baseline=(-1, -0.8))
 
     diff_gra.copy().crop(tmin, tmax).plot_joint()
 
     topo = diff_gra.copy().crop(tmin, tmax).plot_topo()
 
     tfr = diff_gra.copy().crop(tmin, tmax).plot(
-          picks=channels, combine='mean')[0]
+          picks=channel_names, combine='mean')[0]
 
     topo.savefig(f'{savedir_figure4}//{cond}_topo.svg')
     
     tfr.savefig(f'{savedir_figure4}//{cond}_tfr.svg')
 
 
-def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6', 'P4', 'CP6'],
-                             contrast_data=None,
+def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6'],
                              n_perm=10000):
     
     '''run a 2D cluster permutation test on the difference between conditions
@@ -257,7 +270,7 @@ def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6', 'P4', 'CP6
 
     mean_over_channels = np.mean(X[:, spec_channel_list, :, :], axis=1)
 
-    threshold_tfce = dict(start=0, step=0.1)
+    threshold_tfce = dict(start=0, step=0.05)
 
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(
                             mean_over_channels,
@@ -265,8 +278,12 @@ def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6', 'P4', 'CP6
                             n_permutations=n_perm,
                             threshold=threshold_tfce,
                             tail=0,
-                            seed=1)
+                            seed=1234)
     
+    print(f'The minimum p-value is {min(cluster_p_values)}')
+    
+    return T_obs, clusters, cluster_p_values, H0, mean_over_channels
+
 def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
 
     '''plot the output of the 2D cluster permutation test
@@ -281,8 +298,6 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
     None
     '''
 
-    min(cluster_p_values)
-    
     cluster_p_values = cluster_p_values.reshape(mean_over_channels.shape[1]
                                                 ,mean_over_channels.shape[2])
 
@@ -299,14 +314,14 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
     x = np.linspace(-0.5, 0, 126)
     y = np.logspace(*np.log10([6, 35]), num=12)
 
-    # Plot the original image with lower transparency
-    fig = plt.imshow(T_obs, origin='lower', alpha=0.5,
+    # Plot the original image
+    fig = plt.imshow(T_obs, origin='lower',
                      extent=[x.min(), x.max(), y.min(), y.max()],
                      aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
     plt.colorbar()
 
-    # Plot the masked image on top
-    fig = plt.imshow(masked_img, origin='lower',
+    # Plot the masked image on top with lower transparency
+    fig = plt.imshow(masked_img, origin='lower', alpha=0.7,
                      extent=[x.min(), x.max(), y.min(), y.max()],
                      aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
 
@@ -321,6 +336,9 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
 
     # Show the plot
     plt.show()
+
+# Works but now nice plotting implemented yet, potentially also overkill
+# to run 3D cluster permutation test
 
 def run_3D_cluster_perm_test(contrast_data=None):
 
@@ -346,7 +364,6 @@ def run_3D_cluster_perm_test(contrast_data=None):
                                                            adjacency=com_adjacency,
                                                            threshold=threshold_tfce,
                                                            n_jobs=-1)
-
 
 ########################################################## Helper functions
 
