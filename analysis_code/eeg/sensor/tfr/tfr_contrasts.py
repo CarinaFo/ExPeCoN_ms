@@ -16,8 +16,7 @@ import mne
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from behavioral_data_analysis import \
-    figure1 
+from behavioral_data_analysis import figure1
 from permutation_tests import cluster_correlation
 
 # set font to Arial and font size to 22
