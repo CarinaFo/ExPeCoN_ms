@@ -5,6 +5,10 @@
 # import packages
 import os
 import random
+import sys
+
+# add path to sys.path.append() if package isn't found
+sys.path.append('D:\\expecon_ms\\analysis_code')
 
 import matplotlib.pyplot as plt
 import mne
@@ -13,6 +17,7 @@ import pandas as pd
 import scipy
 import scipy.stats as stats
 import seaborn as sns
+from behavioral_data_analysis import figure1
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
@@ -31,10 +36,20 @@ freq_list = np.logspace(*np.log10([6, 35]), num=12)
 
 freq_bands = {'theta': (6, 9), 'alpha': (8, 14), 'low_beta': (14, 21), 'beta_gamma': (20, 36)}
 
-def save_band_power_per_trial():
-    
-    # load behavioral data
 
+def save_band_power_per_trial():
+
+    """This function saves the power per trial per frequency band in a csv file. 
+    The power is calculated for the prestimulus period (-400 to -200ms) and
+    averaged over the channels CP4, C4, C6, CP6.
+    The power is calculated for the following frequency bands:
+        - theta (6-9 Hz)
+        - alpha (8-14 Hz)
+        - low beta (14-21 Hz)
+        - beta gamma (20-36 Hz)
+    """
+
+    # load behavioral data
     os.chdir(behavpath)
 
     data = pd.read_csv("prepro_behav_data_after_rejectepochs.csv")
@@ -77,17 +92,19 @@ def save_band_power_per_trial():
     # concatenate the list of dataframes and save as csv
     pd.concat(brain_behav).to_csv(f"{brain_behav_path}\\brain_behav.csv")
 
+
 def power_criterion_corr():
 
-    """function that saves alpha and beta power per trial with the behavioral data in a csv file
-    correlates and extracts criterion change and prestimulus power change and plots regression plot
+    """This function correlates the power difference between low and high
+    expectations trials with the difference in dprime and criterion for
+    different frequency bands. 
     """
 
     df = pd.read_csv(f"{brain_behav_path}\\brain_behav.csv")
 
     freqs = ['theta_pw', 'alpha_pw', 'low_beta_pw', 'beta_gamma_pw']
 
-    diff_p_list, diff_s_list = [], []
+    diff_p_list = []
 
     # now get beta power per participant and per condition
     for f in freqs:
@@ -97,41 +114,29 @@ def power_criterion_corr():
         low = power.unstack()[0.25].reset_index()
         high = power.unstack()[0.75].reset_index()
 
-        diff_p = np.log(np.array(high[0.75]))-np.log(np.array(low[0.25]))
+        diff_p = np.log(np.array(low[0.25]))-np.log(np.array(high[0.75]))
 
         diff_p_list.append(diff_p)
 
-        # get SDT parameters per participant
-
-    out = prepare_data(df)
+    power_dict = {'theta': diff_p_list[0], 'alpha': diff_p_list[1], 'low_beta': diff_p_list[2], 'beta_gamma': diff_p_list[3]}
+    
+    out = figure1.prepare_behav_data()
         
-    crit = out[0][2]
+    dprime = out[0]
 
-    dprime = out[0][3]
+    crit = out[1]   
 
-    sdt_params = {'criterion': crit, 'd_prime': dprime}
+    sdt_params = {'dprime': dprime, 'criterion': crit}
 
-    for keys,values in sdt_params.items():
+    for p_key, p_value in power_dict.items(): # loop over the power difference
+        for keys, values in sdt_params.items(): # loop over the criterion and dprime difference
 
-        low = values[keys][:39]
+            print(scipy.stats.pearsonr(p_value, values))
 
-        high = values[keys][39:]
-
-        diff = np.array(high) - np.array(low)
-
-        diff_s_list.append(diff)
-
-    for p in diff_p_list: # loop over the power difference
-        for s in diff_s_list: # loop over the criterion and dprime difference
-
-            print(scipy.stats.pearsonr(s, p))
-
-            fig = sns.regplot(s, p)
+            fig = sns.regplot(p_value, values)
             
             os.chdir(r"D:\expecon_ms\figs\brain_behavior")
 
-            fig.figure.savefig(f'{keys}_.svg')
+            fig.figure.savefig(f'{p_key}_{keys}_.svg')
 
             plt.show()
-
-    return df
