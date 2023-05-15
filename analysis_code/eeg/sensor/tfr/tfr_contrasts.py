@@ -4,12 +4,21 @@
 
 # import packages
 import os
+import pickle
+import random
+import sys
+
+# add path to sys.path.append() if package isn't found
+sys.path.append('D:\\expecon_ms\\analysis_code')
+
+import matplotlib.pyplot as plt
 import mne
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import random
-import pickle
+import seaborn as sns
+from behavioral_data_analysis import \
+    figure1 
+from permutation_tests import cluster_correlation
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
@@ -138,6 +147,7 @@ def contrast_conditions():
     '''
 
     diff_all_subs_highlow, diff_all_subs_hitmiss = [], []
+    evo_high_all, evo_low_all = [], []
 
     # load behavioral data 
     # (make sure has the same amount of trials as epochs)
@@ -189,8 +199,11 @@ def contrast_conditions():
         evoked_power_high = power_high.average()
         evoked_power_low = power_low.average()
 
+        evo_high_all.append(evoked_power_high)
+        evo_low_all.append(evoked_power_low)
+
         # calculate the difference between conditions
-        diff_highlow = evoked_power_high - evoked_power_low
+        diff_highlow = evoked_power_low - evoked_power_high
 
         diff_hitmiss = evoked_power_hit - evoked_power_miss
 
@@ -199,7 +212,7 @@ def contrast_conditions():
         diff_all_subs_hitmiss.append(diff_hitmiss)
 
     # Save the list to a file
-    with open(f'{tfr_contrast_dir}//diff_all_subs_highlow.pickle', 'wb') as file:
+    with open(f'{tfr_contrast_dir}//diff_all_subs_lowhigh.pickle', 'wb') as file:
         pickle.dump(diff_all_subs_highlow, file)
         
     with open(f'{tfr_contrast_dir}//diff_all_subs_hitmiss.pickle', 'wb') as file:
@@ -364,6 +377,37 @@ def run_3D_cluster_perm_test(contrast_data=None):
                                                            adjacency=com_adjacency,
                                                            threshold=threshold_tfce,
                                                            n_jobs=-1)
+
+def run_cluster_correlation_2D(cond='lowhigh', channel_names=['CP4', 'CP6', 'C4', 'C6']):
+
+    # load behavioral data
+    df = pd.read_csv(f"{behavpath}//prepro_behav_data.csv")
+
+    out = figure1.prepare_behav_data(exclude_high_fa=False)
+
+    # low - high exp. condition
+
+    crit = out[0]
+
+    dprime = out[1]
+
+    # Load the contrast list from disk
+
+    with open(f'{tfr_contrast_dir}\\'
+              f'diff_all_subs_{cond}.pickle', 'rb') as file:
+        contrast_data = pickle.load(file)
+
+    spec_channel_list = []
+
+    for i, channel in enumerate(channel_names):
+        spec_channel_list.append(contrast_data[15].ch_names.index(channel))
+    spec_channel_list
+
+    X = np.array([d.crop(-0.5, 0).data for d in contrast_data])
+
+    mean_over_channels = np.mean(X[:, spec_channel_list, :, :], axis=1)
+
+    cluster_correlation.permutation_cluster_correlation_test(mean_over_channels, crit)
 
 ########################################################## Helper functions
 
