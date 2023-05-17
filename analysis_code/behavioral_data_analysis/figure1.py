@@ -5,6 +5,19 @@ import scipy.stats as stats
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
+import math
+
+def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_alarm):
+    llr = math.log((base_rate_signal / base_rate_catch) * (cost_hit / cost_false_alarm))
+    c = -0.5 * llr
+    return c
+
+
+c = calculate_optimal_c(0.25, 0.75, 1, 1)
+print("Optimal criterion (c) for low stimulus probability:", c)
+
+c = calculate_optimal_c(0.75, 0.25, 1, 1)
+print("Optimal criterion (c) for high stimulus probability:", c)
 
 
 def prepro_behavioral_data():
@@ -126,7 +139,7 @@ def prepare_behav_data(exclude_high_fa=False):
         return stats.norm.ppf(hitrate) - stats.norm.ppf(farate)
 
     def calc_criterion(hitrate, farate):
-        return -0.5 * (stats.norm.ppf(hitrate) + stats.norm.ppf(farate))
+        return -0.5*(stats.norm.ppf(hitrate) + stats.norm.ppf(farate))
 
     hitrate_low = signal_grouped.unstack()[0.25]
     farate_low = noise_grouped.unstack()[0.25]
@@ -168,7 +181,7 @@ def prepare_behav_data(exclude_high_fa=False):
     d_diff = np.array(d_prime_low) - np.array(d_prime_high)
     c_diff = np.array(criterion_low) - np.array(criterion_high)
 
-    return d_diff, c_diff, conf_con, d_cond, c_cond, fa_cond, hit_cond
+    return d_diff, c_diff, conf_con, d_cond, c_cond, fa_cond, hit_cond, acc_cue
 
 
 def plot_figure1_grid(blue='#2a95ffff', pink='#ff2a2aff',
@@ -402,7 +415,7 @@ def stats_figure1():
     """
     # non parametric
     t, p = stats.wilcoxon(c_cond[0], c_cond[1])
-    print(f'c: {p}')
+    print(f'c: {p} {t}')
 
     t, p = stats.wilcoxon(d_cond[0], d_cond[1])
     print(f'dprime: {p} {t}')
