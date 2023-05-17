@@ -40,6 +40,17 @@ library(ggplot2)
 # set working directory and load behavioral dataframe
 
 behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\prepro_behav_data.csv")
+behav = read.csv("D:\\expecon_ms\\figs\\brain_behavior\\brain_behav.csv")
+
+
+# convert power values, log transform and standardize (see Stephani et. al, 2021)
+
+behav$theta_scale_log <- scale(log10(behav$theta_pw), center=T, scale=T)
+behav$alpha_scale_log <- scale(log10(behav$alpha_pw), center=T, scale=T)
+behav$lowbeta_scale_log <- scale(log10(behav$low_beta_pw), center=T, scale=T)
+behav$beta_gamma_scale_log <- scale(log10(behav$beta_gamma_pw), center=T, scale=T)
+
+hist(behav$theta_scale_log)
 
 ###############manual SDT calculation##############
 
@@ -165,13 +176,51 @@ behav$prevconf = as.factor(behav$prevconf)
 cue_model = glmer(sayyes ~ isyes*cue + (isyes*cue|ID), data=behav, 
                   family=binomial(link='probit'),
                   control=glmerControl(optimizer="bobyqa",
-                                       optCtrl=list(maxfun=2e5)))
+                  optCtrl=list(maxfun=2e5)),
+                  )
 
-save(cue_model, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\sdt_cue.rda")
+saveRDS(cue_model, "D:\\expecon_ms\\analysis_code\\behav\\
+        linear_mixed_models\\cue_model.rda")
+cue_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\
+                     linear_mixed_models\\cue_model.rda")
+
+summary(cue_model)
+
+# fit sdt model with previous choice predictor
+
+cue_prev_model = glmer(sayyes ~ isyes*cue + prevsayyes 
+                       + (isyes*cue + prevsayyes|ID), data=behav, 
+                       family=binomial(link='probit'),
+                       control=glmerControl(optimizer="bobyqa",
+                       optCtrl=list(maxfun=2e5)),
+)
+
+saveRDS(cue_prev_model, "D:\\expecon_ms\\analysis_code\\behav\\
+        linear_mixed_models\\cue_prev_model.rda")
+cue_prev_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\
+                          linear_mixed_models\\cue_prev_model.rda")
+
+summary(cue_prev_model)
 
 # cue is still a significant predictor but less strong effect
 
 # including interaction between cue and previous choice
+
+cue_prev_int_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue 
+                           + (isyes*cue + prevsayyes*cue|ID), data=behav, 
+                           family=binomial(link='probit'),
+                           control=glmerControl(optimizer="bobyqa",
+                           optCtrl=list(maxfun=2e5)),
+)
+
+saveRDS(cue_prev_int_model, "D:\\expecon_ms\\analysis_code\\behav\\
+        linear_mixed_models\\cue_prev_int_model.rda")
+cue_prev_int_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\
+                              linear_mixed_models\\cue_prev_int_model.rda")
+
+summary(cue_prev_int_model)
+
+#################################Confidence#########################################################
 
 # do we see the same effect in confident responses and unconfident responses?
 
@@ -181,67 +230,104 @@ unconfident_trials_only = filter(behav, conf==0)
 # yes, significant interaction in both confident and unconfident trials but stronger in confident 
 # responses (however less unconfident trials)
 
-cue_lag_int_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue + (isyes*cue+prevsayyes*cue|ID), 
-                      data=unconfident_trials_only, family=binomial(link='probit'),
-                      control=glmerControl(optimizer="bobyqa",
-                                           optCtrl=list(maxfun=2e5)))
+cue_prev_int_conf_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue + (isyes*cue+prevsayyes*cue|ID), 
+                                data=confident_trials_only, family=binomial(link='probit'),
+                                control=glmerControl(optimizer="bobyqa",
+                                optCtrl=list(maxfun=2e5)))
 
-# still significant interaction, prevconf is not significantly predicting det response
+saveRDS(cue_lag_int_model_conf, "D:\\expecon_ms\\analysis_code\\behav\\
+        linear_mixed_models\\cue_prev_int_conf_model.rda")
+cue_prev_int_conf_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\
+                                   linear_mixed_models\\cue_prev_int_conf_model.rda")
 
-save(cue_lag_int_model, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\sdt_cue_prevchoice_int.rda")
+summary(cue_prev_int_conf_model)
 
+cue_prev_int_unconf_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue + (isyes*cue+prevsayyes*cue|ID), 
+                                  data=unconfident_trials_only, family=binomial(link='probit'),
+                                  control=glmerControl(optimizer="bobyqa",
+                                  optCtrl=list(maxfun=2e5)))
+
+saveRDS(cue_prev_int_unconf_model, "D:\\expecon_ms\\analysis_code\\behav\\
+        linear_mixed_models\\cue_prev_int_unconf_model.rda")
+cue_prev_int_unconf_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\
+                                     linear_mixed_models\\cue_prev_int_unconf_model.rda")
+
+summary(cue_prev_int_unconf_model)
+
+# significant interaction for both conf and unconf trials
+
+#######################################Prev confidence as regressor#################################
 
 # include confidence in previous trial as regressor
 
-cue_lag_int_conf_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue + prevconf + (isyes*cue+prevsayyes*cue
-                                                                            +prevconf|ID), 
-                          data=behav, family=binomial(link='probit'),
-                          control=glmerControl(optimizer="bobyqa",
-                                               optCtrl=list(maxfun=2e5)))
-
-# still significant interaction, prevconf is not significantly predicting det response
-
-save(cue_lag_int_conf_model, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_lag_int_conf_model.rda")
-
-cue_prevconf = glmer(sayyes ~ isyes*cue + prevconf*cue + (isyes*cue+prevconf*cue|ID), 
+cue_prev_int_confreg_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue + prevconf + 
+                              (isyes*cue+prevsayyes*cue+prevconf|ID), 
                               data=behav, family=binomial(link='probit'),
                               control=glmerControl(optimizer="bobyqa",
-                                                   optCtrl=list(maxfun=2e5)))
+                              optCtrl=list(maxfun=2e5)))
+
+saveRDS(cue_prev_int_confreg_model, "D:\\expecon_ms\\analysis_code\\
+        behav\\linear_mixed_models\\cue_prev_int_confreg_model.rda")
+
+cue_prev_int_confreg_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_confreg_model.rda")
+
+summary(cue_prev_int_confreg_model)
+
+# prev conf is not a sign. regressor
+
+cue_prevconf_int = glmer(sayyes ~ isyes*cue + prevconf*cue + (isyes*cue+prevconf*cue|ID), 
+                              data=behav, family=binomial(link='probit'),
+                              control=glmerControl(optimizer="bobyqa",
+                              optCtrl=list(maxfun=2e5)))
+
+saveRDS(cue_prevconf_int, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevconf_int.rda")
+cue_prevconf_int <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevconf_int.rda")
+
+summary(cue_prevconf_int)
 
 # cue is still significant, interaction between cue and previous confidence rating not
 
-save(cue_prevconf, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevconf.rda")
-
-
-cue_prevconf_resp = glmer(sayyes ~ isyes*cue + prevconf_resp*cue + (isyes*cue+prevconf_resp*cue|ID), 
-                     data=behav, family=binomial(link='probit'),
-                     control=glmerControl(optimizer="bobyqa",
-                                          optCtrl=list(maxfun=2e5)))
-
-# model doesn't converge
-
 ###########################################Metacognition############################################
+
+# does the detection response predict confidence?
 
 resp_conf = glmer(conf ~ sayyes + (sayyes|ID), data=behav, family=binomial(link='probit'))
 
-save(resp_conf, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\resp_conf.rda")
+saveRDS(resp_conf, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\resp_conf.rda")
+
+summary(resp_conf)
 
 # higher confidence in no responses
 
+# does accuracy predict confidence?
+
 conf_acc = glmer(conf ~ correct + (correct|ID), data=behav, family=binomial(link='probit'))
+
+saveRDS(conf_acc, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\conf_acc.rda")
+
+summary(conf_acc)
 
 # higher confidence in correct trials
 
-save(conf_acc, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\conf_acc.rda")
-
 conf_con = glmer(conf ~ congruency + (congruency|ID), data=behav, family=binomial(link='probit'))
+
+saveRDS(conf_con, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\conf_con.rda")
+
+summary(conf_con)
 
 #higher confidence in congruent trials
 
-conf_surprise = glmer(conf ~ congruency + (congruency|ID), data=behav, family=binomial(link='probit'))
+conf_surprise = glmer(conf ~ surprise + (surprise|ID), data=behav, 
+                      family=binomial(link='probit'))
+
+saveRDS(conf_surprise, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\conf_surprise.rda")
+
+summary(conf_surprise)
+
 # higher surprise, less confident
 
-# plot the model parameters
+#################################Plot model parameters##############################################
+
 # Set the font family and size
 
 par(family = "Arial", cex = 1.2)
@@ -250,6 +336,7 @@ est = sjPlot::plot_model(cue_lag_int_model, type='est')
 int = sjPlot::plot_model(cue_lag_int_model, type='int')
 
 # Extract coefficients
+
 coeffs <- as.data.frame(summary(cue_lag_int_model)$coefficients)
 
 # Plot coefficients
@@ -275,3 +362,57 @@ plot(eff, type="response", rug=FALSE)
 ggsave('D:\\expecon_ms\\figs\\behavior\\regression\\prev_sdt_estimates.svg', p1, device='svg', width=10, height=10)
 ggsave('D:\\expecon_ms\\figs\\behavior\\regression\\prev_sdt_int.svg', int[[1]], device='svg')
 ggsave('D:\\expecon_ms\\figs\\behavior\\regression\\prev_sdt_int_2.svg', int[[2]], device='svg')
+
+
+##############################brain behavior modelling##################################
+
+cue_theta = lmer(theta_scale_log ~ cue + (cue|ID), data=behav)
+cue_alpha = lmer(alpha_scale_log ~ cue + (cue|ID), data=behav, control=lmerControl(optimizer="bobyqa",
+                                                                                    optCtrl=list(maxfun=2e5)))
+cue_beta = lmer(lowbeta_scale_log ~ cue + (cue|ID), data=behav)
+cue_beta_gamma = lmer(beta_gamma_scale_log ~ cue + (cue|ID), data=behav)
+
+# previous choice predicts alpha, beta and beta_gamma power
+
+prevchoice_beta = lmer(lowbeta_scale_log ~ prevsayyes + (prevsayyes|ID), data=behav)
+prevchoice_alpha = lmer(alpha_scale_log ~ prevsayyes + (prevsayyes|ID), data=behav)
+prevchoice_theta = lmer(theta_scale_log ~ prevsayyes + (prevsayyes|ID), data=behav)
+prevchoice_beta_gamma = lmer(beta_gamma_scale_log ~ prevsayyes + (prevsayyes|ID), data=behav)
+
+# SDT model with beta power as covariate
+
+sdt_model_beta = glmer(sayyes ~ isyes*cue + lowbeta_scale_log + (isyes*cue + lowbeta_scale_log|ID), data=behav, 
+                        family=binomial(link='probit'),
+                        control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e5)))
+# only beta power is predicted by the cue
+
+cue_model_theta = glmer(sayyes ~ isyes*theta_scale_log + (isyes*theta_scale_log|ID), data=behav, 
+                  family=binomial(link='probit'),
+                  control=glmerControl(optimizer="bobyqa",
+                                       optCtrl=list(maxfun=2e5)))
+
+# theta is not a sign. predictor
+
+cue_model_alpha = glmer(sayyes ~ isyes*alpha_scale_log + (isyes*alpha_scale_log|ID), data=behav, 
+                        family=binomial(link='probit'),
+                        control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e5)))
+
+# alpha power is a sign. predictor, interaction is not significant
+
+
+cue_model_beta = glmer(sayyes ~ isyes*lowbeta_scale_log + prevsayyes+ (isyes*lowbeta_scale_log+prevsayyes|ID), data=behav, 
+                        family=binomial(link='probit'),
+                        control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e5)))
+
+# beta power is a sign. predictor, interaction is not significant
+
+cue_model_beta_gamma = glmer(sayyes ~ isyes*beta_gamma_scale_log + (isyes*beta_gamma_scale_log|ID), data=behav, 
+                             family=binomial(link='probit'),
+                             control=glmerControl(optimizer="bobyqa",
+                                                  optCtrl=list(maxfun=2e5)))
+
+# beta_gamma not sign. but interaction is significant
+
