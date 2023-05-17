@@ -405,16 +405,16 @@ def stats_figure1():
     print(f'c: {p}')
 
     t, p = stats.wilcoxon(d_cond[0], d_cond[1])
-    print(f'dprime: {p}')
+    print(f'dprime: {p} {t}')
 
     t, p = stats.wilcoxon(hit_cond[0], hit_cond[1])
-    print(f'hitrate: {p}')
+    print(f'hitrate: {p} {t}')
 
     t, p = stats.wilcoxon(fa_cond[0], fa_cond[1])
-    print(f'farate: {p}')
+    print(f'farate: {p} {t}')
 
     t, p = stats.wilcoxon(conf_con[0].iloc[:, 1], conf_con[1].iloc[:, 1])
-    print(f'confidence in correct trials only: {p}')
+    print(f'confidence in correct trials only: {p} {t}')
 
     t, p = stats.wilcoxon(acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1])
-    print(f'accuracy between conditions: {p}')
+    print(f'accuracy between conditions: {p} {t}')
