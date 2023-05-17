@@ -7,18 +7,6 @@ import matplotlib.gridspec as gridspec
 import numpy as np
 import math
 
-def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_alarm):
-    llr = math.log((base_rate_signal / base_rate_catch) * (cost_hit / cost_false_alarm))
-    c = -0.5 * llr
-    return c
-
-
-c = calculate_optimal_c(0.25, 0.75, 1, 1)
-print("Optimal criterion (c) for low stimulus probability:", c)
-
-c = calculate_optimal_c(0.75, 0.25, 1, 1)
-print("Optimal criterion (c) for high stimulus probability:", c)
-
 
 def prepro_behavioral_data():
 
@@ -92,6 +80,27 @@ def prepro_behavioral_data():
     os.chdir(behavpath)
     data.to_csv("prepro_behav_data.csv")
 
+def diff_from_optimal_criterion():
+    """ This function calculates the difference between the optimal criterion
+    and the mean criterion for each participant and cue condition."""
+    
+    # calculate the optimal criterion (c) for a given base rate of signal and catch trials, and cost of hit and false alarm
+    def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_alarm):
+        llr = math.log((base_rate_signal / base_rate_catch) * (cost_hit / cost_false_alarm))
+        c = -0.5 * llr
+        return c
+
+    c_low = calculate_optimal_c(0.25, 0.75, 1, 1)
+    print("Optimal criterion (c) for low stimulus probability:", c_low)
+
+    c_high = calculate_optimal_c(0.75, 0.25, 1, 1)
+    print("Optimal criterion (c) for high stimulus probability:", c_high)
+
+    subop_low = [c - c_low for c in criterion_low]
+    diff_op_low = np.mean(subop_low)
+
+    subop_high = [c - c_high for c in criterion_high]
+    diff_op_high = np.mean(subop_high)
 
 def prepare_behav_data(exclude_high_fa=False):
     """
