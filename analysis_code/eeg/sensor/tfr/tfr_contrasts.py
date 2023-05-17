@@ -113,6 +113,9 @@ def calculate_power_per_trial(tmin=-0.5, tmax=0,
         # drop bad epochs
         epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
 
+        # save behavioral data after bad epochs rejection
+        data = pd.read_csv(f"{behavpath}//prepro_behav_data_after_rejectepochs.csv")
+
         # crop the data in the pre-stimulus window
         epochs.crop(tmin, tmax)
 
@@ -151,9 +154,7 @@ def contrast_conditions():
     # load behavioral data 
     # (make sure has the same amount of trials as epochs)
 
-    os.chdir(behavpath)
-
-    data = pd.read_csv("prepro_behav_data_after_rejectepochs.csv")
+    data = pd.read_csv(f"{behavpath}//prepro_behav_data_after_rejectepochs.csv")
 
     for counter, subj in enumerate(IDlist):
 
