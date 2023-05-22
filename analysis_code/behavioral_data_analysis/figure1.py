@@ -83,7 +83,7 @@ def prepro_behavioral_data():
 def diff_from_optimal_criterion():
     """ This function calculates the difference between the optimal criterion
     and the mean criterion for each participant and cue condition."""
-    
+
     # calculate the optimal criterion (c) for a given base rate of signal and catch trials, and cost of hit and false alarm
     def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_alarm):
         llr = math.log((base_rate_signal / base_rate_catch) * (cost_hit / cost_false_alarm))
@@ -98,9 +98,11 @@ def diff_from_optimal_criterion():
 
     subop_low = [c - c_low for c in criterion_low]
     diff_op_low = np.mean(subop_low)
-
+    print(diff_op_low)
+    
     subop_high = [c - c_high for c in criterion_high]
     diff_op_high = np.mean(subop_high)
+    print(diff_op_high)
 
 def prepare_behav_data(exclude_high_fa=False):
     """
