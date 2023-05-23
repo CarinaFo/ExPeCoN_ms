@@ -185,6 +185,8 @@ auto_model = glmer(isyes ~ previsyes*cue+(previsyes*cue|ID), data=behav,
                   family=binomial(link='probit'),
 )
 
+summary(auto_model)
+
 # fit sdt model
 
 cue_model = glmer(sayyes ~ isyes*cue + (isyes*cue|ID), data=behav, 
@@ -199,6 +201,17 @@ cue_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\
 
 summary(cue_model)
 
+cue_prev_model = glmer(sayyes ~ isyes*cue + prevsayyes
+                           + (isyes*cue + prevsayyes|ID), data=behav, 
+                           family=binomial(link='probit'),
+                           control=glmerControl(optimizer="bobyqa",
+                                                optCtrl=list(maxfun=2e5)),
+)
+
+saveRDS(cue_prev_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_model.rda")
+cue_prev_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_model.rda")
+
+summary(cue_prev_model)
 
 # Set the font family and size
 
@@ -207,52 +220,6 @@ par(family = "Arial", cex = 1.2)
 est = sjPlot::plot_model(cue_model, type='est')
 int = sjPlot::plot_model(cue_model, type='int')
 
-
-# fit sdt model with previous choice predictor
-
-cue_prev_model = glmer(sayyes ~ isyes*cue + prevsayyes 
-                       + (isyes*cue + prevsayyes|ID), data=behav, 
-                       family=binomial(link='probit'),
-                       control=glmerControl(optimizer="bobyqa",
-                       optCtrl=list(maxfun=2e5)),
-)
-
-saveRDS(cue_prev_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_model.rda")
-cue_prev_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_model.rda")
-
-AIC(cue_model)
-AIC(cue_prev_model)
-anova(cue_model, cue_prev_model, test='LRT')
-
-est = sjPlot::plot_model(cue_prev_model, type='est')
-int = sjPlot::plot_model(cue_prev_model, type='int')
-
-cue_prevstim_model = glmer(sayyes ~ isyes*cue + previsyes + 
-                       + (isyes*cue + previsyes|ID), data=behav, 
-                       family=binomial(link='probit'),
-                       control=glmerControl(optimizer="bobyqa",
-                                            optCtrl=list(maxfun=2e5)),
-)
-
-saveRDS(cue_prevstim_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevstim_model.rda")
-cue_prevstim_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevstim_model.rda")
-
-summary(cue_prevstim_model)
-
-#check for interaction
-
-cue_prevstim_int_model = glmer(sayyes ~ isyes*cue + previsyes*cue + 
-                             + (isyes*cue + previsyes*cue|ID), data=behav, 
-                           family=binomial(link='probit'),
-                           control=glmerControl(optimizer="bobyqa",
-                                                optCtrl=list(maxfun=2e5)),
-)
-
-saveRDS(cue_prevstim_int_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevstim_int_model.rda")
-cue_prevstim_int_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevstim_int_model.rda")
-
-summary(cue_prevstim_int_model)
-
 # previous stimulus is not significant
 
 # cue is still a significant predictor but less strong effect
@@ -260,7 +227,7 @@ summary(cue_prevstim_int_model)
 # including interaction between cue and previous choice
 
 cue_prev_int_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue 
-                           + (isyes*cue + prevsayyes*cue|ID), data=behav, 
+                           + (prevsayyes*cue + prevsayyes*cue|ID), data=behav, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                            optCtrl=list(maxfun=2e5)),
@@ -275,9 +242,79 @@ AIC(cue_model)
 AIC(cue_prev_model)
 AIC(cue_prev_int_model)
 
+######################## separate model for signal and noise trials only###############
 
-est = sjPlot::plot_model(cue_prev_int_model, type='est')
-int = sjPlot::plot_model(cue_prev_int_model, type='int')
+signal = filter(behav, isyes==1)
+noise = filter(behav, isyes==0)
+
+cue_prev_int_signal_model = glmer(sayyes ~ prevsayyes*cue 
+                           + (prevsayyes*cue|ID), data=signal, 
+                           family=binomial(link='probit'),
+                           control=glmerControl(optimizer="bobyqa",
+                                                optCtrl=list(maxfun=2e5)),
+)
+
+
+cue_prev_int_noise_model = glmer(sayyes ~ prevsayyes*cue 
+                                  + (prevsayyes*cue|ID), data=noise, 
+                                  family=binomial(link='probit'),
+                                  control=glmerControl(optimizer="bobyqa",
+                                                       optCtrl=list(maxfun=2e5)),
+)
+
+saveRDS(cue_prev_int_signal_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_signal_model.rda")
+saveRDS(cue_prev_int_noise_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_noise_model.rda")
+
+cue_prev_int_signal_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_signal_model.rda")
+cue_prev_int_noise_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_noise_model.rda")
+
+summary(cue_prev_int_signal_model)
+summary(cue_prev_int_noise_model)
+
+est = sjPlot::plot_model(cue_prev_int_signal_model, type='est')
+int = sjPlot::plot_model(cue_prev_int_signal_model, type='int')
+
+est = sjPlot::plot_model(cue_prev_int_noise_model, type='est')
+int = sjPlot::plot_model(cue_prev_int_noise_model, type='int')
+
+##################separate model for confident/unconfident previous response#######
+
+conf = filter(behav, prevconf==1)
+unconf = filter(behav, prevconf==0)
+
+
+cue_prev_int_conf_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue+ 
+                                  + (isyes*cue + prevsayyes*cue|ID), data=conf, 
+                                  family=binomial(link='probit'),
+                                  control=glmerControl(optimizer="bobyqa",
+                                                       optCtrl=list(maxfun=2e5)),
+)
+
+
+cue_prev_int_unconf_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue 
+                                 + (isyes*cue + prevsayyes*cue|ID), data=unconf, 
+                                 family=binomial(link='probit'),
+                                 control=glmerControl(optimizer="bobyqa",
+                                                      optCtrl=list(maxfun=2e5)),
+)
+
+
+saveRDS(cue_prev_int_conf_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_conf_model.rda")
+saveRDS(cue_prev_int_unconf_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_unconf_model.rda")
+
+cue_prev_int_conf_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_conf_model.rda")
+cue_prev_int_unconf_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_unconf_model.rda")
+
+summary(cue_prev_int_conf_model)
+summary(cue_prev_int_unconf_model)
+
+est = sjPlot::plot_model(cue_prev_int_conf_model, type='est')
+int = sjPlot::plot_model(cue_prev_int_conf_model, type='int')
+
+est = sjPlot::plot_model(cue_prev_int_unconf_model, type='est')
+int = sjPlot::plot_model(cue_prev_int_unconf_model, type='int')
+
+######################################################################################
 
 
 cue_prevacc_int_model = glmer(sayyes ~ isyes*cue+prevacc*cue+ (isyes*cue+prevacc*cue|ID), 
