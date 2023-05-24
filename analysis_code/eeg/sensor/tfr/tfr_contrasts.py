@@ -172,10 +172,14 @@ def contrast_conditions():
 
         power.metadata = subj_data
 
-        # get high and low expectation trials
-        power_high = power[(power.metadata.cue == 0.75)]
-        power_low = power[(power.metadata.cue == 0.25)]
-
+        # get high and low probability trials for correct rejections
+        power_high = power[((power.metadata.cue == 0.75)
+                           & (power.metadata.isyes == 0)
+                           & (power.metadata.sayyes == 0))]
+        power_low = power[((power.metadata.cue == 0.25)
+                           & (power.metadata.isyes == 0)
+                           & (power.metadata.sayyes == 0))]
+        
         # randomly sample from low power trials to match number of trials
         # in high power condition (equalize epoch counts mne not supported
         # for tfrepochs object (yet))
