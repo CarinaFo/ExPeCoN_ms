@@ -34,7 +34,7 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(tmin=0, tmax=0.3, cond='highlow_prevyes',
+def create_contrast(tmin=0, tmax=0.3, cond='highlow_noise',
                     cond_a='high', cond_b='low', laplace=True,
                     reject_criteria=dict(eeg=200e-6),
                     flat_criteria=dict(eeg=1e-6)):
@@ -104,38 +104,43 @@ def create_contrast(tmin=0, tmax=0.3, cond='highlow_prevyes',
         epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
 
         # create contrasts
-        if cond == 'highlow':
+        if cond == 'highlow': # sign in prestim window
             epochs_a = epochs[(epochs.metadata.cue == 0.75)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-        elif cond == 'prevchoice':
+        elif cond == 'prevchoice': # no sign. cluster in prestim window
             epochs_a = epochs[(epochs.metadata.prevsayyes == 1)]
-            epochs_b = epochs[(epochs.metadata.prevsayyes == 0)]  # no sign. cluster
-        elif cond == 'prevstim':
+            epochs_b = epochs[(epochs.metadata.prevsayyes == 0)]
+        elif cond == 'prevstim':   # no sign cluster in prestim window
             epochs_a = epochs[(epochs.metadata.previsyes == 1)]
-            epochs_b = epochs[(epochs.metadata.previsyes == 0)]  # no sign cluster
-        elif cond == 'prevchoice_yes':
-            epochs_a = epochs[((epochs.metadata.cue == 0.75)  # no sign. cluster
+            epochs_b = epochs[(epochs.metadata.previsyes == 0)]
+        elif cond == 'prevchoice_yes': # no sign. cluster in prestim window
+            epochs_a = epochs[((epochs.metadata.cue == 0.75)
                               & (epochs.metadata.prevsayyes == 1))]
             epochs_b = epochs[((epochs.metadata.cue == 0.25)
                               & (epochs.metadata.prevsayyes == 1))]
-        elif cond == 'prevchoice_no':  # sign. cluster, similar to highlow
-            epochs_a = epochs[(epochs.metadata.cue == 0.75) 
+        elif cond == 'prevchoice_no':  # sign. cluster, similar to highlow in prestim window
+            epochs_a = epochs[(epochs.metadata.cue == 0.75)
                               & (epochs.metadata.prevsayyes == 0)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)
                               & (epochs.metadata.prevsayyes == 0)]
-        elif cond == 'highlow_prevno':  
+        elif cond == 'highlow_prevno':  # n.s. in poststim window
             epochs_a = epochs[((epochs.metadata.prevsayyes == 0)
                               & (epochs.metadata.isyes == 0)
                               & (epochs.metadata.cue == 0.75))]
             epochs_b = epochs[((epochs.metadata.prevsayyes == 0)
                               & (epochs.metadata.isyes == 0)
                               & (epochs.metadata.cue == 0.25))]
-        elif cond == 'highlow_prevyes':  
+        elif cond == 'highlow_prevyes':  # n.s. in poststim window
             epochs_a = epochs[((epochs.metadata.prevsayyes == 1)
                               & (epochs.metadata.isyes == 0)
                               & (epochs.metadata.cue == 0.75))]
             epochs_b = epochs[((epochs.metadata.prevsayyes == 1)
                               & (epochs.metadata.isyes == 0)
+                              & (epochs.metadata.cue == 0.25))]
+        elif cond == 'highlow_noise':   # n.s. in poststim window
+            epochs_a = epochs[((epochs.metadata.isyes == 0)
+                              & (epochs.metadata.cue == 0.75))]
+            epochs_b = epochs[((epochs.metadata.isyes == 0)
                               & (epochs.metadata.cue == 0.25))]
         
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
@@ -169,8 +174,7 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
     a_gra = mne.grand_average(evokeds_a_all)
     b_gra = mne.grand_average(evokeds_b_all)
 
-    if average_over_channels == True:
-            
+    if average_over_channels == True: 
         a = np.array([ax.copy().pick_channels(channels).data 
                       for ax in evokeds_a_all])
         b = np.array([bx.copy().pick_channels(channels).data 
@@ -182,7 +186,7 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
 
         X = a-b
 
-        t, p, h = mne.stats.permutation_t_test(X, n_permutations=perm, tail=0, 
+        t, p, h = mne.stats.permutation_t_test(X, n_permutations=perm, tail=0,
                                                n_jobs=-1)
 
         min(p)
@@ -193,10 +197,10 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
     X = np.transpose(X, [0, 2, 1])
 
     # load cleaned epochs
-    subj='007'
+    subj = '007'
     epochs = mne.read_epochs(f"{dir_cleanepochs}/P{subj}_epochs_after_ica-epo.fif")
 
-    ch_adjacency,_ = mne.channels.find_ch_adjacency(epochs.info, ch_type='eeg')
+    ch_adjacency, _ = mne.channels.find_ch_adjacency(epochs.info, ch_type='eeg')
 
     # threshold_tfce = dict(start=0, step=0.1)
 
@@ -206,20 +210,21 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
                                                                                     tail=0, n_jobs=-1
                                                                                     )
 
-    good_cluster_inds = np.where(cluster_p_values < 0.05)[0] # times where something significant happened
+    good_cluster_inds = np.where(cluster_p_values < 0.05)[0]  # find significant clusters
 
     print(len(good_cluster_inds))
     print(cluster_p_values)
 
     # now plot the significant cluster(s)
     a = cond_a
-    b= cond_b
+    b = cond_b
 
     # configure variables for visualization
     colors = {a: "#ff2a2aff", b: '#2a95ffff'}
 
     # organize data for plotting
-    # instead of grand average we could use the evoked data per subject so that we can plot CIs
+    # instead of grand average we could use the evoked data per subject so 
+    # that we can plot CIs
     grand_average = {a: a_gra, b: b_gra}
 
     # # loop over clusters
@@ -246,9 +251,10 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
         t_evoked = mne.EvokedArray(t_map[:, np.newaxis], a_gra.info, tmin=0)
 
         t_evoked.plot_topomap(times=0, mask=mask, axes=ax_topo,
-                            show=False,
-                            colorbar=False,
-                            mask_params=dict(markersize=10))
+                              show=False,
+                              colorbar=False,
+                              mask_params=dict(markersize=10))
+        
         image = ax_topo.images[0]
 
         # create additional axes (for ERF and colorbar)
@@ -257,7 +263,8 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
         # add axes for colorbar
         ax_colorbar = divider.append_axes('right', size='5%', pad=0.05)
         plt.colorbar(image, cax=ax_colorbar)
-        ax_topo.set_xlabel('Averaged t-map ({:0.3f} - {:0.3f} s)'.format(*sig_times[[0, -1]]))
+        ax_topo.set_xlabel('Averaged t-map ({:0.3f} - {:0.3f} s)'
+                           .format(*sig_times[[0, -1]]))
 
         # add new axis for time courses and plot time courses
         ax_signals = divider.append_axes('right', size='300%', pad=1.2)
@@ -274,7 +281,7 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
         # plot temporal cluster extent
         ymin, ymax = ax_signals.get_ylim()
         ax_signals.fill_betweenx((ymin, ymax), sig_times[0], sig_times[-1],
-                                    color='darkgreen', alpha=0.3)
+                                  color='lightgrey', alpha=0.3)
 
         # clean up viz
         mne.viz.tight_layout(fig=fig)
