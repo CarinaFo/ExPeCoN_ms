@@ -12,21 +12,21 @@
 # cluster_perm_space_time: runs a cluster permutation test over electrodes and timepoints
 # in sensor space and plots the output and saves it
 
+import matplotlib.pyplot as plt
 import mne
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
-import os
 import pandas as pd
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
 
 # set paths
-dir_cleanepochs = r"D:\expecon_ms\data\eeg\prepro_ica\clean_epochs"
+dir_cleanepochs = 'D:\\expecon_ms\\data\\eeg\prepro_ica\\clean_epochs'
+behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
-# save cluster figures as svg and png files
-save_dir_cluster_output = r"D:\expecon_ms\figs\eeg\sensor\evokeds"
+# figure path
+savedir_figs = 'D:\\expecon_ms\\figs\\manuscript_figures\\Figure3'
 
 # participant index
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
@@ -34,12 +34,12 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(perm=10000, tmin=0, tmax=0.5, cond='highsignal', cond_a=
-                            'high', cond_b='low', laplace=True):
+def create_contrast(tmin=0, tmax=0.3, cond='highlow_prevyes',
+                    cond_a='high', cond_b='low', laplace=True,
+                    reject_criteria=dict(eeg=200e-6),
+                    flat_criteria=dict(eeg=1e-6)):
 
-    """ this function runs a cluster permutation test over electrodes and timepoints
-    in sensor space and plots the output and saves it
-    input: 
+    """ this function t: 
     perm: how many permutations for cluster test
     tmin: crop the epochs at this time in seconds
     tmax: crop the data until this time in seconds
@@ -54,19 +54,20 @@ def create_contrast(perm=10000, tmin=0, tmax=0.5, cond='highsignal', cond_a=
 
     evokeds_a_all, evokeds_b_all = [], []
 
-    for idx, subj in enumerate(IDlist):
+    for counter, subj in enumerate(IDlist):
 
         # print participant ID
         print('Analyzing ' + subj)
+
         # skip those participants
-        if subj == '040' or subj == '045' or subj == '032':
+        if subj == '040' or subj == '045' or subj == '032' or subj == '016':
             continue
 
         # load cleaned epochs
-        epochs = mne.read_epochs(f"{dir_cleanepochs}/P{subj}_epochs_after_ica-epo.fif")
+        epochs = mne.read_epochs(f"{dir_cleanepochs}"
+                                 f"/P{subj}_epochs_after_ica-epo.fif")
 
         # Remove 5 blocks with hitrates < 0.2 or > 0.8
-
         if subj == '010':
             epochs = epochs[epochs.metadata.block != 6]
         if subj == '012':
@@ -78,64 +79,116 @@ def create_contrast(perm=10000, tmin=0, tmax=0.5, cond='highsignal', cond_a=
         if subj == '039':
             epochs = epochs[epochs.metadata.block != 3]
         
-        # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
-        before_rt_removal = len(epochs.metadata)
+        # remove trials with rts >= 2.5 (no response trials) 
+        # and trials with rts < 0.1
         epochs = epochs[epochs.metadata.respt1 > 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
 
         # remove first trial of each block (trigger delays)
         epochs = epochs[epochs.metadata.trial != 1]
-        
-        #save n_trials per participant
-        all_trials.append(len(epochs.metadata))
 
-        trials_removed.append(before_rt_removal - len(epochs.metadata))
+        # load behavioral data
+        data = pd.read_csv(f"{behavpath}//prepro_behav_data.csv")
 
-        #high vs. low condition
+        subj_data = data[data.ID == counter+7]
+
+        if ((counter == 5) or (counter == 13) or
+           (counter == 21) or (counter == 28)):  # first epoch has no data
+            epochs.metadata = subj_data.iloc[1:, :]
+        elif counter == 17:
+            epochs.metadata = subj_data.iloc[3:, :]
+        else:
+            epochs.metadata = subj_data
+
+        # drop bad epochs
+        epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
+
+        # create contrasts
         if cond == 'highlow':
             epochs_a = epochs[(epochs.metadata.cue == 0.75)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-        elif cond == 'signalnoise':
-            epochs_a = epochs[(epochs.metadata.isyes == 1)]
-            epochs_b = epochs[(epochs.metadata.isyes == 0)]
-        elif cond == 'highsignal':
-            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 1))]
-            epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.isyes == 1))]
-        elif cond == 'highnoise':
-            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 0))]
-            epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.isyes == 0))]
+        elif cond == 'prevchoice':
+            epochs_a = epochs[(epochs.metadata.prevsayyes == 1)]
+            epochs_b = epochs[(epochs.metadata.prevsayyes == 0)]  # no sign. cluster
+        elif cond == 'prevstim':
+            epochs_a = epochs[(epochs.metadata.previsyes == 1)]
+            epochs_b = epochs[(epochs.metadata.previsyes == 0)]  # no sign cluster
+        elif cond == 'prevchoice_yes':
+            epochs_a = epochs[((epochs.metadata.cue == 0.75)  # no sign. cluster
+                              & (epochs.metadata.prevsayyes == 1))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.25)
+                              & (epochs.metadata.prevsayyes == 1))]
+        elif cond == 'prevchoice_no':  # sign. cluster, similar to highlow
+            epochs_a = epochs[(epochs.metadata.cue == 0.75) 
+                              & (epochs.metadata.prevsayyes == 0)]
+            epochs_b = epochs[(epochs.metadata.cue == 0.25)
+                              & (epochs.metadata.prevsayyes == 0)]
+        elif cond == 'highlow_prevno':  
+            epochs_a = epochs[((epochs.metadata.prevsayyes == 0)
+                              & (epochs.metadata.isyes == 0)
+                              & (epochs.metadata.cue == 0.75))]
+            epochs_b = epochs[((epochs.metadata.prevsayyes == 0)
+                              & (epochs.metadata.isyes == 0)
+                              & (epochs.metadata.cue == 0.25))]
+        elif cond == 'highlow_prevyes':  
+            epochs_a = epochs[((epochs.metadata.prevsayyes == 1)
+                              & (epochs.metadata.isyes == 0)
+                              & (epochs.metadata.cue == 0.75))]
+            epochs_b = epochs[((epochs.metadata.prevsayyes == 1)
+                              & (epochs.metadata.isyes == 0)
+                              & (epochs.metadata.cue == 0.25))]
+        
+        mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
         # apply laplace transform
         if laplace == True:
             epochs_a = mne.preprocessing.compute_current_source_density(epochs_a)
             epochs_b = mne.preprocessing.compute_current_source_density(epochs_b)
 
-        #average and crop in prestimulus window
+        # average and crop in defined time window
         evokeds_a = epochs_a.average().crop(tmin, tmax)
         evokeds_b = epochs_b.average().crop(tmin, tmax)
 
         evokeds_a_all.append(evokeds_a)
         evokeds_b_all.append(evokeds_b)
         
-        # save trial number and trials removed to csv file
+        # save n_trials per participant and trials removed to a csv file
+        pd.DataFrame(trials_removed).to_csv(f'{behavpath}//trials_removed.csv')
+        pd.DataFrame(all_trials).to_csv(f'{behavpath}//trials_per_subject.csv')
 
-        pd.DataFrame(trials_removed).to_csv('trials_removed.csv')
-        pd.DataFrame(all_trials).to_csv('trials_per_subject.csv')
+    return evokeds_a_all, evokeds_b_all, cond_a, cond_b, cond
 
-    return evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b
 
-def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all,
-                                 cond_a, cond_b, perm=10000, tmin=-0.5, tmax=0, cond='highsignal', laplace=True):
+def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6'],
+                                 average_over_channels=False):
 
     # get grand average over all subjects for plotting the results later
+
+    evokeds_a_all, evokeds_b_all, cond_a, cond_b, cond = create_contrast()
 
     a_gra = mne.grand_average(evokeds_a_all)
     b_gra = mne.grand_average(evokeds_b_all)
 
-    a = np.array([ax.data for ax in evokeds_a_all])
-    b = np.array([bx.data for bx in evokeds_b_all])
+    if average_over_channels == True:
+            
+        a = np.array([ax.copy().pick_channels(channels).data 
+                      for ax in evokeds_a_all])
+        b = np.array([bx.copy().pick_channels(channels).data 
+                      for bx in evokeds_b_all])
 
-    X = [ax.data-bx.data for ax,bx in zip(evokeds_a_all, evokeds_b_all)]
+        # take mean over channels
+        a = np.mean(a, axis=1)
+        b = np.mean(b, axis=1)
+
+        X = a-b
+
+        t, p, h = mne.stats.permutation_t_test(X, n_permutations=perm, tail=0, 
+                                               n_jobs=-1)
+
+        min(p)
+
+    # create contrast
+    X = [ax.data-bx.data for ax, bx in zip(evokeds_a_all, evokeds_b_all)]
 
     X = np.transpose(X, [0, 2, 1])
 
@@ -145,7 +198,7 @@ def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all,
 
     ch_adjacency,_ = mne.channels.find_ch_adjacency(epochs.info, ch_type='eeg')
 
-    threshold_tfce = dict(start=0, step=0.1)
+    # threshold_tfce = dict(start=0, step=0.1)
 
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X[:,:,:], n_permutations=perm,
                                                                                     adjacency=ch_adjacency, 
@@ -194,7 +247,8 @@ def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all,
 
         t_evoked.plot_topomap(times=0, mask=mask, axes=ax_topo,
                             show=False,
-                                colorbar=False, mask_params=dict(markersize=10))
+                            colorbar=False,
+                            mask_params=dict(markersize=10))
         image = ax_topo.images[0]
 
         # create additional axes (for ERF and colorbar)
@@ -211,9 +265,11 @@ def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all,
         if len(ch_inds) > 1:
             title += "s (mean)"
 
-        mne.viz.plot_compare_evokeds(grand_average, title=title, picks=ch_inds, axes=ax_signals,
-                                        colors=colors, show=False, ci=True,
-                                        split_legend=True, legend='lower right', truncate_yaxis='auto')
+        mne.viz.plot_compare_evokeds(grand_average, title=title, picks=ch_inds, 
+                                     axes=ax_signals,
+                                     colors=colors, show=False, ci=True,
+                                     split_legend=True, legend='lower right', 
+                                     truncate_yaxis='auto')
 
         # plot temporal cluster extent
         ymin, ymax = ax_signals.get_ylim()
@@ -223,7 +279,7 @@ def cluster_perm_space_time_plot(evokeds_a_all, evokeds_b_all,
         # clean up viz
         mne.viz.tight_layout(fig=fig)
         fig.subplots_adjust(bottom=.05)
-        os.chdir(save_dir_cluster_output)
-        plt.savefig('cluster_highnoise_post_' + str(i_clu) + '.svg')
-        plt.savefig('cluster_highnoise_post_' + str(i_clu) + '.png')
+   
+        plt.savefig(f'{savedir_figs}//cluster_{cond}_{str(i_clu)}.svg')
+        plt.savefig(f'{savedir_figs}//cluster_{cond}_{str(i_clu)}.png')
         plt.show()
