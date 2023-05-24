@@ -160,6 +160,9 @@ def contrast_conditions():
     data = pd.read_csv(f"{behavpath}//prepro_behav_data_after_rejectepochs.csv")
 
     for counter, subj in enumerate(IDlist):
+       
+        # store permutations
+        power_low_perm, power_high_perm = [], [] 
 
         # skip those participants
         if subj == '040' or subj == '045' or subj == '032' or subj == '016':
@@ -183,22 +186,38 @@ def contrast_conditions():
         # randomly sample from low power trials to match number of trials
         # in high power condition (equalize epoch counts mne not supported
         # for tfrepochs object (yet))
+        # run 100 times and average over TFR average object
+        for i in range(500):
+            if power_low.data.shape[0] > power_high.data.shape[0]:
+                random_sample = power_high.data.shape[0]
+                idx_list = list(range(power_low.data.shape[0]))
 
-        if power_low.data.shape[0] > power_high.data.shape[0]:
-            random_sample = power_high.data.shape[0]
-            idx_list = list(range(power_low.data.shape[0]))
+                power_low_idx = random.sample(idx_list, random_sample)
 
-            power_low_idx = random.sample(idx_list, random_sample)
+                power_low.data = power_low.data[power_low_idx, :, :, :]
+            else:
+                random_sample = power_low.data.shape[0]
+                idx_list = list(range(power_high.data.shape[0]))
 
-            power_low.data = power_low.data[power_low_idx, :, :, :]
-        else:
-            random_sample = power_low.data.shape[0]
-            idx_list = list(range(power_high.data.shape[0]))
+                power_high_idx = random.sample(idx_list, random_sample)
 
-            power_high_idx = random.sample(idx_list, random_sample)
+                power_high.data = power_high.data[power_high_idx, :, :, :]
 
-            power_high.data = power_high.data[power_high_idx, :, :, :]
+            evoked_power_high = power_high.average()
+            evoked_power_low = power_low.average()
 
+            power_high_perm.append(evoked_power_high)
+            power_low_perm.append(evoked_power_low)
+
+        # average across permutations
+        evoked_power_high_perm_arr = np.mean(np.array([p.data for p in power_high_perm]), axis=0)
+        evoked_power_low_perm_arr = np.mean(np.array([p.data for p in power_low_perm]), axis=0)
+
+        # put back into TFR object
+        evoked_power_high_perm = mne.time_frequency.AverageTFR(power.info, evoked_power_high_perm_arr, 
+                                                               power.times, power.freqs, power_high.data.shape[0])
+        evoked_power_low_perm = mne.time_frequency.AverageTFR(power.info, evoked_power_low_perm_arr, 
+                                                              power.times, power.freqs, power_low.data.shape[0])
 
         # get hit and miss trials
         power_hit = power[((power.metadata.isyes == 1) &
@@ -209,14 +228,11 @@ def contrast_conditions():
         evoked_power_hit = power_hit.average()
         evoked_power_miss = power_miss.average()
 
-        evoked_power_high = power_high.average()
-        evoked_power_low = power_low.average()
-
         evo_high_all.append(evoked_power_high)
         evo_low_all.append(evoked_power_low)
 
         # calculate the difference between conditions
-        diff_highlow = evoked_power_high - evoked_power_low
+        diff_highlow = evoked_power_high_perm - evoked_power_low_perm
 
         diff_hitmiss = evoked_power_hit - evoked_power_miss
 
@@ -225,7 +241,7 @@ def contrast_conditions():
         diff_all_subs_hitmiss.append(diff_hitmiss)
 
     # Save the list to a file
-    with open(f'{tfr_contrast_dir}//diff_all_subs_highlow.pickle', 'wb') as file:
+    with open(f'{tfr_contrast_dir}//diff_all_subs_highlow_permuted.pickle', 'wb') as file:
         pickle.dump(diff_all_subs_highlow, file)
         
     with open(f'{tfr_contrast_dir}//diff_all_subs_hitmiss.pickle', 'wb') as file:
