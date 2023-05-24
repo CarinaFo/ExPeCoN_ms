@@ -20,7 +20,8 @@ from behavioral_data_analysis import figure1
 from permutation_tests import cluster_correlation
 
 # set font to Arial and font size to 22
-plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
+plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 
+                     'font.sans-serif': 'Arial'})
 
 # datapaths
 tfr_single_trial_power_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\single_trial_power"
@@ -29,9 +30,11 @@ savedir_figure4 = 'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4'
 dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs"
 behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
-IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
-          '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
-          '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
+IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
+          '017', '018', '019', '020', '021','022', '023', '024', '025', '026',
+          '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
+          '037', '038', '039', '040', '041', '042', '043', '044', '045', '046',
+          '047', '048', '049')
 
 
 def calculate_power_per_trial(tmin=-0.5, tmax=0,
@@ -170,22 +173,28 @@ def contrast_conditions():
         power.metadata = subj_data
 
         # get high and low expectation trials
-        power_high = power[((power.metadata.cue == 0.75) &
-                           (power.metadata.isyes == 0) &
-                           (power.metadata.sayyes == 0))]
-        power_low = power[((power.metadata.cue == 0.25) &
-                          (power.metadata.isyes == 0) &
-                          (power.metadata.sayyes == 0))]
+        power_high = power[(power.metadata.cue == 0.75)]
+        power_low = power[(power.metadata.cue == 0.25)]
 
         # randomly sample from low power trials to match number of trials
-        #  in high power condition (equalize epoch counts mne not supported
+        # in high power condition (equalize epoch counts mne not supported
         # for tfrepochs object (yet))
-        random_sample = power_high.data.shape[0]
-        idx_list = list(range(power_low.data.shape[0]))
 
-        power_low_idx = random.sample(idx_list, random_sample)
+        if power_low.data.shape[0] > power_high.data.shape[0]:
+            random_sample = power_high.data.shape[0]
+            idx_list = list(range(power_low.data.shape[0]))
 
-        power_low.data = power_low.data[power_low_idx, :, :, :]
+            power_low_idx = random.sample(idx_list, random_sample)
+
+            power_low.data = power_low.data[power_low_idx, :, :, :]
+        else:
+            random_sample = power_low.data.shape[0]
+            idx_list = list(range(power_high.data.shape[0]))
+
+            power_high_idx = random.sample(idx_list, random_sample)
+
+            power_high.data = power_high.data[power_high_idx, :, :, :]
+
 
         # get hit and miss trials
         power_hit = power[((power.metadata.isyes == 1) &
@@ -203,7 +212,7 @@ def contrast_conditions():
         evo_low_all.append(evoked_power_low)
 
         # calculate the difference between conditions
-        diff_highlow = evoked_power_low - evoked_power_high
+        diff_highlow = evoked_power_high - evoked_power_low
 
         diff_hitmiss = evoked_power_hit - evoked_power_miss
 
@@ -212,7 +221,7 @@ def contrast_conditions():
         diff_all_subs_hitmiss.append(diff_hitmiss)
 
     # Save the list to a file
-    with open(f'{tfr_contrast_dir}//diff_all_subs_lowhigh.pickle', 'wb') as file:
+    with open(f'{tfr_contrast_dir}//diff_all_subs_highlow.pickle', 'wb') as file:
         pickle.dump(diff_all_subs_highlow, file)
         
     with open(f'{tfr_contrast_dir}//diff_all_subs_hitmiss.pickle', 'wb') as file:
