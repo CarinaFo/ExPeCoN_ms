@@ -64,6 +64,7 @@ def save_band_power_per_trial():
             continue
 
         power = mne.time_frequency.read_tfrs(f"{tfr_single_trial_power_dir}\\{subj}_power_per_trial-tfr.h5")[0]
+        
         # add metadata
         subj_data = data[data.ID == counter+7]
         power.metadata = subj_data
