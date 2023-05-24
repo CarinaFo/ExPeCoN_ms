@@ -39,16 +39,41 @@ def create_contrast(tmin=0, tmax=0.3, cond='highlow_noise',
                     reject_criteria=dict(eeg=200e-6),
                     flat_criteria=dict(eeg=1e-6)):
 
-    """ this function t: 
-    perm: how many permutations for cluster test
-    tmin: crop the epochs at this time in seconds
-    tmax: crop the data until this time in seconds
-    cond: condition to be analyzed (highlow, signalnoise, highsignal, highnoise)
-    cond_a: name of condition a
-    cond_b: name of condition b
-    laplace: apply laplace transform to data
-    output:
-    saves the cluster figures as svg and png files """
+    """ This function creates a contrast between two conditions for epoched data in a specified time window.
+    It returns the evoked responses for the two conditions and the contrast between them.
+
+    Parameters
+    ----------
+    tmin : float
+        Start time before event.
+    tmax : float
+        End time after event.
+    cond : str
+        Condition to be contrasted.
+    cond_a : str
+        First condition to be contrasted.
+    cond_b : str
+        Second condition to be contrasted.
+    laplace : bool
+        If True, data is laplacian transformed.
+    reject_criteria : dict
+        Criteria for rejecting trials.
+    flat_criteria : dict
+        Criteria for rejecting trials.
+    
+    Returns
+    -------
+    evokeds_a : mne.evoked
+        Evoked response for condition a.
+    evokeds_b : mne.evoked
+        Evoked response for condition b.
+    cond_a : str
+        Name of condition a.
+    cond_b : str
+        Name of condition b.
+    cond: str
+        Name of contrast.
+    """
 
     all_trials, trials_removed = [], []
 
@@ -166,15 +191,40 @@ def create_contrast(tmin=0, tmax=0.3, cond='highlow_noise',
 
 def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6'],
                                  average_over_channels=False):
+    
+    """Permutation test for cluster-based permutation test over space and time.
+    First creates contrasts and then performs the permutation test over channels 
+    and time points (p=.05 for both cluster and significance level).
+    Plots the evoked signal for the significant cluster and a topomap of the
+    t-values.
+    Parameters
+    ----------
+    perm : int
+        Number of permutations.
+    channels : list
+        List of channels to average over.
+    average_over_channels : bool
+        If True, average over channels.
+    Returns
+    -------
+    t : array
+        T-values.
+    p : array   
+        P-values.
+    h : array
+    Boolean array of significant sensors.
+    """
 
-    # get grand average over all subjects for plotting the results later
 
+    # create contrasts
     evokeds_a_all, evokeds_b_all, cond_a, cond_b, cond = create_contrast()
 
     a_gra = mne.grand_average(evokeds_a_all)
     b_gra = mne.grand_average(evokeds_b_all)
 
-    if average_over_channels == True: 
+    if average_over_channels is True:
+
+        # select channels and convert to array
         a = np.array([ax.copy().pick_channels(channels).data 
                       for ax in evokeds_a_all])
         b = np.array([bx.copy().pick_channels(channels).data 
@@ -184,19 +234,21 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
         a = np.mean(a, axis=1)
         b = np.mean(b, axis=1)
 
+        # test if difference is sign. different from zero
         X = a-b
 
         t, p, h = mne.stats.permutation_t_test(X, n_permutations=perm, tail=0,
                                                n_jobs=-1)
 
-        min(p)
+        print(min(p))
 
     # create contrast
     X = [ax.data-bx.data for ax, bx in zip(evokeds_a_all, evokeds_b_all)]
 
+    # change the axis for cluster test (channels should be last axis)
     X = np.transpose(X, [0, 2, 1])
 
-    # load cleaned epochs
+    # load cleaned epochs for one participant to get channel adjacency
     subj = '007'
     epochs = mne.read_epochs(f"{dir_cleanepochs}/P{subj}_epochs_after_ica-epo.fif")
 
@@ -204,11 +256,11 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
 
     # threshold_tfce = dict(start=0, step=0.1)
 
-    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X[:,:,:], n_permutations=perm,
-                                                                                    adjacency=ch_adjacency, 
-                                                                                    #threshold=threshold_tfce, 
-                                                                                    tail=0, n_jobs=-1
-                                                                                    )
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.
+    permutation_cluster_1samp_test(X[:,:,:], n_permutations=perm,
+                                   adjacency=ch_adjacency,
+                                   #threshold=threshold_tfce,
+                                   tail=0, n_jobs=-1)
 
     good_cluster_inds = np.where(cluster_p_values < 0.05)[0]  # find significant clusters
 
@@ -286,7 +338,8 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
         # clean up viz
         mne.viz.tight_layout(fig=fig)
         fig.subplots_adjust(bottom=.05)
-   
+
+        # save figure as svg and png file
         plt.savefig(f'{savedir_figs}//cluster_{cond}_{str(i_clu)}.svg')
         plt.savefig(f'{savedir_figs}//cluster_{cond}_{str(i_clu)}.png')
         plt.show()
