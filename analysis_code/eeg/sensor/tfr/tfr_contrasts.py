@@ -61,7 +61,7 @@ def calculate_power_per_trial(tmin=-0.5, tmax=0,
 
         '''
     
-    freq_list = np.logspace(*np.log10([6, 35]), num=12)
+    freq_list = np.arange(6, 35, 1)
     n_cycles = freq_list / 2.0  # different number of cycle per frequency
 
     for counter, subj in enumerate(IDlist):
@@ -347,7 +347,7 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
     masked_img = T_obs.copy()
     masked_img[np.where(cluster_p_values > 0.05)] = 0
 
-    vmax = np.max(0)
+    vmax = np.max(T_obs)
     vmin = np.min(T_obs)
 
     #cnorm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)  # min, center & max ERDS
@@ -358,15 +358,15 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
 
     # Plot the original image
     fig = plt.imshow(T_obs, origin='lower',
-                     extent=[x.min(), x.max(), y.min(), y.max()],
+                     extent=[x[0], x[-1], y[0], y[-1]],
                      aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
     plt.colorbar()
 
     # Plot the masked image on top with lower transparency
-    fig = plt.imshow(masked_img, origin='lower', alpha=0.7,
-                     extent=[x.min(), x.max(), y.min(), y.max()],
+    fig = plt.imshow(masked_img, origin='lower', alpha=0.7, 
+                     extent=[x[0], x[-1], y[0], y[-1]],
                      aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
-
+    
     # Add x and y labels
     plt.xlabel('Time (s)')
     plt.ylabel('Freq (Hz)')
