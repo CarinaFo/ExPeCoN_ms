@@ -32,9 +32,9 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
-freq_list = np.logspace(*np.log10([6, 35]), num=12)
+freq_list = np.arange(6, 35, 1)
 
-freq_bands = {'theta': (6, 9), 'alpha': (8, 14), 'low_beta': (14, 21), 'beta_gamma': (20, 36)}
+freq_bands = {'alpha': (6, 13), 'low_beta': (14, 20), 'beta_gamma': (20, 35)}
 
 
 def save_band_power_per_trial():
@@ -73,7 +73,7 @@ def save_band_power_per_trial():
         # strongest effects between -400 and -200ms prestimulus
         # ROI channels selected
 
-        power.crop(-0.4, -0.2).pick_channels(['CP4', 'C4', 'C6', 'CP6'])
+        power.crop(-0.4, -0.1).pick_channels(['CP4', 'C4', 'C6', 'CP6'])
 
         # now we average over time and channels
 
@@ -82,10 +82,9 @@ def save_band_power_per_trial():
         # now we average over the frequency bands and add the column to the 
         # behavioral data frame
 
-        subj_data['theta_pw'] = np.mean(power.data[:,0:2], axis=1) # 6-9 Hz
-        subj_data['alpha_pw'] = np.mean(power.data[:,2:6], axis=1)  # 8-14 Hz
-        subj_data['low_beta_pw'] = np.mean(power.data[:,5:8], axis=1) # 14-21 Hz
-        subj_data['beta_gamma_pw'] = np.mean(power.data[:,9:], axis=1) # 20-36 Hz
+        subj_data['alpha_pw'] = np.mean(power.data[:,:8], axis=1)  # 8-14 Hz
+        subj_data['low_beta_pw'] = np.mean(power.data[:,8:15], axis=1) # 14-21 Hz
+        subj_data['beta_gamma_pw'] = np.mean(power.data[:,15:], axis=1) # 20-36 Hz
 
         # save the data in a list
         brain_behav.append(subj_data)
@@ -119,7 +118,7 @@ def power_criterion_corr():
 
         diff_p_list.append(diff_p)
 
-    power_dict = {'theta': diff_p_list[0], 'alpha': diff_p_list[1], 'low_beta': diff_p_list[2], 'beta_gamma': diff_p_list[3]}
+    power_dict = {'alpha': diff_p_list[0], 'low_beta': diff_p_list[1], 'beta_gamma': diff_p_list[2]}
     
     out = figure1.prepare_behav_data()
         
