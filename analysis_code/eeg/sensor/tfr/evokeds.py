@@ -34,7 +34,7 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(tmin=0, tmax=0.3, cond='highlow_noise',
+def create_contrast(tmin=0, tmax=0.5, cond='highlow_prevyes',
                     cond_a='high', cond_b='low', laplace=True,
                     reject_criteria=dict(eeg=200e-6),
                     flat_criteria=dict(eeg=1e-6)):
@@ -148,24 +148,37 @@ def create_contrast(tmin=0, tmax=0.3, cond='highlow_noise',
                               & (epochs.metadata.prevsayyes == 0)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)
                               & (epochs.metadata.prevsayyes == 0)]
-        elif cond == 'highlow_prevno':  # n.s. in poststim window
+        elif cond == 'highlow_prevno':  # 2 sign. clusters in prestim window
             epochs_a = epochs[((epochs.metadata.prevsayyes == 0)
-                              & (epochs.metadata.isyes == 0)
+                              & (epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 1)
                               & (epochs.metadata.cue == 0.75))]
             epochs_b = epochs[((epochs.metadata.prevsayyes == 0)
-                              & (epochs.metadata.isyes == 0)
+                              & (epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 1)
                               & (epochs.metadata.cue == 0.25))]
         elif cond == 'highlow_prevyes':  # n.s. in poststim window
             epochs_a = epochs[((epochs.metadata.prevsayyes == 1)
-                              & (epochs.metadata.isyes == 0)
+                              & (epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 1)
                               & (epochs.metadata.cue == 0.75))]
             epochs_b = epochs[((epochs.metadata.prevsayyes == 1)
-                              & (epochs.metadata.isyes == 0)
+                              & (epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 1)
                               & (epochs.metadata.cue == 0.25))]
-        elif cond == 'highlow_noise':   # n.s. in poststim window
+        elif cond == 'highlow_cr':   # n.s. in poststim window
             epochs_a = epochs[((epochs.metadata.isyes == 0)
+                              & (epochs.metadata.sayyes == 0)
                               & (epochs.metadata.cue == 0.75))]
             epochs_b = epochs[((epochs.metadata.isyes == 0)
+                              & (epochs.metadata.sayyes == 0)
+                              & (epochs.metadata.cue == 0.25))]
+        elif cond == 'highlow_hits':   # 1 sign. cluster in poststim window
+            epochs_a = epochs[((epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 1)
+                              & (epochs.metadata.cue == 0.75))]
+            epochs_b = epochs[((epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 1)
                               & (epochs.metadata.cue == 0.25))]
         
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
@@ -256,8 +269,7 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
 
     # threshold_tfce = dict(start=0, step=0.1)
 
-    T_obs, clusters, cluster_p_values, H0 = mne.stats.
-    permutation_cluster_1samp_test(X[:,:,:], n_permutations=perm,
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X[:,:,:], n_permutations=perm,
                                    adjacency=ch_adjacency,
                                    #threshold=threshold_tfce,
                                    tail=0, n_jobs=-1)
@@ -265,7 +277,7 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
     good_cluster_inds = np.where(cluster_p_values < 0.05)[0]  # find significant clusters
 
     print(len(good_cluster_inds))
-    print(cluster_p_values)
+    print(cluster_p_values[good_cluster_inds])
 
     # now plot the significant cluster(s)
     a = cond_a
