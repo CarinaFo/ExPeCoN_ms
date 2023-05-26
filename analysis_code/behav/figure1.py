@@ -164,14 +164,21 @@ def prepare_behav_data(exclude_high_fa=False):
     acc_low = data_grouped.unstack()[0.25].reset_index()
     acc_cue = [acc_low, acc_high]
 
+    
+    # Calculate mean accuracy for each participant and ce condition
+    data_grouped = data.groupby(['ID', 'cue']).mean()['conf']
+    conf_high = data_grouped.unstack()[0.75].reset_index()
+    conf_low = data_grouped.unstack()[0.25].reset_index()
+    conf_cue = [conf_low, conf_high]
+
     # Calculate the difference in d-prime and c between the high/low condition
     d_diff = np.array(d_prime_low) - np.array(d_prime_high)
     c_diff = np.array(criterion_low) - np.array(criterion_high)
 
-    return d_diff, c_diff, conf_con, d_cond, c_cond, fa_cond, hit_cond
+    return d_diff, c_diff, conf_con, d_cond, c_cond, fa_cond, hit_cond, conf_cue, acc_cue
 
 
-def plot_figure1_grid(blue='#2a95ffff', pink='#ff2a2aff',
+def plot_figure1_grid(blue='#2a95ffff', red='#ff2a2aff',
                       medcolor=['black', 'black'],
                       savepath_fig1='D:\\expecon_ms\\figs\\behavior'):
 
@@ -184,7 +191,7 @@ def plot_figure1_grid(blue='#2a95ffff', pink='#ff2a2aff',
             The colors to use for the median lines in the boxplots
             """
 
-    colors=[blue, pink]
+    colors=[blue, red]
 
     fig = plt.figure(figsize=(8, 10), tight_layout=True)  # original working was 10,12
     gs = gridspec.GridSpec(6, 4)
@@ -367,7 +374,7 @@ def plot_figure1_grid(blue='#2a95ffff', pink='#ff2a2aff',
                 format='svg')
     plt.show()
 
-    # save accuracy plot for supplementary material
+    # save accuracy and confidence per condition plot for supplementary material
 
     # Plot individual data points 
     for index in range(len(acc_cue[0])):
@@ -381,14 +388,57 @@ def plot_figure1_grid(blue='#2a95ffff', pink='#ff2a2aff',
                  acc_cue[1].iloc[index, 1]],
                  marker='', markersize=0, color='gray', alpha=.25)
 
-    hr_box = plt.boxplot([acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1]], 
+    acc_box = plt.boxplot([acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1]], 
                          patch_artist=True)
+    
+    # Set the face color and alpha for the boxes in the plot
+    for patch, color in zip(acc_box['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.75)
 
-    hr_ax.set_ylabel('accuracy', fontname="Arial", fontsize=14)
-    hr_ax.set_yticklabels(['0', '0.5', '1.0'], fontname="Arial", fontsize=12)
-    hr_ax.text(1.3, 1, '***', verticalalignment='center', fontname='Arial',
-               fontsize='18')
-    plt.savefig(savepath_fig1 + "\\acc_cue.svg", dpi=300, bbox_inches='tight',
+    # Set the color for the medians in the plot
+    for patch, color in zip(acc_box['medians'], medcolor):
+        patch.set_color(color)
+
+    #plt.xticks(['0.25', '0.75'], fontname="Arial",
+                            #fontsize=12)
+    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
+
+    plt.ylabel('accuracy', fontname="Arial", fontsize=14)
+    plt.savefig(savepath_fig1 + "\\acc_cue.svg", dpi=300, bbox_inches='tight',format='svg')
+    plt.show()
+
+    # Plot individual data points 
+    for index in range(len(conf_cue[0])):
+        plt.plot(1, conf_cue[0].iloc[index, 1],
+                 marker='', markersize=8, color=colors[0],
+                 markeredgecolor=colors[0], alpha=.5)
+        plt.plot(2, conf_cue[1].iloc[index, 1],
+                 marker='', markersize=8, color=colors[1],
+                 markeredgecolor=colors[1], alpha=.5)
+        plt.plot([1, 2], [conf_cue[0].iloc[index, 1],
+                 conf_cue[1].iloc[index, 1]],
+                 marker='', markersize=0, color='gray', alpha=.25)
+
+    conf_box = plt.boxplot([conf_cue[0].iloc[:, 1], conf_cue[1].iloc[:, 1]], 
+                         patch_artist=True)
+    
+    # Set the face color and alpha for the boxes in the plot
+    for patch, color in zip(conf_box['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.75)
+
+    # Set the color for the medians in the plot
+    for patch, color in zip(conf_box['medians'], medcolor):
+        patch.set_color(color)
+
+    #plt.xticks(['0.25', '0.75'], fontname="Arial",
+     #                       fontsize=12)
+    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
+
+    plt.ylabel('confidence', fontname="Arial", fontsize=14)
+    #plt.yticks(['0', '0.5', '1.0'], fontname="Arial", fontsize=12)
+    plt.savefig(savepath_fig1 + "\\conf_cue.svg", dpi=300, bbox_inches='tight',
                 format='svg')
     plt.show()
 
