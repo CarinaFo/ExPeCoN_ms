@@ -151,6 +151,9 @@ def prepare_behav_data(exclude_high_fa=False):
 
     # Filter for correct trials only
     correct_only = data[data.correct == 1]
+    incorrect_only = data[data.correct == 0]
+    yes_response = correct_only[correct_only.sayyes == 1]
+    no_response = correct_only[correct_only.sayyes == 0]
 
     # Calculate mean confidence for each participant and congruency condition
     data_grouped = correct_only.groupby(['ID', 'congruency']).mean()['conf']
@@ -158,14 +161,49 @@ def prepare_behav_data(exclude_high_fa=False):
     incon_condition = data_grouped.unstack()[0].reset_index()
     conf_con = [con_condition, incon_condition]
 
-    # Calculate mean accuracy for each participant and ce condition
+    # Calculate mean confidence for each participant and congruency condition
+    data_grouped = yes_response.groupby(['ID', 'congruency']).mean()['conf']
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
+    conf_con_yes = [con_condition, incon_condition]
+
+    # Calculate mean confidence for each participant and congruency condition
+    data_grouped = no_response.groupby(['ID', 'congruency']).mean()['conf']
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
+    conf_con_no = [con_condition, incon_condition]
+
+    # Calculate mean rts for each participant and congruency condition
+    data_grouped = correct_only.groupby(['ID', 'congruency']).mean()['respt1']
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
+    rt_con = [con_condition, incon_condition]
+
+    # Calculate mean rts for each participant and congruency condition
+    data_grouped = incorrect_only.groupby(['ID', 'congruency']).mean()['respt1']
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
+    rt_con_incorrect = [con_condition, incon_condition]
+
+    # Calculate mean rts for each participant and congruency condition
+    data_grouped = yes_response.groupby(['ID', 'congruency']).mean()['respt1']
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
+    rt_con_yes = [con_condition, incon_condition]
+
+    # Calculate mean rts for each participant and congruency condition
+    data_grouped = no_response.groupby(['ID', 'congruency']).mean()['respt1']
+    con_condition = data_grouped.unstack()[1].reset_index()
+    incon_condition = data_grouped.unstack()[0].reset_index()
+    rt_con_no = [con_condition, incon_condition]
+
+    # Calculate mean accuracy for each participant and cue condition
     data_grouped = data.groupby(['ID', 'cue']).mean()['correct']
     acc_high = data_grouped.unstack()[0.75].reset_index()
     acc_low = data_grouped.unstack()[0.25].reset_index()
     acc_cue = [acc_low, acc_high]
 
-    
-    # Calculate mean accuracy for each participant and ce condition
+    # Calculate mean confidence for each participant and cue condition
     data_grouped = data.groupby(['ID', 'cue']).mean()['conf']
     conf_high = data_grouped.unstack()[0.75].reset_index()
     conf_low = data_grouped.unstack()[0.25].reset_index()
@@ -175,7 +213,9 @@ def prepare_behav_data(exclude_high_fa=False):
     d_diff = np.array(d_prime_low) - np.array(d_prime_high)
     c_diff = np.array(criterion_low) - np.array(criterion_high)
 
-    return d_diff, c_diff, conf_con, d_cond, c_cond, fa_cond, hit_cond, conf_cue, acc_cue
+    return d_diff, c_diff, conf_con, d_cond, c_cond, fa_cond, hit_cond, \
+           conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, rt_con_yes, \
+           rt_con_incorrect
 
 
 def plot_figure1_grid(blue='#2a95ffff', red='#ff2a2aff',
@@ -442,6 +482,146 @@ def plot_figure1_grid(blue='#2a95ffff', red='#ff2a2aff',
                 format='svg')
     plt.show()
 
+    # congruency effect for yes and no responses
+
+    colors = ['white', 'black']
+
+    # Plot individual data points 
+    for index in range(len(conf_con_yes[0])):
+        plt.plot(1, conf_con_yes[0].iloc[index, 1],
+                 marker='', markersize=8, color=colors[0],
+                 markeredgecolor=colors[0], alpha=.5)
+        plt.plot(2, conf_con_yes[1].iloc[index, 1],
+                 marker='', markersize=8, color=colors[1],
+                 markeredgecolor=colors[1], alpha=.5)
+        plt.plot([1, 2], [conf_con_yes[0].iloc[index, 1],
+                 conf_con_yes[1].iloc[index, 1]],
+                 marker='', markersize=0, color='gray', alpha=.25)
+
+    conf_con_yes_box = plt.boxplot([conf_con_yes[0].iloc[:, 1], 
+                                    conf_con_yes[1].iloc[:, 1]], 
+                                    patch_artist=True)
+    
+    # Set the face color and alpha for the boxes in the plot
+    for patch, color in zip(conf_con_yes_box['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.75)
+
+    # Set the color for the medians in the plot
+    for patch, color in zip(conf_con_yes_box['medians'], medcolor):
+        patch.set_color(color)
+
+    #plt.xticks(['0.25', '0.75'], fontname="Arial",
+                            #fontsize=12)
+    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
+
+    plt.ylabel('Mean confidence', fontname="Arial", fontsize=14)
+    plt.savefig(savepath_fig1 + "\\conf_con_yes.svg", dpi=300, bbox_inches='tight',format='svg')
+    plt.show()
+
+    # Plot individual data points 
+    for index in range(len(conf_con_no[0])):
+        plt.plot(1, conf_con_no[0].iloc[index, 1],
+                 marker='', markersize=8, color=colors[0],
+                 markeredgecolor=colors[0], alpha=.5)
+        plt.plot(2, conf_con_no[1].iloc[index, 1],
+                 marker='', markersize=8, color=colors[1],
+                 markeredgecolor=colors[1], alpha=.5)
+        plt.plot([1, 2], [conf_con_no[0].iloc[index, 1],
+                 conf_con_no[1].iloc[index, 1]],
+                 marker='', markersize=0, color='gray', alpha=.25)
+
+    conf_con_no_box = plt.boxplot([conf_con_no[0].iloc[:, 1],
+                                   conf_con_no[1].iloc[:, 1]],
+                                   patch_artist=True)
+    
+    # Set the face color and alpha for the boxes in the plot
+    for patch, color in zip(conf_con_no_box['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.75)
+
+    # Set the color for the medians in the plot
+    for patch, color in zip(conf_con_no_box['medians'], medcolor):
+        patch.set_color(color)
+
+    #plt.xticks(['0.25', '0.75'], fontname="Arial",
+                            #fontsize=12)
+    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
+
+    plt.ylabel('Mean confidence', fontname="Arial", fontsize=14)
+    plt.savefig(savepath_fig1 + "\\conf_con_no.svg", dpi=300, bbox_inches='tight',
+                format='svg')
+    plt.show()
+
+    # Reaction time for congruent trials and correct vs. incorrect
+
+    # Plot individual data points 
+    for index in range(len(rt_con[0])):
+        plt.plot(1, rt_con[0].iloc[index, 1],
+                 marker='', markersize=8, color=colors[0],
+                 markeredgecolor=colors[0], alpha=.5)
+        plt.plot(2, rt_con[1].iloc[index, 1],
+                 marker='', markersize=8, color=colors[1],
+                 markeredgecolor=colors[1], alpha=.5)
+        plt.plot([1, 2], [rt_con[0].iloc[index, 1],
+                 rt_con[1].iloc[index, 1]],
+                 marker='', markersize=0, color='gray', alpha=.25)
+
+    rt_con_box = plt.boxplot([rt_con[0].iloc[:, 1], 
+                                    rt_con[1].iloc[:, 1]], 
+                                    patch_artist=True)
+    
+    # Set the face color and alpha for the boxes in the plot
+    for patch, color in zip(rt_con_box['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.75)
+
+    # Set the color for the medians in the plot
+    for patch, color in zip(rt_con_box['medians'], medcolor):
+        patch.set_color(color)
+
+    #plt.xticks(['0.25', '0.75'], fontname="Arial",
+                            #fontsize=12)
+    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
+
+    plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
+    plt.savefig(savepath_fig1 + "\\rt_con.svg", dpi=300, bbox_inches='tight',format='svg')
+    plt.show()
+
+     # Plot individual data points 
+    for index in range(len(rt_con_incorrect[0])):
+        plt.plot(1, rt_con_incorrect[0].iloc[index, 1],
+                 marker='', markersize=8, color=colors[0],
+                 markeredgecolor=colors[0], alpha=.5)
+        plt.plot(2, rt_con_incorrect[1].iloc[index, 1],
+                 marker='', markersize=8, color=colors[1],
+                 markeredgecolor=colors[1], alpha=.5)
+        plt.plot([1, 2], [rt_con_incorrect[0].iloc[index, 1],
+                 rt_con_incorrect[1].iloc[index, 1]],
+                 marker='', markersize=0, color='gray', alpha=.25)
+
+    rt_con_in_box = plt.boxplot([rt_con_incorrect[0].iloc[:, 1], 
+                                    rt_con_incorrect[1].iloc[:, 1]], 
+                                    patch_artist=True)
+    
+    # Set the face color and alpha for the boxes in the plot
+    for patch, color in zip(rt_con_in_box['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.75)
+
+    # Set the color for the medians in the plot
+    for patch, color in zip(rt_con_in_box['medians'], medcolor):
+        patch.set_color(color)
+
+    #plt.xticks(['0.25', '0.75'], fontname="Arial",
+                            #fontsize=12)
+    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
+
+    plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
+    plt.savefig(savepath_fig1 + "\\rt_con_incorrect.svg", dpi=300, bbox_inches='tight',format='svg')
+    plt.show()
+
+
 
 def stats_figure1():
     """stats for Figure 1
@@ -468,3 +648,11 @@ def stats_figure1():
 
     t, p = stats.wilcoxon(acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1])
     print(f'accuracy between conditions: {p}')
+
+    t, p = stats.wilcoxon(rt_con[0].iloc[:, 1], rt_con[1].iloc[:, 1])
+    print(f'rt diffs between conditions: {p}')
+
+    t, p = stats.wilcoxon(rt_con_incorrect[0].iloc[:, 1],
+                           rt_con_incorrect[1].iloc[:, 1])
+    
+    print(f'rt diffs between conditions: {p}')
