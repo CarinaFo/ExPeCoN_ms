@@ -57,6 +57,10 @@ def extract_source_power_in_band():
 
     reject_criteria=dict(eeg=200e-6)
     flat_criteria=dict(eeg=1e-6)
+
+    freqs = np.arange(7, 30, 2)  # define frequencies of interest
+    n_cycles = freqs / 3.0  # different number of cycle per frequency
+
     stcs_a_list, stcs_b_list = [], []
 
     for counter, subj in enumerate(IDlist):
@@ -128,12 +132,32 @@ def extract_source_power_in_band():
         method='eLORETA'
         )
 
+        # compute the source space power and the inter-trial coherence
+        power_a, itc = mne.minimum_norm.source_induced_power(
+        epochs_a,
+        inverse_operator=inv_op,
+        freqs=freqs,
+        label=labelS1,
+        n_cycles=n_cycles,
+        n_jobs=None,
+        method='eLORETA')
+
         stcs_a_list.append(stcs_a)
 
         stcs_b = source_band_induced_power(
         epochs_b, inverse_operator=inv_op, label=labelS1, bands=bands, use_fft=True, n_jobs=None,
         method='eLORETA'
         )
+
+        # compute the source space power and the inter-trial coherence
+        power_b, itc = mne.minimum_norm.source_induced_power(
+        epochs_b,
+        inverse_operator=inv_op,
+        freqs=freqs,
+        label=labelS1,
+        n_cycles=n_cycles,
+        n_jobs=None,
+        method='eLORETA')
 
         stcs_b_list.append(stcs_b)
 
