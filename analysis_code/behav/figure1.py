@@ -43,6 +43,9 @@ def prepro_behavioral_data():
     # Add a 'congruency' column
     data['congruency'] = ((data.cue == 0.25) & (data.sayyes == 0)) | ((
                           data.cue == 0.75) & (data.sayyes == 1))
+    # Add a 'congruency stimulus' column
+    data['congruency_stim'] = ((data.cue == 0.25) & (data.isyes == 0)) | ((
+                          data.cue == 0.75) & (data.isyes == 1))
     
     data = data.reset_index()
 
@@ -174,25 +177,25 @@ def prepare_behav_data(exclude_high_fa=False):
     conf_con_no = [con_condition, incon_condition]
 
     # Calculate mean rts for each participant and congruency condition
-    data_grouped = correct_only.groupby(['ID', 'congruency']).mean()['respt1']
+    data_grouped = correct_only.groupby(['ID', 'congruency_stim']).mean()['respt1']
     con_condition = data_grouped.unstack()[1].reset_index()
     incon_condition = data_grouped.unstack()[0].reset_index()
     rt_con = [con_condition, incon_condition]
 
     # Calculate mean rts for each participant and congruency condition
-    data_grouped = incorrect_only.groupby(['ID', 'congruency']).mean()['respt1']
+    data_grouped = incorrect_only.groupby(['ID', 'congruency_stim']).mean()['respt1']
     con_condition = data_grouped.unstack()[1].reset_index()
     incon_condition = data_grouped.unstack()[0].reset_index()
     rt_con_incorrect = [con_condition, incon_condition]
 
     # Calculate mean rts for each participant and congruency condition
-    data_grouped = yes_response.groupby(['ID', 'congruency']).mean()['respt1']
+    data_grouped = yes_response.groupby(['ID', 'congruency_stim']).mean()['respt1']
     con_condition = data_grouped.unstack()[1].reset_index()
     incon_condition = data_grouped.unstack()[0].reset_index()
     rt_con_yes = [con_condition, incon_condition]
 
     # Calculate mean rts for each participant and congruency condition
-    data_grouped = no_response.groupby(['ID', 'congruency']).mean()['respt1']
+    data_grouped = no_response.groupby(['ID', 'congruency_stim']).mean()['respt1']
     con_condition = data_grouped.unstack()[1].reset_index()
     incon_condition = data_grouped.unstack()[0].reset_index()
     rt_con_no = [con_condition, incon_condition]
@@ -410,7 +413,7 @@ def plot_figure1_grid(blue='#2a95ffff', red='#ff2a2aff',
                                   rotation=30)
             plots.set_xlabel('')
 
-    fig.savefig(savepath_fig1 + "\\figure1_exclhighfa.svg",dpi=300, bbox_inches='tight',
+    fig.savefig(savepath_fig1 + "\\figure1_exclhighfa.svg", dpi=300, bbox_inches='tight',
                 format='svg')
     plt.show()
 
