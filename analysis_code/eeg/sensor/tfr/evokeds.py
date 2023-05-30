@@ -12,11 +12,15 @@
 # cluster_perm_space_time: runs a cluster permutation test over electrodes and timepoints
 # in sensor space and plots the output and saves it
 
+import os.path as op
+
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
 import pandas as pd
+import pyvistaqt  # for proper 3D plotting
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+import scipy.stats as stats
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
@@ -34,8 +38,8 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(tmin=0, tmax=0.5, cond='highlow_prevyes',
-                    cond_a='high', cond_b='low', laplace=True,
+def create_contrast(tmin=-0.5, tmax=0, cond='highlow_no',
+                    cond_a='high', cond_b='low', laplace=False,
                     reject_criteria=dict(eeg=200e-6),
                     flat_criteria=dict(eeg=1e-6)):
 
@@ -129,9 +133,23 @@ def create_contrast(tmin=0, tmax=0.5, cond='highlow_prevyes',
         epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
 
         # create contrasts
-        if cond == 'highlow': # sign in prestim window
-            epochs_a = epochs[(epochs.metadata.cue == 0.75)]
-            epochs_b = epochs[(epochs.metadata.cue == 0.25)]
+        if cond == 'highlow_no':
+            epochs_a = epochs[((epochs.metadata.cue == 0.75)
+                              & (epochs.metadata.prevsayyes == 0))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.25)
+                              & (epochs.metadata.prevsayyes == 0))]
+        if cond == 'hitmiss': # sign in prestim window
+            epochs_a = epochs[((epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 1))]
+            epochs_b = epochs[((epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 0))]
+        elif cond == 'confunconf_hits': # sign in prestim window
+            epochs_a = epochs[((epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 1)
+                              & (epochs.metadata.conf == 1))]
+            epochs_b = epochs[((epochs.metadata.isyes == 1)
+                              & (epochs.metadata.sayyes == 1)
+                              & (epochs.metadata.conf == 0))]
         elif cond == 'prevchoice': # no sign. cluster in prestim window
             epochs_a = epochs[(epochs.metadata.prevsayyes == 1)]
             epochs_b = epochs[(epochs.metadata.prevsayyes == 0)]
@@ -180,7 +198,7 @@ def create_contrast(tmin=0, tmax=0.5, cond='highlow_prevyes',
             epochs_b = epochs[((epochs.metadata.isyes == 1)
                               & (epochs.metadata.sayyes == 1)
                               & (epochs.metadata.cue == 0.25))]
-        
+
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
         # apply laplace transform
@@ -201,6 +219,100 @@ def create_contrast(tmin=0, tmax=0.5, cond='highlow_prevyes',
 
     return evokeds_a_all, evokeds_b_all, cond_a, cond_b, cond
 
+def load_all_epochs(tmin=-0.3, tmax=-0.2, laplace=True,
+                    reject_criteria=dict(eeg=200e-6),
+                    flat_criteria=dict(eeg=1e-6),
+                    channel_list = ['C3', 'CP5', 'CP1', 'Pz', 'CP2', 'C4', 'T8', 'FC6','FC2',
+                                    'C1','CP3', 'P1', 'P2', 'CPz','CP4','C6','C2','FC4']):
+
+    """ This function loads all epochs per participant and averages over time and channels
+
+    Parameters
+    ----------
+    tmin : float
+        Start time before event.
+    tmax : float
+        End time after event.
+    laplace : bool
+        If True, data is laplacian transformed.
+    reject_criteria : dict
+        Criteria for rejecting trials.
+    flat_criteria : dict
+        Criteria for rejecting trials.
+    
+    Returns
+    -------
+    evokeds_a : mne.evoked
+        Evoked response for condition a.
+    """
+    epochs_all, df = [], []
+
+    for counter, subj in enumerate(IDlist):
+
+        # print participant ID
+        print('Analyzing ' + subj)
+
+        # skip those participants
+        if subj == '040' or subj == '045' or subj == '032' or subj == '016':
+            continue
+
+        # load cleaned epochs
+        epochs = mne.read_epochs(f"{dir_cleanepochs}"
+                                 f"/P{subj}_epochs_after_ica-epo.fif")
+
+        # Remove 5 blocks with hitrates < 0.2 or > 0.8
+        if subj == '010':
+            epochs = epochs[epochs.metadata.block != 6]
+        if subj == '012':
+            epochs = epochs[epochs.metadata.block != 6]
+        if subj == '026':
+            epochs = epochs[epochs.metadata.block != 4]
+        if subj == '030':
+            epochs = epochs[epochs.metadata.block != 3]
+        if subj == '039':
+            epochs = epochs[epochs.metadata.block != 3]
+        
+        # remove trials with rts >= 2.5 (no response trials) 
+        # and trials with rts < 0.1
+        epochs = epochs[epochs.metadata.respt1 > 0.1]
+        epochs = epochs[epochs.metadata.respt1 != 2.5]
+
+        # remove first trial of each block (trigger delays)
+        epochs = epochs[epochs.metadata.trial != 1]
+
+        # load behavioral data
+        data = pd.read_csv(f"{behavpath}//prepro_behav_data.csv")
+
+        subj_data = data[data.ID == counter+7]
+
+        if ((counter == 5) or (counter == 13) or
+           (counter == 21) or (counter == 28)):  # first epoch has no data
+            epochs.metadata = subj_data.iloc[1:, :]
+        elif counter == 17:
+            epochs.metadata = subj_data.iloc[3:, :]
+        else:
+            epochs.metadata = subj_data
+
+        # drop bad epochs
+        epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
+
+        # apply laplace transform
+        if laplace == True:
+            epochs = mne.preprocessing.compute_current_source_density(epochs)
+
+        # average and crop in defined time window
+        epochs = epochs.crop(tmin, tmax)
+        epochs = epochs.pick_channels(channel_list)
+
+        metadata = epochs.metadata
+
+        df.append(metadata)
+
+        epochs = epochs.get_data().mean(axis=(1, 2))
+    
+        epochs_all.append(epochs)
+        
+    return epochs_all, df
 
 def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6'],
                                  average_over_channels=False):
@@ -352,6 +464,124 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
         fig.subplots_adjust(bottom=.05)
 
         # save figure as svg and png file
-        plt.savefig(f'{savedir_figs}//cluster_{cond}_{str(i_clu)}.svg')
-        plt.savefig(f'{savedir_figs}//cluster_{cond}_{str(i_clu)}.png')
+        plt.savefig(f'{savedir_figs}//cluster_nolaplace_{cond}_{str(i_clu)}.svg')
+        plt.savefig(f'{savedir_figs}//cluster_nolaplace_{cond}_{str(i_clu)}.png')
         plt.show()
+
+def cluster_to_source_space(tmin=-0.4, tmax=0, lambda2=0.05, method='eLORETA'):
+
+    evokeds_a_all, evokeds_b_all, cond_a, cond_b, cond = out
+
+    stc_conda, stc_condb = [], []
+    inv_op = mne.minimum_norm.read_inverse_operator('D:\\expecon_ms\\data\\eeg\\source\\fsaverage-6oct-inv.fif')
+
+    for a, b in zip(evokeds_a_all, evokeds_b_all):
+            
+            a.set_eeg_reference(projection=True).crop(tmin, tmax)
+            b.set_eeg_reference(projection=True).crop(tmin, tmax)
+
+            condition1_stc, condition1_residual = mne.minimum_norm.apply_inverse(a, inv_op, lambda2,
+                                                                                method=method, return_residual=True)
+
+            condition2_stc, condition2_residual = mne.minimum_norm.apply_inverse(b, inv_op, lambda2,
+                                                                                method=method, return_residual=True)
+            stc_conda.append(condition1_stc)
+            stc_condb.append(condition2_stc)
+
+def permutation_test():
+    
+    src_dir = 'D:\\expecon_ms\\data\eeg\\source\\fsaverage-6oct-src.fif'
+
+    src = mne.read_source_spaces(src_dir)
+    fsave_vertices = [s["vertno"] for s in src]
+
+    print("Computing adjacency.")
+
+    adjacency = mne.spatial_src_adjacency(src)
+
+    X = np.array([a.data-b.data for a,b in zip(stc_conda, stc_condb)])
+
+    X.shape
+
+    X = np.transpose(X, [0, 2, 1])
+
+    # should be participantsxtimepointsxvertices
+    # Here we set a cluster forming threshold based on a p-value for
+    # the cluster based permutation test.
+    # We use a two-tailed threshold, the "1 - p_threshold" is needed
+    # because for two-tailed tests we must specify a positive threshold.
+    
+    # Now let's actually do the clustering. This can take a long time...
+    print("Clustering.")
+    T_obs, clusters, cluster_p_values, H0 = clu = mne.stats.spatio_temporal_cluster_1samp_test(
+                                X,
+                                adjacency=adjacency,
+                                n_jobs=None,
+                                buffer_size=None,
+                                verbose=True,
+                                n_permutations=1000
+                                )
+
+    # Select the clusters that are statistically significant at p < 0.05
+    good_clusters_idx = np.where(cluster_p_values < 0.05)[0]
+    good_clusters = [clusters[idx] for idx in good_clusters_idx]
+
+    print("Visualizing clusters.")
+
+    tstep = stc_conda[0].tstep*1000 # convert to ms
+
+    # Now let's build a convenient representation of our results, where consecutive
+    # cluster spatial maps are stacked in the time dimension of a SourceEstimate
+    # object. This way by moving through the time dimension we will be able to see
+    # subsequent cluster maps.
+    stc_all_cluster_vis = mne.stats.summarize_clusters_stc(
+        clu, vertices=fsave_vertices, subject="fsaverage", tmin=0,
+        tstep=tstep
+    )
+
+    # Let's actually plot the first "time point" in the SourceEstimate, which
+    # shows all the clusters, weighted by duration.
+    subject = 'fsaverage'
+
+    # blue blobs are for condition A < condition B, red for A > B
+    brain = stc_all_cluster_vis.plot(
+        hemi="both",
+        views="lateral",
+        subject=subject,
+        time_label="temporal extent (ms)",
+        size=(800, 800),
+        smoothing_steps=5,
+        backend='pyvistaqt',
+        background='w',
+    )
+
+# We could save this via the following:
+brain.save_image('cluster_highlow.png')
+
+def plot_evoked_source():
+
+    fs_dir = mne.datasets.fetch_fsaverage(verbose=True)
+    subjects_dir = op.dirname(fs_dir)
+    subject = 'fsaverage'
+
+    # convert list to array with dimensions: subjects,vertices,timepoints
+    a_array = np.mean(np.array([s.data for s in stc_conda]), axis=0)
+
+    # convert back to source estimate
+    a_stc = mne.SourceEstimate(a_array, stc_conda[0].vertices, tmin=-0.4, tstep=0.004)
+
+    mne.viz.plot_source_estimates(a_stc, subject=subject, subjects_dir=subjects_dir, hemi='both')
+
+    # convert to array and take mean over participants
+    b_array = np.mean(np.array([s.data for s in stc_condb]), axis=0)
+
+    # convert back to source estimate
+    b_stc = mne.SourceEstimate(b_array, stc_condb[0].vertices, tmin=-0.4, tstep=0.004)
+
+    mne.viz.plot_source_estimates(b_stc, subject=subject, subjects_dir=subjects_dir)
+
+    diff_arr = a_array - b_array
+
+    diff_stc = mne.SourceEstimate(diff_arr, stc_conda[0].vertices, tmin=-0.4, tstep=0.004)
+
+    mne.viz.plot_source_estimates(diff_stc, subject=subject, subjects_dir=subjects_dir, hemi='both')
