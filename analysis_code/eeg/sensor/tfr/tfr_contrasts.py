@@ -140,7 +140,7 @@ def calculate_power_per_trial(tmin=-0.5, tmax=0,
         mne.time_frequency.write_tfrs(f"{tfr_single_trial_power_dir}//{subj}_power_per_trial-tfr.h5", power)
 
 
-def contrast_conditions(cond='prevchoice', permute=0):
+def contrast_conditions(cond='highlow_prevno', permute=1, n_permutations=500):
     
     '''calculate the difference between conditions for each subject
     average across trials and calculate grand average over participants
@@ -175,10 +175,12 @@ def contrast_conditions(cond='prevchoice', permute=0):
 
         power.metadata = subj_data
 
-        if cond == 'highlow':
+        if cond == 'highlow_prevno':
             # get high and low probability trials 
-            power_a = power[(power.metadata.cue == 0.75)]
-            power_b = power[(power.metadata.cue == 0.25)]
+            power_a = power[((power.metadata.cue == 0.75)
+                             & (power.metadata.prevsayyes == 0))]
+            power_b = power[((power.metadata.cue == 0.25)
+                             & (power.metadata.prevsayyes == 0))]
         elif cond == 'prevchoice':
             # get previous no and previous yes trials
             power_a = power[(power.metadata.prevsayyes == 1)]
@@ -197,7 +199,7 @@ def contrast_conditions(cond='prevchoice', permute=0):
 
         if permute:
         
-            for i in range(500):
+            for i in range(n_permutations):
                 if power_b.data.shape[0] > power_a.data.shape[0]:
                     random_sample = power_a.data.shape[0]
                     idx_list = list(range(power_b.data.shape[0]))
@@ -227,9 +229,9 @@ def contrast_conditions(cond='prevchoice', permute=0):
 
             # put back into TFR object
             evoked_power_a = mne.time_frequency.AverageTFR(power.info, evoked_power_a_perm_arr, 
-                                                                power.times, power.freqs, power_high.data.shape[0])
+                                                                power.times, power.freqs, power_a.data.shape[0])
             evoked_power_b = mne.time_frequency.AverageTFR(power.info, evoked_power_b_perm_arr, 
-                                                                power.times, power.freqs, power_low.data.shape[0])
+                                                                power.times, power.freqs, power_b.data.shape[0])
 
         # average across trials
         evoked_power_a = power_a.average()
