@@ -44,7 +44,8 @@ fname_labelaparc = subjects_dir + '\\fsaverage\\label\\%s.label' % label_aparc
 labelap = mne.read_label(fname_labelaparc)
 
 
-def extract_source_power_in_band():
+def extract_source_power(source_band=0):
+
     """Extract source power in a specific frequency band
 
     Returns
@@ -118,55 +119,69 @@ def extract_source_power_in_band():
         epochs_a = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1))]
         epochs_b = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0))]
 
-        mne.equalize_epoch_counts([epochs_a, epochs_b])
+        mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
         #epochs_a = epochs[((epochs.metadata.cue == 0.75))]
         #epochs_b = epochs[((epochs.metadata.cue == 0.25))]
 
-        # Compute a source estimate per frequency band
-        bands = dict(alpha=[9, 11], beta=[18, 22])
+        if source_band:
 
-        # 5 cycles is default
-        stcs_a = source_band_induced_power(
-        epochs_a, inverse_operator=inv_op, label=labelS1, bands=bands, use_fft=True, n_jobs=None,
-        method='eLORETA'
-        )
+            # Compute a source estimate per frequency band
+            bands = dict(alpha=[9, 11], beta=[18, 22])
 
-        # compute the source space power and the inter-trial coherence
-        power_a, itc = mne.minimum_norm.source_induced_power(
-        epochs_a,
-        inverse_operator=inv_op,
-        freqs=freqs,
-        label=labelS1,
-        n_cycles=n_cycles,
-        n_jobs=None,
-        method='eLORETA')
+            # 5 cycles is default
+            stcs_a = source_band_induced_power(
+            epochs_a, inverse_operator=inv_op, label=labelS1, bands=bands, 
+            use_fft=True, n_jobs=None,
+            method='eLORETA'
+            )
 
-        stcs_a_list.append(stcs_a)
+            stcs_a_list.append(stcs_a)
 
-        stcs_b = source_band_induced_power(
-        epochs_b, inverse_operator=inv_op, label=labelS1, bands=bands, use_fft=True, n_jobs=None,
-        method='eLORETA'
-        )
+            stcs_b = source_band_induced_power(
+            epochs_b, inverse_operator=inv_op, label=labelS1, bands=bands, use_fft=True, n_jobs=None,
+            method='eLORETA'
+            )
 
-        # compute the source space power and the inter-trial coherence
-        power_b, itc = mne.minimum_norm.source_induced_power(
-        epochs_b,
-        inverse_operator=inv_op,
-        freqs=freqs,
-        label=labelS1,
-        n_cycles=n_cycles,
-        n_jobs=None,
-        method='eLORETA')
+            stcs_b_list.append(stcs_b)
 
-        stcs_b_list.append(stcs_b)
+            
+            for b, stc in stcs_a.items():
+                stc.save(f"D:\expecon_ms\data\eeg\source\\induced_power_bands_s1\\{subj}_induced_power_{b}_hit")
+            for b, stc in stcs_b.items():
+                stc.save(f"D:\expecon_ms\data\eeg\source\\induced_power_bands_s1\\{subj}_induced_power_{b}_miss")
 
-        for b, stc in stcs_a.items():
-            stc.save(f"D:\expecon_ms\data\eeg\source\\induced_power_bands_s1\\{subj}_induced_power_{b}_hit")
-        for b, stc in stcs_b.items():
-            stc.save(f"D:\expecon_ms\data\eeg\source\\induced_power_bands_s1\\{subj}_induced_power_{b}_miss")
+        else:
+            
+            # compute the source space power and the inter-trial coherence
+            power_a, itc = mne.minimum_norm.source_induced_power(
+            epochs_a,
+            inverse_operator=inv_op,
+            freqs=freqs,
+            label=labelS1,
+            n_cycles=n_cycles,
+            n_jobs=None,
+            method='eLORETA')
 
-        return stcs_a, stcs_b
+            stcs_a_list.append(power_a)
+
+            # compute the source space power and the inter-trial coherence
+            power_b, itc = mne.minimum_norm.source_induced_power(
+            epochs_b,
+            inverse_operator=inv_op,
+            freqs=freqs,
+            label=labelS1,
+            n_cycles=n_cycles,
+            n_jobs=None,
+            method='eLORETA')
+
+            stcs_b_list.append(power_b)
+
+            # save the source estimates
+            np.save(f"D:\expecon_ms\data\eeg\source\\induced_power_s1\\{subj}_induced_power_hit", power_a)
+            np.save(f"D:\expecon_ms\data\eeg\source\\induced_power_s1\\{subj}_induced_power_miss", power_b)
+
+    return stcs_a_list, stcs_b_list
 
 def load_and_plot_source_power_bands():
 
@@ -235,54 +250,3 @@ def load_and_plot_source_power_bands():
     plt.title("Mean source induced power")
     plt.show()
 
-
-
-plt.plot(stcs_a["alpha"].times, stcs_a["alpha"].data.mean(axis=0), label="alpha_high")
-plt.plot(stcs_b["alpha"].times, stcs_b["alpha"].data.mean(axis=0), label="alpha_low")
-plt.xlabel("Time (ms)")
-plt.ylabel("Power")
-plt.legend()
-plt.title("Mean source induced power")
-plt.show()
-
-
-plt.plot(stcs_a["alpha"].times, stcs_a["beta"].data.mean(axis=0), label="beta_high")
-plt.plot(stcs_b["alpha"].times, stcs_b["beta"].data.mean(axis=0), label="beta_low")
-plt.xlabel("Time (ms)")
-plt.ylabel("Power")
-plt.legend()
-plt.title("Mean source induced power")
-plt.show()
-
-
-
-######################### calculate tfr epochs in source space ################################################
-# datapaths
-tfr_single_trial_power_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\single_trial_power"
-behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
-
-data = pd.read_csv(f"{behavpath}//prepro_behav_data_after_rejectepochs.csv")
-
-for counter, subj in enumerate(IDlist):
-    
-    # store permutations
-    power_a_perm, power_b_perm = [], [] 
-
-    # skip those participants
-    if subj == '040' or subj == '045' or subj == '032' or subj == '016':
-        continue
-
-    power = mne.time_frequency.read_tfrs(f"{tfr_single_trial_power_dir}\\{subj}_power_per_trial-tfr.h5")[0]
-    
-    # add metadata
-    subj_data = data[data.ID == counter+7]
-
-    power.metadata = subj_data
-
-    power_a = power[((power.metadata.isyes == 1) &
-                        (power.metadata.sayyes == 1))]
-    power_b = power[((power.metadata.isyes == 1) &
-                        (power.metadata.sayyes == 0))]
-
-    source_power_a = mne.minimum_norm.apply_inverse_tfr_epochs(power_a, inv_op, lambda2=0.11, method='eLORETA', label=labelS1)
-    source_power_b = mne.minimum_norm.apply_inverse_tfr_epochs(power_b, inv_op,  lambda2=0.11, method='eLORETA', label=labelS1)
