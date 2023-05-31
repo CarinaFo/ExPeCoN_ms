@@ -18,6 +18,10 @@ import pandas as pd
 import seaborn as sns
 from behavioral_data_analysis import figure1
 from permutation_tests import cluster_correlation
+import pyvistaqt  # for proper 3D plotting
+
+# for plots in new windows
+# %matplotlib qt
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 
@@ -140,7 +144,7 @@ def calculate_power_per_trial(tmin=-0.5, tmax=0,
         mne.time_frequency.write_tfrs(f"{tfr_single_trial_power_dir}//{subj}_power_per_trial-tfr.h5", power)
 
 
-def contrast_conditions(cond='highlow_prevno', permute=1, n_permutations=500):
+def contrast_conditions(cond='prevchoice'):
     
     '''calculate the difference between conditions for each subject
     average across trials and calculate grand average over participants
@@ -161,9 +165,6 @@ def contrast_conditions(cond='highlow_prevno', permute=1, n_permutations=500):
 
     for counter, subj in enumerate(IDlist):
        
-        # store permutations
-        power_a_perm, power_b_perm = [], [] 
-
         # skip those participants
         if subj == '040' or subj == '045' or subj == '032' or subj == '016':
             continue
@@ -175,12 +176,12 @@ def contrast_conditions(cond='highlow_prevno', permute=1, n_permutations=500):
 
         power.metadata = subj_data
 
-        if cond == 'highlow_prevno':
+        if cond == 'highlow_prevyes':
             # get high and low probability trials 
             power_a = power[((power.metadata.cue == 0.75)
-                             & (power.metadata.prevsayyes == 0))]
+                             & (power.metadata.prevsayyes == 1))]
             power_b = power[((power.metadata.cue == 0.25)
-                             & (power.metadata.prevsayyes == 0))]
+                             & (power.metadata.prevsayyes == 1))]
         elif cond == 'prevchoice':
             # get previous no and previous yes trials
             power_a = power[(power.metadata.prevsayyes == 1)]
@@ -192,47 +193,6 @@ def contrast_conditions(cond='highlow_prevno', permute=1, n_permutations=500):
             power_b = power[((power.metadata.isyes == 1) &
                             (power.metadata.sayyes == 0))]
         
-        # randomly sample from low power trials to match number of trials
-        # in high power condition (equalize epoch counts mne not supported
-        # for tfrepochs object (yet))
-        # run 100 times and average over TFR average object
-
-        if permute:
-        
-            for i in range(n_permutations):
-                if power_b.data.shape[0] > power_a.data.shape[0]:
-                    random_sample = power_a.data.shape[0]
-                    idx_list = list(range(power_b.data.shape[0]))
-
-                    power_b_idx = random.sample(idx_list, random_sample)
-
-                    power_b.data = power_b.data[power_b_idx, :, :, :]
-                else:
-                    random_sample = power_b.data.shape[0]
-                    idx_list = list(range(power_a.data.shape[0]))
-
-                    power_a_idx = random.sample(idx_list, random_sample)
-
-                    power_a.data = power_a.data[power_a_idx, :, :, :]
-
-                evoked_power_a = power_a.average()
-                evoked_power_b = power_b.average()
-
-                power_a_perm.append(evoked_power_a)
-                power_b_perm.append(evoked_power_b)
-
-
-        if permute:
-            # average across permutations
-            evoked_power_a_perm_arr = np.mean(np.array([p.data for p in power_a_perm]), axis=0)
-            evoked_power_b_perm_arr = np.mean(np.array([p.data for p in power_b_perm]), axis=0)
-
-            # put back into TFR object
-            evoked_power_a = mne.time_frequency.AverageTFR(power.info, evoked_power_a_perm_arr, 
-                                                                power.times, power.freqs, power_a.data.shape[0])
-            evoked_power_b = mne.time_frequency.AverageTFR(power.info, evoked_power_b_perm_arr, 
-                                                                power.times, power.freqs, power_b.data.shape[0])
-
         # average across trials
         evoked_power_a = power_a.average()
         evoked_power_b = power_b.average()
@@ -319,8 +279,7 @@ def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6'],
                             n_jobs=-1,
                             n_permutations=n_perm,
                             threshold=threshold_tfce,
-                            tail=0,
-                            seed=1234)
+                            tail=0)
     
     print(f'The minimum p-value is {min(cluster_p_values)}')
     
@@ -345,7 +304,7 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
 
     # Apply the mask to the image
     masked_img = T_obs.copy()
-    masked_img[np.where(cluster_p_values > 0.06)] = 0
+    masked_img[np.where(cluster_p_values > 0.05)] = 0
 
     vmax = np.max(T_obs)
     vmin = np.min(T_obs)
@@ -459,3 +418,47 @@ def zero_pad_data(data):
         padded_list.append([value for value in ch_list])
 
     return np.squeeze(np.array(padded_list))
+
+        # randomly sample from low power trials to match number of trials
+        # in high power condition (equalize epoch counts mne not supported
+        # for tfrepochs object (yet))
+        # run 100 times and average over TFR average object
+
+def permutate_trials(n_permutations=500, power_a=None, power_b=None):
+
+    """ Permutate trials between two conditions and equalize trial counts"""
+
+    # store permutations
+    power_a_perm, power_b_perm = [], [] 
+
+    for i in range(n_permutations):
+        if power_b.data.shape[0] > power_a.data.shape[0]:
+            random_sample = power_a.data.shape[0]
+            idx_list = list(range(power_b.data.shape[0]))
+
+            power_b_idx = random.sample(idx_list, random_sample)
+
+            power_b.data = power_b.data[power_b_idx, :, :, :]
+        else:
+            random_sample = power_b.data.shape[0]
+            idx_list = list(range(power_a.data.shape[0]))
+
+            power_a_idx = random.sample(idx_list, random_sample)
+
+            power_a.data = power_a.data[power_a_idx, :, :, :]
+
+        evoked_power_a = power_a.average()
+        evoked_power_b = power_b.average()
+
+        power_a_perm.append(evoked_power_a)
+        power_b_perm.append(evoked_power_b)
+
+    # average across permutations
+    evoked_power_a_perm_arr = np.mean(np.array([p.data for p in power_a_perm]), axis=0)
+    evoked_power_b_perm_arr = np.mean(np.array([p.data for p in power_b_perm]), axis=0)
+
+    # put back into TFR object
+    evoked_power_a = mne.time_frequency.AverageTFR(power.info, evoked_power_a_perm_arr, 
+                                                        power.times, power.freqs, power_a.data.shape[0])
+    evoked_power_b = mne.time_frequency.AverageTFR(power.info, evoked_power_b_perm_arr, 
+                                                        power.times, power.freqs, power_b.data.shape[0])
