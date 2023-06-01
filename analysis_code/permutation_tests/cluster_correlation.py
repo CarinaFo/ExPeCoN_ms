@@ -47,6 +47,7 @@ def permutation_cluster_correlation_test(X, behavior, test='pearson', threshold=
     import scipy.ndimage as ndimage
     import scipy.stats as stats
     import seaborn as sns
+    import matplotlib.pyplot as plt
 
     # create correlation matrix
     corr_matrix = np.zeros([X.shape[1], X.shape[2]])
