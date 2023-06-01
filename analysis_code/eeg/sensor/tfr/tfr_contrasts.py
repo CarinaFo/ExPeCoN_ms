@@ -176,12 +176,12 @@ def contrast_conditions(cond='prevchoice'):
 
         power.metadata = subj_data
 
-        if cond == 'highlow_prevyes':
+        if cond == 'highlow_signal':
             # get high and low probability trials 
             power_a = power[((power.metadata.cue == 0.75)
-                             & (power.metadata.prevsayyes == 1))]
+                             & (power.metadata.isyes == 1))]
             power_b = power[((power.metadata.cue == 0.25)
-                             & (power.metadata.prevsayyes == 1))]
+                             & (power.metadata.isyes == 1))]
         elif cond == 'prevchoice':
             # get previous no and previous yes trials
             power_a = power[(power.metadata.prevsayyes == 1)]
