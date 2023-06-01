@@ -37,7 +37,7 @@ freq_list = np.arange(6, 35, 1)
 freq_bands = {'alpha': (6, 13), 'low_beta': (14, 20), 'beta_gamma': (20, 35)}
 
 
-def save_band_power_per_trial():
+def save_band_power_per_trial(tmin, tmax):
 
     """This function saves the power per trial per frequency band in a csv file. 
     The power is calculated for the prestimulus period (-400 to -200ms) and
@@ -73,7 +73,7 @@ def save_band_power_per_trial():
         # strongest effects between -400 and -200ms prestimulus
         # ROI channels selected
 
-        power.crop(-0.4, -0.1).pick_channels(['CP4', 'C4', 'C6', 'CP6'])
+        power.crop(tmin, tmax).pick_channels(['CP4', 'C4', 'C6', 'CP6'])
 
         # now we average over time and channels
 
@@ -83,8 +83,8 @@ def save_band_power_per_trial():
         # behavioral data frame
 
         subj_data['alpha_pw'] = np.mean(power.data[:,:8], axis=1)  # 8-14 Hz
-        subj_data['low_beta_pw'] = np.mean(power.data[:,8:15], axis=1) # 14-21 Hz
-        subj_data['beta_gamma_pw'] = np.mean(power.data[:,15:], axis=1) # 20-36 Hz
+        subj_data['beta'] = np.mean(power.data[:,8:21], axis=1) # 14-21 Hz
+        #subj_data['beta_gamma_pw'] = np.mean(power.data[:,15:], axis=1) # 20-36 Hz
 
         # save the data in a list
         brain_behav.append(subj_data)
@@ -102,7 +102,7 @@ def power_criterion_corr():
 
     df = pd.read_csv(f"{brain_behav_path}\\brain_behav.csv")
 
-    freqs = ['theta_pw', 'alpha_pw', 'low_beta_pw', 'beta_gamma_pw']
+    freqs = ['alpha_pw', 'beta']
 
     diff_p_list = []
 
@@ -118,7 +118,7 @@ def power_criterion_corr():
 
         diff_p_list.append(diff_p)
 
-    power_dict = {'alpha': diff_p_list[0], 'low_beta': diff_p_list[1], 'beta_gamma': diff_p_list[2]}
+    power_dict = {'alpha': diff_p_list[0], 'beta': diff_p_list[1]}
     
     out = figure1.prepare_behav_data()
         
@@ -131,11 +131,14 @@ def power_criterion_corr():
     for p_key, p_value in power_dict.items(): # loop over the power difference
         for keys, values in sdt_params.items(): # loop over the criterion and dprime difference
 
-            print(scipy.stats.pearsonr(p_value, values))
+            fig = sns.regplot(p_value[values>0], values[values>0])
 
-            fig = sns.regplot(p_value, values)
-            
-            os.chdir(r"D:\expecon_ms\figs\brain_behavior")
+            plt.xlabel(f'{p_key} power difference')
+            plt.ylabel(f'{keys} difference')
+
+            print(scipy.stats.spearmanr(p_value[values>0], values[values>0]))
+
+            os.chdir(r"D:\expecon_ms\\figs\brain_behavior")
 
             fig.figure.savefig(f'{p_key}_{keys}_.svg')
 
