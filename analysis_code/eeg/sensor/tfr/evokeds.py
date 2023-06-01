@@ -198,8 +198,8 @@ def create_contrast(tmin=-0.5, tmax=0, cond='highlow',
                               & (epochs.metadata.cue == 0.25))]
         
         if induced:
-            epochs_a = epochs_a.subract_evoked()
-            epochs_b = epochs_b.subract_evoked()
+            epochs_a = epochs_a.subtract_evoked()
+            epochs_b = epochs_b.subtract_evoked()
 
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
