@@ -38,10 +38,10 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(tmin=-0.5, tmax=0, cond='highlow_no',
-                    cond_a='high', cond_b='low', laplace=False,
+def create_contrast(tmin=-0.5, tmax=0, cond='highlow',
+                    cond_a='high', cond_b='low', laplace=True,
                     reject_criteria=dict(eeg=200e-6),
-                    flat_criteria=dict(eeg=1e-6)):
+                    flat_criteria=dict(eeg=1e-6), induced=True):
 
     """ This function creates a contrast between two conditions for epoched data in a specified time window.
     It returns the evoked responses for the two conditions and the contrast between them.
@@ -133,11 +133,9 @@ def create_contrast(tmin=-0.5, tmax=0, cond='highlow_no',
         epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
 
         # create contrasts
-        if cond == 'highlow_no':
-            epochs_a = epochs[((epochs.metadata.cue == 0.75)
-                              & (epochs.metadata.prevsayyes == 0))]
-            epochs_b = epochs[((epochs.metadata.cue == 0.25)
-                              & (epochs.metadata.prevsayyes == 0))]
+        if cond == 'highlow':
+            epochs_a = epochs[(epochs.metadata.cue == 0.75)]
+            epochs_b = epochs[(epochs.metadata.cue == 0.25)]
         if cond == 'hitmiss': # sign in prestim window
             epochs_a = epochs[((epochs.metadata.isyes == 1)
                               & (epochs.metadata.sayyes == 1))]
@@ -198,6 +196,10 @@ def create_contrast(tmin=-0.5, tmax=0, cond='highlow_no',
             epochs_b = epochs[((epochs.metadata.isyes == 1)
                               & (epochs.metadata.sayyes == 1)
                               & (epochs.metadata.cue == 0.25))]
+        
+        if induced:
+            epochs_a = epochs_a.subract_evoked()
+            epochs_b = epochs_b.subract_evoked()
 
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
@@ -218,6 +220,30 @@ def create_contrast(tmin=-0.5, tmax=0, cond='highlow_no',
         pd.DataFrame(all_trials).to_csv(f'{behavpath}//trials_per_subject.csv')
 
     return evokeds_a_all, evokeds_b_all, cond_a, cond_b, cond
+
+def plot_psd(data_a=None, data_b=None, cond_a=None, cond_b=None,
+             fmin=1, fmax=40, picks=['C4']):
+
+    """Plot PSD for grand average data."""
+
+    gra_high = mne.grand_average(data_a)
+    gra_low = mne.grand_average(data_b)
+
+    psd_low = gra_low.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
+    psd_high = gra_high.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
+
+    psd_low_d = psd_low.get_data()
+    psd_high_d = psd_high.get_data()
+
+    freqs = psd_low.freqs
+
+    plt.plot(freqs, np.log10(psd_high_d[0]), label=cond_a)
+    plt.plot(freqs, np.log10(psd_low_d[0]), label=cond_b)
+    plt.legend()
+
+    plt.savefig(f'psd_{cond_a}_{cond_b}_laplace.png')
+    plt.show()
+
 
 def load_all_epochs(tmin=-0.3, tmax=-0.2, laplace=True,
                     reject_criteria=dict(eeg=200e-6),
@@ -555,8 +581,8 @@ def permutation_test():
         background='w',
     )
 
-# We could save this via the following:
-brain.save_image('cluster_highlow.png')
+    # We could save this via the following:
+    brain.save_image('cluster_highlow.png')
 
 def plot_evoked_source():
 
