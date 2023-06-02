@@ -41,7 +41,7 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
 def create_contrast(tmin=-0.5, tmax=0, cond='highlow',
                     cond_a='high', cond_b='low', laplace=True,
                     reject_criteria=dict(eeg=200e-6),
-                    flat_criteria=dict(eeg=1e-6), induced=True):
+                    flat_criteria=dict(eeg=1e-6), induced=False):
 
     """ This function creates a contrast between two conditions for epoched data in a specified time window.
     It returns the evoked responses for the two conditions and the contrast between them.
@@ -81,7 +81,7 @@ def create_contrast(tmin=-0.5, tmax=0, cond='highlow',
 
     all_trials, trials_removed = [], []
 
-    evokeds_a_all, evokeds_b_all = [], []
+    data_a, data_b = [], []
 
     for counter, subj in enumerate(IDlist):
 
@@ -212,36 +212,82 @@ def create_contrast(tmin=-0.5, tmax=0, cond='highlow',
         evokeds_a = epochs_a.average().crop(tmin, tmax)
         evokeds_b = epochs_b.average().crop(tmin, tmax)
 
-        evokeds_a_all.append(evokeds_a)
-        evokeds_b_all.append(evokeds_b)
+        data_a.append(evokeds_a)
+        data_b.append(evokeds_b)
         
         # save n_trials per participant and trials removed to a csv file
         pd.DataFrame(trials_removed).to_csv(f'{behavpath}//trials_removed.csv')
         pd.DataFrame(all_trials).to_csv(f'{behavpath}//trials_per_subject.csv')
 
-    return evokeds_a_all, evokeds_b_all, cond_a, cond_b, cond
+    return data_a, data_b, cond_a, cond_b, cond
 
 def plot_psd(data_a=None, data_b=None, cond_a=None, cond_b=None,
-             fmin=1, fmax=40, picks=['C4']):
+             fmin=2, fmax=40, picks=['C4']):
 
-    """Plot PSD for grand average data."""
+    """Plot PSD for evoked data per participant and condition.
+    
+    Parameters
+    ----------
+    data_a : list
+        List of evoked data for condition a.
+    data_b : list
+        List of evoked data for condition b.
+    cond_a : str
+        Name of condition a
+    cond_b : str
+        Name of condition b
+    fmin : int
+    fmax : int
+    picks : list
+        List of channels to plot.
+    Returns
+    -------
+            """
 
-    gra_high = mne.grand_average(data_a)
-    gra_low = mne.grand_average(data_b)
+    psd_a_all, psd_b_all = [], []
 
-    psd_low = gra_low.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
-    psd_high = gra_high.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
+    for a in data_a:
+        psd_a = a.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
+        psd_a_all.append(psd_a.get_data())
 
-    psd_low_d = psd_low.get_data()
-    psd_high_d = psd_high.get_data()
+    for b in data_b:
+        psd_b = a.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
+        psd_b_all.append(psd_b.get_data())
 
-    freqs = psd_low.freqs
+    psd_a_all = 10*np.log10(np.squeeze(np.array(psd_a_all)))
+    psd_b_all = 10*np.log10(np.squeeze(np.array(psd_b_all)))
 
-    plt.plot(freqs, np.log10(psd_high_d[0]), label=cond_a)
-    plt.plot(freqs, np.log10(psd_low_d[0]), label=cond_b)
+    mean_psd_a = np.mean(psd_a_all, axis=0)
+    mean_psd_b = np.mean(psd_b_all, axis=0)
+
+    sd_psd_a = np.std(psd_a_all, axis=0)
+    sd_psd_b = np.std(psd_b_all, axis=0)
+
+    freqs = psd_a.freqs
+
+    plt.plot(freqs, mean_psd_b, label=cond_b,
+        color='darkgreen')
+
+    plt.fill_between(freqs, mean_psd_b + sd_psd_b,
+                    mean_psd_b - sd_psd_b,
+                    color="darkgreen",
+                    alpha=0.5,
+                    edgecolor="none")
+    
+    plt.plot(freqs, mean_psd_a, label=cond_a,
+            color='cyan')
+    
+    plt.fill_between(freqs, mean_psd_a - sd_psd_a,
+                    mean_psd_a + sd_psd_a,
+                color="cyan",
+                alpha=0.3,
+                edgecolor="none")
+
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Power Spectral Density (dB)')
     plt.legend()
 
-    plt.savefig(f'psd_{cond_a}_{cond_b}_laplace.png')
+    plt.savefig(f'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4\\psd_{cond_a}_{cond_b}_laplace.png')
     plt.show()
 
 
