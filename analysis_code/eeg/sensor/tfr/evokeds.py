@@ -38,10 +38,10 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(tmin=-0.5, tmax=0, cond='highlow',
-                    cond_a='high', cond_b='low', laplace=True,
+def create_contrast(tmin=-0.5, tmax=0, cond='hitmiss',
+                    cond_a='hit', cond_b='miss', laplace=False,
                     reject_criteria=dict(eeg=200e-6),
-                    flat_criteria=dict(eeg=1e-6), induced=False):
+                    flat_criteria=dict(eeg=1e-6), induced=True):
 
     """ This function creates a contrast between two conditions for epoched data in a specified time window.
     It returns the evoked responses for the two conditions and the contrast between them.
@@ -244,6 +244,9 @@ def plot_psd(data_a=None, data_b=None, cond_a=None, cond_b=None,
     -------
             """
 
+    mean_psd_a = mne.grand_average(data_a).apply_baseline((-0.5,-0.4)).plot_psd(fmin=fmin, fmax=fmax, picks=picks, show=False)
+    mean_psd_b = mne.grand_average(data_b).apply_baseline((-0.5,-0.4)).plot_psd(fmin=fmin, fmax=fmax, picks=picks, show=False)
+    
     psd_a_all, psd_b_all = [], []
 
     for a in data_a:
@@ -251,11 +254,11 @@ def plot_psd(data_a=None, data_b=None, cond_a=None, cond_b=None,
         psd_a_all.append(psd_a.get_data())
 
     for b in data_b:
-        psd_b = a.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
+        psd_b = b.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
         psd_b_all.append(psd_b.get_data())
 
-    psd_a_all = 10*np.log10(np.squeeze(np.array(psd_a_all)))
-    psd_b_all = 10*np.log10(np.squeeze(np.array(psd_b_all)))
+    psd_a_all = np.squeeze(np.array(psd_a_all))
+    psd_b_all = np.squeeze(np.array(psd_b_all))
 
     mean_psd_a = np.mean(psd_a_all, axis=0)
     mean_psd_b = np.mean(psd_b_all, axis=0)
@@ -265,29 +268,29 @@ def plot_psd(data_a=None, data_b=None, cond_a=None, cond_b=None,
 
     freqs = psd_a.freqs
 
+    plt.plot(freqs, mean_psd_a, label=cond_a,
+        color='cyan')
+    
     plt.plot(freqs, mean_psd_b, label=cond_b,
         color='darkgreen')
-
-    plt.fill_between(freqs, mean_psd_b + sd_psd_b,
-                    mean_psd_b - sd_psd_b,
-                    color="darkgreen",
-                    alpha=0.5,
-                    edgecolor="none")
-    
-    plt.plot(freqs, mean_psd_a, label=cond_a,
-            color='cyan')
     
     plt.fill_between(freqs, mean_psd_a - sd_psd_a,
                     mean_psd_a + sd_psd_a,
-                color="cyan",
-                alpha=0.3,
-                edgecolor="none")
+                    color="cyan",
+                    alpha=0.3,
+                    edgecolor="none")
+    
+    plt.fill_between(freqs, mean_psd_b - sd_psd_b,
+                    mean_psd_b + sd_psd_b,
+                    color="darkgreen",
+                    alpha=0.3,
+                    edgecolor="none")
 
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Power Spectral Density (dB)')
     plt.legend()
 
-    plt.savefig(f'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4\\psd_{cond_a}_{cond_b}_laplace.png')
+    plt.savefig(f'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4\\psd_{cond_a}_{cond_b}_laplace_-1before.png')
     plt.show()
 
 
