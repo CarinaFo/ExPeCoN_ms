@@ -1,10 +1,12 @@
 import os
+
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import scipy.stats as stats
-
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import numpy as np
+import statsmodels.api as sm
+from matplotlib.font_manager import FontProperties
 
 
 def prepro_behavioral_data():
@@ -623,6 +625,37 @@ def plot_figure1_grid(blue='#2a95ffff', red='#ff2a2aff',
     plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
     plt.savefig(savepath_fig1 + "\\rt_con_incorrect.svg", dpi=300, bbox_inches='tight',format='svg')
     plt.show()
+
+    # Plot relationship between dprime and criterion
+    x=d_prime_high
+    y=criterion_high
+
+    reg = sns.regplot(x, y)
+
+    # Fit a linear regression model to calculate the p-value
+    model = sm.OLS(x, sm.add_constant(y))
+    results = model.fit()
+    p_value = results.pvalues[1]
+
+    # Retrieve the regression line equation and round the coefficients
+    slope, intercept = reg.get_lines()[0].get_data()
+    slope = round(slope[1], 2)
+    intercept = round(intercept[1], 2)
+
+    # Add the regression line equation and p-value to the plot with Arial font and size 14
+    equation = f'y = {slope}x + {intercept}'
+    p_value_text = f'p-value: {p_value:.4f}'
+
+    font = {'family': 'Arial', 'size': 14}
+
+    plt.annotate(equation, xy=(0.05, 0.9), xycoords='axes fraction',
+                 fontproperties=font)
+    plt.annotate(p_value_text, xy=(0.05, 0.8), xycoords='axes fraction',
+                 fontproperties=font)
+
+    plt.xlabel('dprime 0.75', fontname="Arial", fontsize=14)
+    plt.ylabel('c 0.75', fontname="Arial", fontsize=14)
+    plt.savefig(savepath_fig1 + "\\d_c_high.svg", dpi=300, bbox_inches='tight',format='svg')
 
 
 
