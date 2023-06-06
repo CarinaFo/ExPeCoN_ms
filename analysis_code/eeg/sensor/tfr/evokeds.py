@@ -2,7 +2,7 @@
 
 
 # Author: Carina Forster
-# Date: 2023-04-03
+# Date: 2023-02-06
 
 # This script plots grand average evoked responses for high and low cue conditions
 # and runs a paired ttest between the two conditions with a cluster based permutation test
@@ -41,7 +41,8 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
 def create_contrast(tmin=-0.5, tmax=0, cond='hitmiss',
                     cond_a='hit', cond_b='miss', laplace=False,
                     reject_criteria=dict(eeg=200e-6),
-                    flat_criteria=dict(eeg=1e-6), induced=True):
+                    flat_criteria=dict(eeg=1e-6), induced=False,
+                    average=1):
 
     """ This function creates a contrast between two conditions for epoched data in a specified time window.
     It returns the evoked responses for the two conditions and the contrast between them.
@@ -64,6 +65,10 @@ def create_contrast(tmin=-0.5, tmax=0, cond='hitmiss',
         Criteria for rejecting trials.
     flat_criteria : dict
         Criteria for rejecting trials.
+    induced : bool
+        If True, evoked response is subtracted from each trial.
+    average : bool
+        If True, epochs are averaged across trials.
     
     Returns
     -------
@@ -131,12 +136,15 @@ def create_contrast(tmin=-0.5, tmax=0, cond='hitmiss',
 
         # drop bad epochs
         epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
+                
+        if induced == 1:
+            epochs = epochs.subtract_evoked()
 
         # create contrasts
         if cond == 'highlow':
             epochs_a = epochs[(epochs.metadata.cue == 0.75)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-        if cond == 'hitmiss': # sign in prestim window
+        elif cond == 'hitmiss':  # sign in prestim window
             epochs_a = epochs[((epochs.metadata.isyes == 1)
                               & (epochs.metadata.sayyes == 1))]
             epochs_b = epochs[((epochs.metadata.isyes == 1)
@@ -196,21 +204,21 @@ def create_contrast(tmin=-0.5, tmax=0, cond='hitmiss',
             epochs_b = epochs[((epochs.metadata.isyes == 1)
                               & (epochs.metadata.sayyes == 1)
                               & (epochs.metadata.cue == 0.25))]
-        
-        if induced:
-            epochs_a = epochs_a.subtract_evoked()
-            epochs_b = epochs_b.subtract_evoked()
 
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
         # apply laplace transform
-        if laplace == True:
+        if laplace == 1:
             epochs_a = mne.preprocessing.compute_current_source_density(epochs_a)
             epochs_b = mne.preprocessing.compute_current_source_density(epochs_b)
 
         # average and crop in defined time window
-        evokeds_a = epochs_a.average().crop(tmin, tmax)
-        evokeds_b = epochs_b.average().crop(tmin, tmax)
+        if average == 1:
+            evokeds_a = epochs_a.average().crop(tmin, tmax)
+            evokeds_b = epochs_b.average().crop(tmin, tmax)
+        else:
+            evokeds_a = epochs_a.crop(tmin, tmax)
+            evokeds_b = epochs_b.crop(tmin, tmax)
 
         data_a.append(evokeds_a)
         data_b.append(evokeds_b)
@@ -244,28 +252,37 @@ def plot_psd(data_a=None, data_b=None, cond_a=None, cond_b=None,
     -------
             """
 
-    mean_psd_a = mne.grand_average(data_a).apply_baseline((-0.5,-0.4)).plot_psd(fmin=fmin, fmax=fmax, picks=picks, show=False)
-    mean_psd_b = mne.grand_average(data_b).apply_baseline((-0.5,-0.4)).plot_psd(fmin=fmin, fmax=fmax, picks=picks, show=False)
-    
+    data_a, data_b, cond_a, cond_b, cond = create_contrast(laplace=0,
+                                                            induced=0)
+
+    # compute psd for each participant and condition and store data in a list
     psd_a_all, psd_b_all = [], []
 
     for a in data_a:
-        psd_a = a.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
+        psd_a = a.compute_psd(method='welch', fmin=fmin, fmax=fmax,
+                              picks=picks, n_per_seg=126)
         psd_a_all.append(psd_a.get_data())
 
     for b in data_b:
-        psd_b = b.compute_psd(fmin=fmin, fmax=fmax, picks=picks)
+        psd_b = b.compute_psd(method='welch', fmin=fmin,
+                              fmax=fmax,  picks=picks, n_per_seg=126)
         psd_b_all.append(psd_b.get_data())
 
-    psd_a_all = np.squeeze(np.array(psd_a_all))
-    psd_b_all = np.squeeze(np.array(psd_b_all))
+    # decibel transformation
+    psd_a_all = 10*np.log10(np.squeeze(np.array(psd_a_all)))
+    psd_b_all = 10*np.log10(np.squeeze(np.array(psd_b_all)))
 
+    # compute stats
+    W, p = stats.wilcoxon(psd_a_all, psd_b_all)
+
+    # compute mean and sd across participants
     mean_psd_a = np.mean(psd_a_all, axis=0)
     mean_psd_b = np.mean(psd_b_all, axis=0)
 
     sd_psd_a = np.std(psd_a_all, axis=0)
     sd_psd_b = np.std(psd_b_all, axis=0)
 
+    # extract frequencies
     freqs = psd_a.freqs
 
     plt.plot(freqs, mean_psd_a, label=cond_a,
@@ -290,13 +307,13 @@ def plot_psd(data_a=None, data_b=None, cond_a=None, cond_b=None,
     plt.ylabel('Power Spectral Density (dB)')
     plt.legend()
 
-    plt.savefig(f'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4\\psd_{cond_a}_{cond_b}_laplace_-1before.png')
+    plt.savefig(f'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4\\psd_{cond_a}_{cond_b}.png')
     plt.show()
 
-
-def load_all_epochs(tmin=-0.3, tmax=-0.2, laplace=True,
+def load_all_epochs(tmin=-0.5, tmax=0, laplace=True,
                     reject_criteria=dict(eeg=200e-6),
-                    flat_criteria=dict(eeg=1e-6),
+                    flat_criteria=dict(eeg=1e-6), pick_channels=0,
+                    average_time_space=0,
                     channel_list = ['C3', 'CP5', 'CP1', 'Pz', 'CP2', 'C4', 'T8', 'FC6','FC2',
                                     'C1','CP3', 'P1', 'P2', 'CPz','CP4','C6','C2','FC4']):
 
@@ -314,11 +331,16 @@ def load_all_epochs(tmin=-0.3, tmax=-0.2, laplace=True,
         Criteria for rejecting trials.
     flat_criteria : dict
         Criteria for rejecting trials.
-    
+    pick_channels : boolean
+        Do you want to choose specific channels?
+    average_time_space : boolean
+        Do you want to average over time and space?
+    channel_list : list
+        List of channels to pick.
     Returns
     -------
-    evokeds_a : mne.evoked
-        Evoked response for condition a.
+    evokeds_all : list
+        List of epochs for each participant
     """
     epochs_all, df = [], []
 
@@ -372,19 +394,22 @@ def load_all_epochs(tmin=-0.3, tmax=-0.2, laplace=True,
         epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
 
         # apply laplace transform
-        if laplace == True:
+        if laplace:
             epochs = mne.preprocessing.compute_current_source_density(epochs)
 
         # average and crop in defined time window
         epochs = epochs.crop(tmin, tmax)
-        epochs = epochs.pick_channels(channel_list)
+
+        if pick_channels:
+            epochs = epochs.pick_channels(channel_list)
 
         metadata = epochs.metadata
 
         df.append(metadata)
 
-        epochs = epochs.get_data().mean(axis=(1, 2))
-    
+        if average_time_space:
+            epochs = epochs.average().pick_types(eeg=True)
+
         epochs_all.append(epochs)
         
     return epochs_all, df
@@ -414,7 +439,6 @@ def cluster_perm_space_time_plot(perm=10000, channels=['C4', 'CP4', 'C6', 'CP6']
     h : array
     Boolean array of significant sensors.
     """
-
 
     # create contrasts
     evokeds_a_all, evokeds_b_all, cond_a, cond_b, cond = create_contrast()
