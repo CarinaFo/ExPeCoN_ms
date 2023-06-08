@@ -272,6 +272,35 @@ def plot_psd(data_a=None, data_b=None, cond_a=None, cond_b=None,
     psd_a_all = 10*np.log10(np.squeeze(np.array(psd_a_all)))
     psd_b_all = 10*np.log10(np.squeeze(np.array(psd_b_all)))
 
+    slope_a, slope_b, intercept_a, intercept_b = [], [], [], []
+
+    freqs_log = np.log10(psd_a.freqs)
+
+    for psd_a in psd_a_all:
+        slope_condition1, intercept_condition1 = np.polyfit(freqs_log, psd_a, deg=1)
+        slope_a.append(slope_condition1)
+        intercept_a.append(intercept_condition1)
+
+    for psd_b in psd_b_all:
+        slope_condition2, intercept_condition2 = np.polyfit(freqs_log, psd_b, deg=1)
+        slope_b.append(slope_condition2)
+        intercept_b.append(intercept_condition2)
+   
+   stats.wilcoxon(slope_a, slope_b)
+   stats.wilcoxon(intercept_a, intercept_b)
+
+    # Assuming slopes_condition1 and slopes_condition2 are lists of slope values for each participant
+    participant_numbers = range(len(slope_a))
+
+    plt.scatter(participant_numbers, slope_a, color='blue', label='0.75')
+    plt.scatter(participant_numbers, slope_b, color='red', label='0.25')
+
+    plt.xlabel('Participant')
+    plt.ylabel('Slope of PSD')
+    plt.legend()
+    plt.savefig(f'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4\\slope_highlow.svg')
+    plt.show()
+
     # compute stats
     W, p = stats.wilcoxon(psd_a_all, psd_b_all)
 
