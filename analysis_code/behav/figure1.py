@@ -218,7 +218,7 @@ def prepare_behav_data(exclude_high_fa=False):
     d_diff = np.array(d_prime_low) - np.array(d_prime_high)
     c_diff = np.array(criterion_low) - np.array(criterion_high)
 
-    return d_diff, c_diff, conf_con, d_cond, c_cond, fa_cond, hit_cond, \
+    return d_cond, c_cond, hit_cond, fa_cond, conf_con, \
            conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, rt_con_yes, \
            rt_con_incorrect
 
@@ -657,38 +657,74 @@ def plot_figure1_grid(blue='#2a95ffff', red='#ff2a2aff',
     plt.ylabel('c 0.75', fontname="Arial", fontsize=14)
     plt.savefig(savepath_fig1 + "\\d_c_high.svg", dpi=300, bbox_inches='tight',format='svg')
 
-
-
-def stats_figure1():
-    """stats for Figure 1
-    Parameters  ---------- None.
-    Returns
-    -------
-    None.
+def effect_wilcoxon(x1, x2):
     """
-    # non parametric
-    t, p = stats.wilcoxon(c_cond[0], c_cond[1])
-    print(f'c: {p}')
+    Calculate Cohen's d as an effect size for the Wilcoxon signed-rank test (paired samples).
 
-    t, p = stats.wilcoxon(d_cond[0], d_cond[1])
-    print(f'dprime: {p}')
+    Parameters:
+    - x1: numpy array or list, the first sample
+    - x2: numpy array or list, the second sample
 
-    t, p = stats.wilcoxon(hit_cond[0], hit_cond[1])
-    print(f'hitrate: {p}')
+    Returns:
+    - d: float, Cohen's d
+    - statistic: float, test statistic from the Wilcoxon signed-rank test
+    - p_value: float, p-value from the Wilcoxon signed-rank test
+    """
 
-    t, p = stats.wilcoxon(fa_cond[0], fa_cond[1])
-    print(f'farate: {p}')
+    if len(x1) != len(x2):
+        raise ValueError("The two samples must have the same length for paired analysis.")
 
-    t, p = stats.wilcoxon(conf_con[0].iloc[:, 1], conf_con[1].iloc[:, 1])
-    print(f'confidence in correct trials only: {p}')
+    statistic, p_value = stats.wilcoxon(x1, x2)
 
-    t, p = stats.wilcoxon(acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1])
-    print(f'accuracy between conditions: {p}')
+    # effect size rank biserial
+    n = len(x1)
 
-    t, p = stats.wilcoxon(rt_con[0].iloc[:, 1], rt_con[1].iloc[:, 1])
-    print(f'rt diffs between conditions: {p}')
+    r = 1 - (2 * statistic) / (n * (n + 1))
 
-    t, p = stats.wilcoxon(rt_con_incorrect[0].iloc[:, 1],
-                           rt_con_incorrect[1].iloc[:, 1])
+    output = [r, statistic, p_value]
+
+    return output
+
+def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
+    np.random.seed(0)  # Set a random seed for reproducibility
+    n = len(x1)
+    effect_sizes = []
+
+    out = effect_wilcoxon(x1, x2)
+    r, statistic, p_value = out
+
+    # Print the result with description
+    print("r (Effect Size):", r)
+    print("Test Statistic:", statistic)
+    print("p-value:", p_value)
+
+    for _ in range(n_iterations):
+        indices = np.random.randint(0, n, size=n)  # Perform random sampling with replacement
+        x1_sample = x1[indices]
+        x2_sample = x2[indices]
+        effect_size = effect_wilcoxon(x1_sample, x2_sample)
+        effect_sizes.append(effect_size[0])
+
+    lower_percentile = (1 - alpha) / 2
+    upper_percentile = 1 - lower_percentile
+    ci_lower = np.percentile(effect_sizes, lower_percentile * 100)
+    ci_upper = np.percentile(effect_sizes, upper_percentile * 100)
+
+    print("Effect size (r) 95% CI:", (ci_lower, ci_upper))
+
+    return ci_lower, ci_upper
+
+def calc_stats():
+   
+
+   """ Calculate statistics for the behavioral data."""
+
+    out = prepare_behav_data()
     
-    print(f'rt diffs between conditions: {p}')
+    for idx, cond in enumerate(out[:4]):
+        if idx > 1:
+            ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(x1=cond[0].reset_index(drop=True), 
+                                                                   x2=cond[1].reset_index(drop=True))
+        else:
+            ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(cond[0], cond[1])
+        
