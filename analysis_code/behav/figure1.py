@@ -717,14 +717,18 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
 def calc_stats():
    
 
-   """ Calculate statistics for the behavioral data."""
+   """ Calculate statistics and effect sizes for the behavioral data."""
 
     out = prepare_behav_data()
-    
-    for idx, cond in enumerate(out[:4]):
-        if idx > 1:
+   
+    # only for dprime, crit, hitrate, farate and confidence congruency
+    for idx, cond in enumerate(out[:5]):
+        if idx > 1 and idx < 4:
             ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(x1=cond[0].reset_index(drop=True), 
-                                                                   x2=cond[1].reset_index(drop=True))
+                                                          x2=cond[1].reset_index(drop=True))
+        elif idx == 4:
+            ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(cond[0].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0]
+                                                                   , cond[1].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0])
         else:
             ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(cond[0], cond[1])
         
