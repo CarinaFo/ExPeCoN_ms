@@ -666,7 +666,7 @@ def effect_wilcoxon(x1, x2):
     - x2: numpy array or list, the second sample
 
     Returns:
-    - d: float, Cohen's d
+    - r: float, rank biserial correlation coefficient
     - statistic: float, test statistic from the Wilcoxon signed-rank test
     - p_value: float, p-value from the Wilcoxon signed-rank test
     """
@@ -677,6 +677,7 @@ def effect_wilcoxon(x1, x2):
     statistic, p_value = stats.wilcoxon(x1, x2)
 
     # effect size rank biserial
+
     n = len(x1)
 
     r = 1 - (2 * statistic) / (n * (n + 1))
@@ -686,6 +687,21 @@ def effect_wilcoxon(x1, x2):
     return output
 
 def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
+    
+    """
+    Calculate the confidence interval for Cohen's d as an effect size for the Wilcoxon signed-rank test (paired samples).
+    
+    Parameters:
+    - x1: numpy array or list, the first sample
+    - x2: numpy array or list, the second sample
+    - n_iterations: int, the number of bootstrap iterations
+    - alpha: float, the confidence level
+    
+    Returns:
+    - lower_percentile: float, the lower percentile of the confidence interval
+    - upper_percentile: float, the upper percentile of the confidence interval
+    """
+
     np.random.seed(0)  # Set a random seed for reproducibility
     n = len(x1)
     effect_sizes = []
@@ -714,21 +730,22 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
 
     return ci_lower, ci_upper
 
-def calc_stats():
-   
 
-   """ Calculate statistics and effect sizes for the behavioral data."""
+def calc_stats():
+
+    """ Calculate statistics and effect sizes for the behavioral data."""
 
     out = prepare_behav_data()
-   
+
     # only for dprime, crit, hitrate, farate and confidence congruency
+
     for idx, cond in enumerate(out[:5]):
         if idx > 1 and idx < 4:
             ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(x1=cond[0].reset_index(drop=True), 
-                                                          x2=cond[1].reset_index(drop=True))
+                                                            x2=cond[1].reset_index(drop=True))
         elif idx == 4:
             ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(cond[0].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0]
-                                                                   , cond[1].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0])
+                                                                    , cond[1].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0])
         else:
             ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(cond[0], cond[1])
         
