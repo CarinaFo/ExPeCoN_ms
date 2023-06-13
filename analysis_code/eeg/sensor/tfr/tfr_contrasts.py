@@ -19,6 +19,7 @@ import seaborn as sns
 from behavioral_data_analysis import figure1
 from permutation_tests import cluster_correlation
 import pyvistaqt  # for proper 3D plotting
+from behavioral_data_analysis import figure1
 
 # for plots in new windows
 # %matplotlib qt
@@ -276,14 +277,22 @@ def plot_grand_average(cond_a='high', cond_b='low',
     with open(f'{tfr_contrast_dir}\\'
               f'{cond_b}_all_subs_evoked_nzp.pickle', 'rb') as file:
         evokeds_low = pickle.load(file)
+
+        
+    out = figure1.prepare_behav_data()
+        
+    dprime = out[0]
+
+    crit = out[1]   
     
     # baseline correction
-    evokeds_high = [e.apply_baseline((-1,-0.8), mode='zscore') for e in evokeds_high]
-    evokeds_low = [e.apply_baseline((-1,-0.8), mode='zscore') for e in evokeds_low]
+    evokeds_high = [e.apply_baseline((-0.8,-0.6), mode='zscore') for e in evokeds_high]
+    evokeds_low = [e.apply_baseline((-0.8,-0.6), mode='zscore') for e in evokeds_low]
 
     # contrast data
     contrast_data = np.array([h.crop(tmin,tmax).pick_channels(channel_names).data-l.crop(tmin,tmax).pick_channels(['CP4']).data for h,l in zip (evokeds_high, evokeds_low)])
-    
+    times = evokeds_high[0].times
+
     high_data = np.array([h.crop(tmin,tmax).pick_channels(channel_names).data for h in evokeds_high])
     low_data = np.array([l.crop(tmin,tmax).pick_channels(channel_names).data for l in evokeds_low])
 
@@ -298,11 +307,13 @@ def plot_grand_average(cond_a='high', cond_b='low',
     
     t,p,H = mne.stats.permutation_t_test(diff)
 
+    print(f'{times[np.where(p<0.05)]} alpha')
+
     alpha_sd_high = np.std(high_data[:,:,2:8,:], axis=(0,1,2))
     alpha_sd_low = np.std(low_data[:,:,2:8,:], axis=(0,1,2))
 
-    beta_high = np.mean(high_data[:,:,14:20,:], axis=(0,1,2))
-    beta_low = np.mean(low_data[:,:,14:20,:], axis=(0,1,2))
+    beta_high = np.mean(high_data[crit>0,:,14:20,:], axis=(0,1,2))
+    beta_low = np.mean(low_data[crit>0,:,14:20,:], axis=(0,1,2))
 
     beta_high_sub = np.mean(high_data[:,:,14:20,:], axis=(1,2))
     beta_low_sub = np.mean(low_data[:,:,14:20,:], axis=(1,2))
@@ -310,6 +321,8 @@ def plot_grand_average(cond_a='high', cond_b='low',
     diff = beta_high_sub-beta_low_sub
 
     t,p,H = mne.stats.permutation_t_test(diff)
+
+    print(f'{times[np.where(p<0.05)]} beta')
 
     beta_sd_high = np.std(high_data[:,:,2:8,:], axis=(0,1,2))
     beta_sd_low = np.std(low_data[:,:,2:8,:], axis=(0,1,2))
@@ -328,7 +341,6 @@ def plot_grand_average(cond_a='high', cond_b='low',
     plt.xlabel('Time (s)')
     plt.ylabel('Power')
     plt.savefig(f'{savedir_figure4}\\{cond_a}_{cond_b}_beta_zoom.svg', dpi=300)
-
 
     contrast_data = np.array([h.crop(tmin,tmax).data-l.crop(tmin,tmax).data for h,l in zip (evokeds_high, evokeds_low)])
     
@@ -352,7 +364,7 @@ def plot_grand_average(cond_a='high', cond_b='low',
 
     diff = high_gra - low_gra
 
-    diff.apply_baseline((-0.4,0), mode='logratio').copy().crop(-0.4,0).plot(picks=channel_names, 
+    diff.crop(-0.8,0.3).plot(picks=channel_names,
                                   combine='mean')[0]
 
     topo.savefig(f'{savedir_figure4}//{cond}_topo.svg')
@@ -426,7 +438,7 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
     #cnorm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)  # min, center & max ERDS
     
     # add time on the x axis 
-    x = np.linspace(-0.5, 0, 126)
+    x = np.linspace(tmin, tmax, mean_over_channels.shape[2])
     y = np.arange(6, 35, 1)
 
     # Plot the original image
@@ -509,7 +521,9 @@ def run_cluster_correlation_2D(cond='lowhigh', channel_names=['CP4', 'CP6', 'C4'
 
     mean_over_channels = np.mean(contrast_data[:, spec_channel_list, :, :], axis=1)
 
-    cluster_correlation.permutation_cluster_correlation_test(mean_over_channels, crit, threshold=0.05)
+    out = cluster_correlation.permutation_cluster_correlation_test(mean_over_channels, 
+                                                             crit, threshold=0.05, 
+                                                             test='pearson')
 
 ########################################################## Helper functions
 
