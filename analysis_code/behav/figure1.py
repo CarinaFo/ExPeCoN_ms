@@ -1,3 +1,4 @@
+import math
 import os
 
 import matplotlib.gridspec as gridspec
@@ -221,6 +222,30 @@ def prepare_behav_data(exclude_high_fa=False):
     return d_cond, c_cond, hit_cond, fa_cond, conf_con, \
            conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, rt_con_yes, \
            rt_con_incorrect
+
+def diff_from_optimal_criterion():
+    """ This function calculates the difference between the optimal criterion
+    and the mean criterion for each participant and cue condition."""
+
+    # calculate the optimal criterion (c) for a given base rate of signal and catch trials, and cost of hit and false alarm
+    def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_alarm):
+        llr = math.log((base_rate_signal / base_rate_catch) * (cost_hit / cost_false_alarm))
+        c = -0.5 * llr
+        return c
+
+    c_low = calculate_optimal_c(0.25, 0.75, 1, 1)
+    print("Optimal criterion (c) for low stimulus probability:", c_low)
+
+    c_high = calculate_optimal_c(0.75, 0.25, 1, 1)
+    print("Optimal criterion (c) for high stimulus probability:", c_high)
+
+    subop_low = [c - c_low for c in criterion_low]
+    diff_op_low = np.mean(subop_low)
+    print(diff_op_low)
+    
+    subop_high = [c - c_high for c in criterion_high]
+    diff_op_high = np.mean(subop_high)
+    print(diff_op_high)
 
 
 def plot_figure1_grid(blue='#2a95ffff', red='#ff2a2aff',
@@ -689,7 +714,7 @@ def effect_wilcoxon(x1, x2):
 def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     
     """
-    Calculate the confidence interval for Cohen's d as an effect size for the Wilcoxon signed-rank test (paired samples).
+    Calculate the confidence interval for rank biserial as an effect size for the Wilcoxon signed-rank test (paired samples).
     
     Parameters:
     - x1: numpy array or list, the first sample
