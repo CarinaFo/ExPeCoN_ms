@@ -100,8 +100,6 @@ def template_matching(apply_raw=0, save=1, manual=0):
     In order to detect blink and cardiac artifacts we use the mne function detect_artifacts.
     If you choose to manually remove components, set detect_artifacts to "manual".
     This allows you to see all the components and select which one to remove.
-    After removing artifact components we check for remaining bad epochs.
-    We use autoreject and delete them (as recommended by autoreject).
     The cleaned data will be saved as a -epo.fif file
     Update: added rereferencing after ICA
     """
