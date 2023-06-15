@@ -198,6 +198,8 @@ def exclude_data():
     # Remove the '_merge' column
     data = filtered_df.drop('_merge', axis=1)
 
+    data.to_csv(behavpath + '\\prepro_behav_data.csv')
+    
     return data
 
 
