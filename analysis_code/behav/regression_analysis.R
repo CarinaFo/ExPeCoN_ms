@@ -35,6 +35,8 @@ library(sjPlot)
 library(svglite)
 library(ggplot2)
 library(MuMIn)
+library(finalfit)
+library(htmlTable)
 
 ####################################################################################################
 
@@ -241,6 +243,13 @@ summary(cue_prev_int_model)
 AIC(cue_model)
 AIC(cue_prev_model)
 AIC(cue_prev_int_model)
+
+# save table to PDF
+table1 = sjPlot::tab_model(cue_model, cue_prev_model, cue_prev_int_model, show.aic=TRUE, show.loglik=TRUE)
+
+# Save the output as an HTML file
+output_file <- "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\table1.html"
+htmlTable(table1, file = output_file)
 
 ######################## separate model for signal and noise trials only###############
 
