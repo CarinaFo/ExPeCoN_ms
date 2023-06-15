@@ -343,7 +343,7 @@ def plot_figure1_grid(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\F
     
     # load data
     df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, \
-    rt_con, rt_con_yes, rt_con_incorrect = prepare_for_plotting(exclude_high_fa=True)
+    rt_con, rt_con_yes, rt_con_incorrect = prepare_for_plotting(exclude_high_fa=False)
     
     # set colors for both conditions
     blue = '#2a95ffff'  # 0.25 cue
@@ -560,20 +560,19 @@ def calc_stats():
 
     """ Calculate statistics and effect sizes for the behavioral data."""
 
-    out = prepare_behav_data()
+    out = prepare_for_plotting()
 
     # only for dprime, crit, hitrate, farate and confidence congruency
+    df_sdt = out[0]
+    conf = out[1]
 
-    for idx, cond in enumerate(out[:5]):
-        if idx > 1 and idx < 4:
-            ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(x1=cond[0].reset_index(drop=True), 
-                                                            x2=cond[1].reset_index(drop=True))
-        elif idx == 4:
-            ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(cond[0].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0]
-                                                                    , cond[1].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0])
-        else:
-            ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(cond[0], cond[1])
+    cond_list = ['criterion', 'hit_rate', 'fa_rate', 'dprime']
+    for cond in cond_list:
+        ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(x1=df_sdt[cond][df_sdt.cue == 0.25].reset_index(drop=True), 
+                                                            x2=df_sdt[cond][df_sdt.cue == 0.75].reset_index(drop=True))
 
+    ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(conf[0].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0]
+                                                                    ,conf[1].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0])
 
 def effect_wilcoxon(x1, x2):
     """
