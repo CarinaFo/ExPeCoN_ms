@@ -14,10 +14,8 @@ from matplotlib.font_manager import FontProperties
 def prepro_behavioral_data():
 
     """ This function preprocesses the behavioral data.
-    It removes participants/blocks with excessively high/low hitrates,
-    removes trials with no response or super fast responses,
-    and removes the first trial from each block (weird trigger behavior).
-    It also adds columns for lagged variables.
+    We remove trials with no response or super fast responses
+    and add aditional columns to the dataframe.
     Returns:
     data: pandas dataframe containing the preprocessed behavioral data
     """
@@ -51,9 +49,12 @@ def prepro_behavioral_data():
 
     # add a column that combines the confidence ratings and the detection response
 
-    conf_resp = [4 if data.loc[i, 'sayyes'] == 1 and data.loc[i, 'conf'] == 1 else
-                 3 if data.loc[i, 'sayyes'] == 0 and data.loc[i, 'conf'] == 1 else
-                 2 if data.loc[i, 'sayyes'] == 1 and data.loc[i, 'conf'] == 0 else
+    conf_resp = [4 if data.loc[i, 'sayyes'] == 1 and
+                 data.loc[i, 'conf'] == 1 else
+                 3 if data.loc[i, 'sayyes'] == 0 and
+                 data.loc[i, 'conf'] == 1 else
+                 2 if data.loc[i, 'sayyes'] == 1 and
+                 data.loc[i, 'conf'] == 0 else
                  1 for i in range(len(data))]
     
     data['conf_resp'] = conf_resp
@@ -98,19 +99,24 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
     
     for subject in subjects:
         for condition in conditions:
-            subset = df[(df[subject_col] == subject) & (df[condition_col] == condition)]
+            subset = df[(df[subject_col] == subject) &
+                         (df[condition_col] == condition)]
             
-            detect_hits = subset[(subset[signal_col] == True) & (subset[response_col] == True)].shape[0]
-            detect_misses = subset[(subset[signal_col] == True) & (subset[response_col] == False)].shape[0]
-            false_alarms = subset[(subset[signal_col] == False) & (subset[response_col] == True)].shape[0]
-            correct_rejections = subset[(subset[signal_col] == False) & (subset[response_col] == False)].shape[0]
+            detect_hits = subset[(subset[signal_col] == True) &
+                                 (subset[response_col] == True)].shape[0]
+            detect_misses = subset[(subset[signal_col] == True) &
+                                   (subset[response_col] == False)].shape[0]
+            false_alarms = subset[(subset[signal_col] == False) &
+                                  (subset[response_col] == True)].shape[0]
+            correct_rejections = subset[(subset[signal_col] == False) &
+                                        (subset[response_col] == False)].shape[0]
             
             if condition == 0.75:
                 hit_rate = (detect_hits + 0.75) / (detect_hits + detect_misses + 1.5)
                 false_alarm_rate = (false_alarms + 0.25) / (false_alarms + correct_rejections + 0.5)
             else:
                 hit_rate = (detect_hits + 0.25) / (detect_hits + detect_misses + 0.5)
-                false_alarm_rate = (false_alarms + 0.75) / (false_alarms + correct_rejections + 1.5)
+                false_alarm_rate = (false_alarms + 0.75) /(false_alarms + correct_rejections + 1.5)
 
             d_prime = stats.norm.ppf(hit_rate) - stats.norm.ppf(false_alarm_rate)
             criterion = -0.5 * (stats.norm.ppf(hit_rate) + stats.norm.ppf(false_alarm_rate))
@@ -118,31 +124,22 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
             results.append((subject, condition, hit_rate, false_alarm_rate, d_prime, criterion))
     
     # Create a new dataframe with the results
-    results_df = pd.DataFrame(results, columns=[subject_col, condition_col, 'hit_rate', 'fa_rate', 'dprime', 'criterion'])
+    results_df = pd.DataFrame(results, columns=[subject_col, condition_col, 
+                                                'hit_rate', 'fa_rate', 'dprime',
+                                                'criterion'])
     
     return results_df
 
 
-def prepare_behav_data():
+def exclude_data():
     """
-    This function prepares the behavioral data for the figure 1 grid.
-    It calculates hit rates, false alarm rates, d-prime, and criterion
-    for each participant and cue condition.
-    It also calculates mean confidence for each participant and congruency
-    condition.
-    Parameters:
-    exclude_high_fa: Boolean Yes/No (exclude participants with fa rate > 0.4)
+    Excludes participants and trials from the data based on the exclusion criteria.
+    Arguments:
+    None
+
     Returns:
-    c_cond: list of dataframes containing mean confidence for each participant
-    and congruency condition
-    d_cond: list of dataframes containing d-prime for each participant and
-    cue condition
-    fa_cond: list of dataframes containing false alarm rates for each
-    participant and cue condition
-    hit_cond: list of dataframes containing hit rates for each participant
-    and cue condition
-    conf_con: list of dataframes containing mean confidence
-    and congruency condition
+    data -- Pandas dataframe containing the data
+
     """
 
     # Set up data path
@@ -204,21 +201,18 @@ def prepare_behav_data():
     return data
 
 
-def prepare_for_plotting(data=None, exclude_high_fa=True):
+def prepare_for_plotting(exclude_high_fa=False):
 
     """
-    This function prepares the behavioral data for the figure 1 grid.
-    It calculates hit rates, false alarm rates, d-prime, and criterion
-    for each participant and cue condition.
-    It also calculates mean confidence for each participant and congruency
-    condition.
-    Parameters:
-    data: dataframe containing the behavioral data
+    Prepares the data for plotting.
+    Arguments:
+    exclude_high_fa -- Boolean indicating whether to exclude participants with high false alarm rates
+    
     Returns:
-    condition_lists
+    data -- Pandas dataframe containing the data
     """
 
-    data = prepare_behav_data()
+    data = exclude_data()
 
     # calculate hit rates, false alarm rates, d-prime, and criterion per participant and cue condition
     # and per condition
@@ -297,11 +291,14 @@ def prepare_for_plotting(data=None, exclude_high_fa=True):
     conf_high = data_grouped.unstack()[0.75].reset_index()
     conf_low = data_grouped.unstack()[0.25].reset_index()
     conf_cue = [conf_low, conf_high]
-
-    return df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, \
-           rt_con, rt_con_yes, rt_con_incorrect
+    
+    conditions = df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, \
+                 conf_con_no, rt_con, rt_con_yes, rt_con_incorrect
+    
+    return conditions, exclude_high_fa
 
 def diff_from_optimal_criterion():
+
     """ This function calculates the difference between the optimal criterion
     and the mean criterion for each participant and cue condition."""
 
@@ -317,13 +314,13 @@ def diff_from_optimal_criterion():
     c_high = calculate_optimal_c(0.75, 0.25, 1, 1)
     print("Optimal criterion (c) for high stimulus probability:", c_high)
 
-    subop_low = [c - c_low for c in criterion_low]
+    subop_low = [c - c_low for c in df_sdt.criterion[df_sdt.cue == 0.25]]
     mean_low = np.mean(subop_low)
     std_low = np.std(subop_low)
     print(mean_low)
     print(std_low)
     
-    subop_high = [c - c_high for c in criterion_high]
+    subop_high = [c - c_high for c in df_sdt.criterion[df_sdt.cue == 0.75]]
     mean_high = np.mean(subop_high)
     std_high = np.std(subop_high)
     print(mean_high)
@@ -332,18 +329,24 @@ def diff_from_optimal_criterion():
 
 def plot_figure1_grid(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\Figure1\\'):
 
-    """Plot the figure 1 grid and the behavioral data, including accuracy plot
+    """Plot the figure 1 grid and the behavioral data
+
     Parameters
     ----------
-        colors : list of strings
-            The colors to use for the low and high cue condition
-            medcolor : list of strings
-            The colors to use for the median lines in the boxplots
-            """
-    
+    savepath_fig1 : str
+        Path to save the figure to
+
+    Returns
+    -------
+    None
+    """
+
     # load data
-    df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, \
-    rt_con, rt_con_yes, rt_con_incorrect = prepare_for_plotting(exclude_high_fa=False)
+    conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=False)
+
+    # unpack data
+    df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, \
+    rt_con_yes, rt_con_incorrect = conditions
     
     # set colors for both conditions
     blue = '#2a95ffff'  # 0.25 cue
@@ -547,7 +550,7 @@ def plot_figure1_grid(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\F
                                   rotation=30)
             plots.set_xlabel('')
 
-    if exclude_high_fa == True:
+    if exclude_high_fa is True:
         fig.savefig(savepath_fig1 + "\\figure1_exclhighfa.svg", dpi=300, bbox_inches='tight',
                     format='svg')
     else:
@@ -576,7 +579,7 @@ def calc_stats():
 
 def effect_wilcoxon(x1, x2):
     """
-    Calculate Cohen's d as an effect size for the Wilcoxon signed-rank test (paired samples).
+    Calculate effect size for the Wilcoxon signed-rank test (paired samples).
 
     Parameters:
     - x1: numpy array or list, the first sample
@@ -607,7 +610,8 @@ def effect_wilcoxon(x1, x2):
 def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     
     """
-    Calculate the confidence interval for rank biserial as an effect size for the Wilcoxon signed-rank test (paired samples).
+    Calculate the confidence interval for rank biserial as an effect size for 
+    the Wilcoxon signed-rank test (paired samples).
     
     Parameters:
     - x1: numpy array or list, the first sample
@@ -633,7 +637,8 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     print("p-value:", p_value)
 
     for _ in range(n_iterations):
-        indices = np.random.randint(0, n, size=n)  # Perform random sampling with replacement
+        # Perform random sampling with replacement
+        indices = np.random.randint(0, n, size=n)
         x1_sample = x1[indices]
         x2_sample = x2[indices]
         effect_size = effect_wilcoxon(x1_sample, x2_sample)
@@ -649,10 +654,21 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     return ci_lower, ci_upper
 
 
-def supplementary_plots():
+def supplementary_plots(data=None, savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\Figure1\\',
+                        exclude_high_fa=False):
 
-    # save accuracy and confidence per condition plot for supplementary material
-    
+    # set colors for both conditions
+    blue = '#2a95ffff'  # 0.25 cue
+    red = '#ff2a2aff'
+
+    colors = [blue, red]
+    medcolor = ['black', 'black']
+
+    # unpack data
+    df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, \
+    rt_con_yes, rt_con_incorrect = data
+
+    # save accuracy and confidence for both conditions
     for index in range(len(acc_cue[0])):
         plt.plot(1, acc_cue[0].iloc[index, 1],
                  marker='', markersize=8, color=colors[0],
@@ -676,15 +692,20 @@ def supplementary_plots():
     for patch, color in zip(acc_box['medians'], medcolor):
         patch.set_color(color)
 
-    #plt.xticks(['0.25', '0.75'], fontname="Arial",
-                            #fontsize=12)
+    # Set x-axis tick labels
+    plt.xticks([1, 2], ['0.25', '0.75'])    
     plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
-
     plt.ylabel('accuracy', fontname="Arial", fontsize=14)
-    plt.savefig(savepath_fig1 + "\\acc_cue.svg", dpi=300, bbox_inches='tight',format='svg')
+
+    if exclude_high_fa is True:
+        plt.savefig(savepath_fig1 + "\\acc_cue_exclhighfa.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
+    else:
+        plt.savefig(savepath_fig1 + "\\acc_cue.svg", dpi=300, bbox_inches='tight',
+                        format='svg')
     plt.show()
 
-    # Plot individual data points 
+    # is confidence higher for correct than incorrect responses?
     for index in range(len(conf_cue[0])):
         plt.plot(1, conf_cue[0].iloc[index, 1],
                  marker='', markersize=8, color=colors[0],
@@ -696,8 +717,8 @@ def supplementary_plots():
                  conf_cue[1].iloc[index, 1]],
                  marker='', markersize=0, color='gray', alpha=.25)
 
-    conf_box = plt.boxplot([conf_cue[0].iloc[:, 1], conf_cue[1].iloc[:, 1]], 
-                         patch_artist=True)
+    conf_box = plt.boxplot([conf_cue[0].iloc[:, 1], conf_cue[1].iloc[:, 1]],
+                            patch_artist=True)
     
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(conf_box['boxes'], colors):
@@ -708,18 +729,22 @@ def supplementary_plots():
     for patch, color in zip(conf_box['medians'], medcolor):
         patch.set_color(color)
 
-    #plt.xticks(['0.25', '0.75'], fontname="Arial",
-     #                       fontsize=12)
+    # Set x-axis tick labels
+    plt.xticks([1, 2], ['0.25', '0.75'])    
     plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
+    plt.ylabel('accuracy', fontname="Arial", fontsize=14)
 
     plt.ylabel('confidence', fontname="Arial", fontsize=14)
-    #plt.yticks(['0', '0.5', '1.0'], fontname="Arial", fontsize=12)
-    plt.savefig(savepath_fig1 + "\\conf_cue.svg", dpi=300, bbox_inches='tight',
+
+    if exclude_high_fa is True:
+        plt.savefig(savepath_fig1 + "\\conf_cue_exclhighfa.svg", dpi=300, bbox_inches='tight',
                 format='svg')
+    else:
+        plt.savefig(savepath_fig1 + "\\conf_cue.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
     plt.show()
 
-    # congruency effect for yes and no responses
-
+    # congruency on confidence for yes and no responses
     colors = ['white', 'black']
 
     # Plot individual data points 
@@ -747,15 +772,20 @@ def supplementary_plots():
     for patch, color in zip(conf_con_yes_box['medians'], medcolor):
         patch.set_color(color)
 
-    #plt.xticks(['0.25', '0.75'], fontname="Arial",
-                            #fontsize=12)
-    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
+        # Set x-axis tick labels
+    plt.xticks([1, 2], ['Congruent', 'Incongruent']) 
+    plt.xlabel('Yes responses', fontname="Arial", fontsize=14)
+    plt.ylabel('Confidence', fontname="Arial", fontsize=14)
 
-    plt.ylabel('Mean confidence', fontname="Arial", fontsize=14)
-    plt.savefig(savepath_fig1 + "\\conf_con_yes.svg", dpi=300, bbox_inches='tight',format='svg')
+    if exclude_high_fa is True:
+        plt.savefig(savepath_fig1 + "\\conf_con_yes_exclhighfa.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
+    else:
+        plt.savefig(savepath_fig1 + "\\conf_con_yes.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
     plt.show()
 
-    # Plot individual data points 
+    # congruency on confidence for no responses
     for index in range(len(conf_con_no[0])):
         plt.plot(1, conf_con_no[0].iloc[index, 1],
                  marker='', markersize=8, color=colors[0],
@@ -780,18 +810,20 @@ def supplementary_plots():
     for patch, color in zip(conf_con_no_box['medians'], medcolor):
         patch.set_color(color)
 
-    #plt.xticks(['0.25', '0.75'], fontname="Arial",
-                            #fontsize=12)
-    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
-
+    # Set x-axis tick labels
+    plt.xticks([1, 2], ['Congruent', 'Incongruent']) 
+    plt.xlabel('No responses', fontname="Arial", fontsize=14)
     plt.ylabel('Mean confidence', fontname="Arial", fontsize=14)
-    plt.savefig(savepath_fig1 + "\\conf_con_no.svg", dpi=300, bbox_inches='tight',
-                format='svg')
+
+    if exclude_high_fa is True:
+        plt.savefig(savepath_fig1 + "\\conf_con_no_exclhighfa.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
+    else:
+        plt.savefig(savepath_fig1 + "\\conf_con_no.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
     plt.show()
 
-    # Reaction time for congruent trials and correct vs. incorrect
-
-    # Plot individual data points 
+    # Reaction times for stimulus congruent trials (correct only)
     for index in range(len(rt_con[0])):
         plt.plot(1, rt_con[0].iloc[index, 1],
                  marker='', markersize=8, color=colors[0],
@@ -816,15 +848,20 @@ def supplementary_plots():
     for patch, color in zip(rt_con_box['medians'], medcolor):
         patch.set_color(color)
 
-    #plt.xticks(['0.25', '0.75'], fontname="Arial",
-                            #fontsize=12)
-    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
-
+    # Set x-axis tick labels
+    plt.xticks([1, 2], ['Congruent', 'Incongruent']) 
+    plt.xlabel('Correct trials only', fontname="Arial", fontsize=14)
     plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
-    plt.savefig(savepath_fig1 + "\\rt_con.svg", dpi=300, bbox_inches='tight',format='svg')
+
+    if exclude_high_fa is True:
+        plt.savefig(savepath_fig1 + "\\rt_con_exclhighfa.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
+    else:
+        plt.savefig(savepath_fig1 + "\\rt_con.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
     plt.show()
 
-     # Plot individual data points 
+    # Incorrect trials only
     for index in range(len(rt_con_incorrect[0])):
         plt.plot(1, rt_con_incorrect[0].iloc[index, 1],
                  marker='', markersize=8, color=colors[0],
@@ -849,17 +886,22 @@ def supplementary_plots():
     for patch, color in zip(rt_con_in_box['medians'], medcolor):
         patch.set_color(color)
 
-    #plt.xticks(['0.25', '0.75'], fontname="Arial",
-                            #fontsize=12)
-    plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
-
+    # Set x-axis tick labels
+    plt.xticks([1, 2], ['Congruent', 'Incongruent']) 
+    plt.xlabel('Incorrect trials only', fontname="Arial", fontsize=14)
     plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
-    plt.savefig(savepath_fig1 + "\\rt_con_incorrect.svg", dpi=300, bbox_inches='tight',format='svg')
+
+    if exclude_high_fa is True:
+        plt.savefig(savepath_fig1 + "\\rt_con_incorrect_exclhighfa.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
+    else:
+        plt.savefig(savepath_fig1 + "\\rt_con_incorrect.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
     plt.show()
 
     # Plot relationship between dprime and criterion
-    x=d_prime_high
-    y=criterion_high
+    x = df_sdt.criterion[df_sdt.cue == 0.75]
+    y = df_sdt.dprime[df_sdt.cue == 0.75]
 
     reg = sns.regplot(x, y)
 
@@ -886,4 +928,11 @@ def supplementary_plots():
 
     plt.xlabel('dprime 0.75', fontname="Arial", fontsize=14)
     plt.ylabel('c 0.75', fontname="Arial", fontsize=14)
-    plt.savefig(savepath_fig1 + "\\d_c_high.svg", dpi=300, bbox_inches='tight',format='svg')
+
+    if exclude_high_fa is True:
+        plt.savefig(savepath_fig1 + "\\dprime_c_exclhighfa.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
+    else:
+        plt.savefig(savepath_fig1 + "\\dprime_c.svg", dpi=300, bbox_inches='tight',
+                    format='svg')
+ 
