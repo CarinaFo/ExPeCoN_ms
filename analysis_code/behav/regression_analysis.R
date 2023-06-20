@@ -200,14 +200,12 @@ cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=
                   optCtrl=list(maxfun=2e5)),
                   )
 
-cue_model = brms(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
-                  family=binomial(link='probit'))
-
 check_collinearity(cue_model)
 check_convergence(cue_model)
 
-saveRDS(cue_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_model.rda")
-cue_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_model.rda")
+saveRDS(cue_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_model.rda")
+
+cue_model <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_model.rda")
 
 summary(cue_model)
 
@@ -240,8 +238,8 @@ cue_prev_model = glmer(sayyes ~ isyes + cue + prevsayyes + isyes*cue +
 check_collinearity(cue_prev_model)
 check_convergence(cue_prev_model)
 
-saveRDS(cue_prev_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_model.rda")
-cue_prev_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_model.rda")
+saveRDS(cue_prev_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_model.rda")
+cue_prev_model <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_model.rda")
 
 summary(cue_prev_model)
 
@@ -272,8 +270,9 @@ cue_prev_int_model = glmer(sayyes ~ isyes + prevsayyes + cue + prevsayyes*cue + 
 check_collinearity(cue_prev_int_model)
 check_convergence(cue_prev_int_model)
 
-saveRDS(cue_prev_int_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model.rda")
-cue_prev_int_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model.rda")
+saveRDS(cue_prev_int_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model.rda")
+
+cue_prev_int_model <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model.rda")
 
 summary(cue_prev_int_model)
 
@@ -341,8 +340,8 @@ cue_prev_int_model_signal = glmer(sayyes ~ prevsayyes + cue + prevsayyes*cue +
 check_collinearity(cue_prev_int_model_signal)
 check_convergence(cue_prev_int_model_signal)
 
-saveRDS(cue_prev_int_model_signal, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_signal.rda")
-cue_prev_int_model_signal <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_signal.rda")
+saveRDS(cue_prev_int_model_signal, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_signal.rda")
+cue_prev_int_model_signal <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_signal.rda")
 
 summary(cue_prev_int_model_signal)
 
@@ -358,8 +357,8 @@ cue_prev_int_model_noise = glmer(sayyes ~ prevsayyes + cue + prevsayyes*cue +
 check_collinearity(cue_prev_int_model_noise)
 check_convergence(cue_prev_int_model_noise)
 
-saveRDS(cue_prev_int_model_noise, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_noise.rda")
-cue_prev_int_model_noise <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_noise.rda")
+saveRDS(cue_prev_int_model_noise, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_noise.rda")
+cue_prev_int_model_noise <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_noise.rda")
 
 summary(cue_prev_int_model_noise)
 
@@ -412,12 +411,11 @@ check_convergence(cue_prev_int_model_unconf)
 
 summary(cue_prev_int_model_unconf)
 
-saveRDS(cue_prev_int_model_conf, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_conf.rda")
-saveRDS(cue_prev_int_model_unconf, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_unconf.rda")
+saveRDS(cue_prev_int_model_conf, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_conf.rda")
+saveRDS(cue_prev_int_model_unconf, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_unconf.rda")
 
-cue_prev_int_model_conf <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_conf.rda")
-cue_prev_int_model_unconf <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_unconf.rda")
-
+cue_prev_int_model_conf <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_conf.rda")
+cue_prev_int_model_unconf <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_unconf.rda")
 
 int = sjPlot::plot_model(cue_prev_int_model_unconf, type='int', title='Predicted probability of responding yes')
 
@@ -432,191 +430,3 @@ int
 # Save the plot as an SVG file
 ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_conf_model.svg", plot = int, device = "svg")
 ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_unconf_model.svg", plot = int, device = "svg")
-
-######################################################################################
-
-
-cue_prevacc_int_model = glmer(sayyes ~ isyes*cue+prevacc*cue+ (isyes*cue+prevacc*cue|ID), 
-                                data=behav, family=binomial(link='probit'),
-                                control=glmerControl(optimizer="bobyqa",
-                                optCtrl=list(maxfun=2e5)))
-
-saveRDS(cue_previsyes_int_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_previsyes_int_model.rda")
-cue_previsyes_int_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_previsyes_int_model.rda")
-
-summary(cue_previsyes_int_model)
-
-AIC(cue_model)
-AIC(cue_prev_model)
-AIC(cue_prev_int_model)
-AIC(cue_previsyes_int_model)
-
-#################################Confidence#########################################################
-
-# stronger prevchoice effect in confident trials
-
-cue_prev_int_conf_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue + (isyes*cue+prevsayyes*cue|ID), 
-                                data=confident_trials_only, family=binomial(link='probit'),
-                                control=glmerControl(optimizer="bobyqa",
-                                optCtrl=list(maxfun=2e5)))
-
-saveRDS(cue_prev_int_conf_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_conf_model.rda")
-cue_prev_int_conf_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_conf_model.rda")
-
-summary(cue_prev_int_conf_model)
-
-AIC(cue_prev_int_model)
-AIC(cue_prev_int_conf_model)
-
-#######################################Prev confidence as regressor#################################
-
-# include confidence in previous trial as regressor
-
-cue_prev_int_confreg_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue + prevconf + 
-                              (isyes*cue+prevsayyes*cue+prevconf|ID), 
-                              data=behav, family=binomial(link='probit'),
-                              control=glmerControl(optimizer="bobyqa",
-                              optCtrl=list(maxfun=2e5)))
-
-saveRDS(cue_prev_int_confreg_model, "D:\\expecon_ms\\analysis_code\\
-        behav\\linear_mixed_models\\cue_prev_int_confreg_model.rda")
-
-cue_prev_int_confreg_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_confreg_model.rda")
-
-summary(cue_prev_int_confreg_model)
-
-# prev conf is not a sign. regressor
-
-cue_prevconf_int = glmer(sayyes ~ isyes*cue + prevconf*cue + (isyes*cue+prevconf*cue|ID), 
-                              data=behav, family=binomial(link='probit'),
-                              control=glmerControl(optimizer="bobyqa",
-                              optCtrl=list(maxfun=2e5)))
-
-saveRDS(cue_prevconf_int, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevconf_int.rda")
-cue_prevconf_int <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevconf_int.rda")
-
-summary(cue_prevconf_int)
-
-cue_prevacc_int_model = glmer(sayyes ~ isyes*cue+prevacc*cue+ (isyes*cue+prevacc*cue|ID), 
-                              data=behav, family=binomial(link='probit'),
-                              control=glmerControl(optimizer="bobyqa",
-                                                   optCtrl=list(maxfun=2e5)))
-
-saveRDS(cue_prevacc_int_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevacc_int_model.rda")
-cue_prevacc_int_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prevacc_int_model.rda")
-
-summary(cue_prevacc_int_model)
-
-# cue is still significant, interaction between cue and previous confidence rating not
-
-###########################################Metacognition############################################
-
-# does the detection response predict confidence?
-
-resp_conf = glmer(conf ~ sayyes + (sayyes|ID), data=behav, family=binomial(link='probit'))
-
-saveRDS(resp_conf, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\resp_conf.rda")
-
-summary(resp_conf)
-
-# higher confidence in no responses
-
-# does accuracy predict confidence?
-
-conf_acc = glmer(conf ~ correct + (correct|ID), data=behav, family=binomial(link='probit'))
-
-saveRDS(conf_acc, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\conf_acc.rda")
-
-summary(conf_acc)
-
-# higher confidence in correct trials
-
-conf_con = glmer(conf ~ congruency + (congruency|ID), data=behav, family=binomial(link='probit'))
-
-saveRDS(conf_con, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\conf_con.rda")
-
-summary(conf_con)
-
-#higher confidence in congruent trials
-
-conf_surprise = glmer(conf ~ surprise + (surprise|ID), data=behav, 
-                      family=binomial(link='probit'))
-
-saveRDS(conf_surprise, file="D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\conf_surprise.rda")
-
-summary(conf_surprise)
-
-# higher surprise, less confident
-
-#################################Plot model parameters##############################################
-
-# Set the font family and size
-
-par(family = "Arial", cex = 1.2)
-
-est = sjPlot::plot_model(cue_model, type='est')
-int = sjPlot::plot_model(cue_model, type='int')
-
-# Extract coefficients
-
-coeffs <- as.data.frame(summary(cue_lag_int_model)$coefficients)
-
-# Plot coefficients
-p1 <- ggplot(coeffs, aes(x = rownames(coeffs), y = Estimate)) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-  geom_point(size = 3.5, color = "#2E8B57") +
-  geom_errorbar(aes(ymin = Estimate - 1.96 * sdt, ymax = Estimate + 1.96 * sdt),  width = 0.3, size=1, color = "#2E8B57") +
-  coord_flip() +
-  labs(x = "", y = "Effect Size") +
-  theme_classic() +
-  theme(plot.title = element_text(hjust = 0.5),
-        axis.text.y = element_text(size = 12),
-        axis.line.x = element_blank(),
-        panel.border = element_blank())
-p1
-
-# Create an effects object for the interaction
-eff <- effect("cue0.75:lagsayyes1", cue_lag_int_model)
-
-# Plot the predicted probabilities
-plot(eff, type="response", rug=FALSE)
-
-ggsave('D:\\expecon_ms\\figs\\behavior\\regression\\prev_sdt_estimates.svg', p1, device='svg', width=10, height=10)
-ggsave('D:\\expecon_ms\\figs\\behavior\\regression\\prev_sdt_int.svg', int[[1]], device='svg')
-ggsave('D:\\expecon_ms\\figs\\behavior\\regression\\prev_sdt_int_2.svg', int[[2]], device='svg')
-
-
-##############################brain behavior modelling##################################
-
-cue_theta = lmer(theta_scale_log ~ cue + (cue|ID), data=behav) # n.s.
-
-cue_alpha = lmer(alpha_scale_log ~ cue + (cue|ID), data=behav, control=lmerControl(optimizer="bobyqa",
-                                                                                    optCtrl=list(maxfun=2e5)))
-# n.s.
-
-cue_beta = lmer(lowbeta_scale_log ~ cue + (cue|ID), data=behav) # p = 0.02
-cue_beta_gamma = lmer(beta_gamma_scale_log ~ cue + (cue|ID), data=behav) # n.s.
-
-# previous choice predicts alpha, beta and beta_gamma power
-
-prevchoice_beta = lmer(lowbeta_scale_log ~ prevsayyes + (prevsayyes|ID), data=behav)
-prevchoice_alpha = lmer(alpha_scale_log ~ prevsayyes + (prevsayyes|ID), data=behav)
-prevchoice_theta = lmer(theta_scale_log ~ prevsayyes + (prevsayyes|ID), data=behav)
-prevchoice_beta_gamma = lmer(beta_gamma_scale_log ~ prevsayyes + (prevsayyes|ID), data=behav)
-
-# SDT model with beta power as covariate
-
-sdt_model_beta = glmer(sayyes ~ isyes*lowbeta_scale_log + prevsayyes*lowbeta_scale_log + 
-                       (isyes*lowbeta_scale_log + prevsayyes*lowbeta_scale_log|ID), data=behav, 
-                        family=binomial(link='probit'),
-                        control=glmerControl(optimizer="bobyqa",
-                        optCtrl=list(maxfun=2e5)))
-
-sdt_model_beta_gamma = glmer(sayyes ~ isyes*beta_gamma_scale_log + prevsayyes*beta_gamma_scale_log + 
-                            (isyes*beta_gamma_scale_log + prevsayyes*beta_gamma_scale_log|ID), data=behav, 
-                             family=binomial(link='probit'),
-                             control=glmerControl(optimizer="bobyqa",
-                             optCtrl=list(maxfun=2e5)))
-
-
-
