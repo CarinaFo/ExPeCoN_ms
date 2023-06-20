@@ -21,7 +21,7 @@ raw_dir = r'D:\expecon_EEG\raw'
 # EEG cap layout file
 filename_montage = r'D:\expecon_EEG\CACS-64_REF.bvef'
 # raw behavioral data
-behavpath = r'D:\expecon_ms\data\behav'
+behavpath = r'D:\expecon_ms\data\behav\behav_df'
 
 # save cleaned EEG data
 save_dir_cue = r'D:\expecon_ms\data\eeg\prepro_cue'
