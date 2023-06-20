@@ -25,35 +25,23 @@
 # Email: forster@mpg.cbs.de
 
 library(lme4) # mixed models 
-library(brms) # bayesian mixed models
 library(lmerTest) # no p values without this package for linear mixed mdoels
 library(dplyr)# pandas style
-library(mediation)
 library(tidyr)
 library(data.table) # for shift function
 library(sjPlot)
-library(svglite)
 library(ggplot2)
-library(MuMIn)
-library(finalfit)
 library(htmlTable)
+
+# Set the font family and size
+
+par(family = "Arial", cex = 1.2)
 
 ####################################################################################################
 
-# set working directory and load behavioral dataframe
+# set working directory and load clean, behavioral dataframe
 
-#behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\prepro_behav_data.csv")
-behav = read.csv("D:\\expecon_ms\\figs\\brain_behavior\\brain_behav.csv")
-
-
-# convert power values, log transform and standardize (see Stephani et. al, 2021)
-
-behav$theta_scale_log <- scale(log10(behav$theta_pw), center=T, scale=T)
-behav$alpha_scale_log <- scale(log10(behav$alpha_pw), center=T, scale=T)
-behav$lowbeta_scale_log <- scale(log10(behav$low_beta_pw), center=T, scale=T)
-behav$beta_gamma_scale_log <- scale(log10(behav$beta_gamma_pw), center=T, scale=T)
-
-hist(behav$alpha_scale_log)
+behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\prepro_behav_data.csv")
 
 ###############manual SDT calculation#####################################################
 
@@ -174,14 +162,14 @@ behav$cue = as.factor(behav$cue)
 behav$prevsayyes = as.factor(behav$prevsayyes)
 behav$previsyes = as.factor(behav$previsyes)
 behav$prevconf = as.factor(behav$prevconf)
+behav$correct = as.factor(behav$correct)
 
-# create prev correct column
-behav$prevacc = shift(behav$correct)
+# Remove the first row (assures equal amount of data for all models)
+behav <- behav[-1, ]
 
 # test for autocorrelation between trials?
-
-high_only = filter(behav, cue==0.75)
-low_only = filter(behav, cue==0.25)
+high = filter(behav, cue==0.75)
+low = filter(behav, cue==0.25)
 
 auto_model = glmer(isyes ~ previsyes*cue+(previsyes*cue|ID), data=behav, 
                   family=binomial(link='probit'),
@@ -189,139 +177,261 @@ auto_model = glmer(isyes ~ previsyes*cue+(previsyes*cue|ID), data=behav,
 
 summary(auto_model)
 
+# Calculate autocorrelation
+autocorrelation <- acf(behav$isyes, plot = FALSE)
+
+# Check for significant autocorrelation
+significant_lags <- which(abs(autocorrelation$acf) > 2 / sqrt(length(data)))
+
+if (length(significant_lags) > 0) {
+  print("Significant autocorrelation detected at lag(s):")
+  print(significant_lags)
+} else {
+  print("No significant autocorrelation detected.")
+}
+
+# No significant autocorrelation between trials
+
 # fit sdt model
 
-cue_model = glmer(sayyes ~ isyes*cue + (isyes*cue|ID), data=behav, 
+cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
                   family=binomial(link='probit'),
                   control=glmerControl(optimizer="bobyqa",
                   optCtrl=list(maxfun=2e5)),
                   )
 
-saveRDS(cue_model, "D:\\expecon_ms\\analysis_code\\behav\\
-        linear_mixed_models\\cue_model.rda")
+cue_model = brms(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
+                  family=binomial(link='probit'))
+
+check_collinearity(cue_model)
+check_convergence(cue_model)
+
+saveRDS(cue_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_model.rda")
 cue_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_model.rda")
 
 summary(cue_model)
 
-cue_prev_model = glmer(sayyes ~ isyes*cue + prevsayyes
-                           + (isyes*cue + prevsayyes|ID), data=behav, 
+est = sjPlot::plot_model(cue_model, type='est', title='detection response ~',
+                          axis.lim=c(0.8,8)) +
+  theme(plot.background = element_blank(),
+        text = element_text(family = "Arial", size = 14)) +
+        ylab("Odds Ratio")
+
+est
+
+int = sjPlot::plot_model(cue_model, type='int', title='Predicted probability of responding yes')+
+      theme(plot.background = element_blank(),
+            text = element_text(family = "Arial", size = 14)) +
+      ylab('detection response') +
+      xlab('stimulus')
+int
+
+# Save the plot as an SVG file
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\est_cue_model.svg", plot = est, device = "svg")
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\int_cue_model.svg", plot = int, device = "svg")
+
+cue_prev_model = glmer(sayyes ~ isyes + cue + prevsayyes + isyes*cue +
+                           + (isyes + cue + prevsayyes + isyes*cue|ID), data=behav, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
 )
+
+check_collinearity(cue_prev_model)
+check_convergence(cue_prev_model)
 
 saveRDS(cue_prev_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_model.rda")
 cue_prev_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_model.rda")
 
 summary(cue_prev_model)
 
-# Set the font family and size
+# Plot model
 
-par(family = "Arial", cex = 1.2)
+est = sjPlot::plot_model(cue_prev_model, type='est', title='detection response ~',
+                         axis.lim=c(0.8,8)) +
+  theme(plot.background = element_blank(),
+        text = element_text(family = "Arial", size = 14)) +
+  ylab("Odds Ratio")
 
-est = sjPlot::plot_model(cue_model, type='est')
-int = sjPlot::plot_model(cue_model, type='int')
+est
 
-# previous stimulus is not significant
+# Save the plot as an SVG file
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_model_est.svg", plot = est, device = "svg")
 
 # cue is still a significant predictor but less strong effect
 
 # including interaction between cue and previous choice
 
-cue_prev_int_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue 
-                           + (prevsayyes*cue + prevsayyes*cue|ID), data=behav, 
+cue_prev_int_model = glmer(sayyes ~ isyes + prevsayyes + cue + prevsayyes*cue + isyes*cue +
+                            (isyes + prevsayyes + cue + prevsayyes*cue + isyes*cue|ID), data=behav, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                            optCtrl=list(maxfun=2e5)),
 )
+
+check_collinearity(cue_prev_int_model)
+check_convergence(cue_prev_int_model)
 
 saveRDS(cue_prev_int_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model.rda")
 cue_prev_int_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model.rda")
 
 summary(cue_prev_int_model)
 
-AIC(cue_model)
-AIC(cue_prev_model)
-AIC(cue_prev_int_model)
+est = sjPlot::plot_model(cue_prev_int_model, type='est', title='detection response ~',
+                         axis.lim=c(0.8,8)) +
+  theme(plot.background = element_blank(),
+        text = element_text(family = "Arial", size = 14)) +
+  ylab("Odds Ratio")
+
+est
+
+int = sjPlot::plot_model(cue_prev_int_model, type='int', title='Predicted probability of responding yes')
+
+int = int[[1]]+
+  theme(plot.background = element_blank(),
+        text = element_text(family = "Arial", size = 14)) +
+  ylab('detection response') +
+  xlab('stimulus')
+
+int
+
+# Save the plot as an SVG file
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_model.svg", plot = int, device = "svg")
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_est_model.svg", plot = est, device = "svg")
+
+# Model comparision
+
+# Likelihood ratio tests
+anova(cue_model, cue_prev_model)
+anova(cue_prev_int_model, cue_prev_model)
+
+# difference in AIC and BIC
+
+diff_aic_1 = AIC(cue_prev_model) - AIC(cue_model)
+diff_bic_1 = BIC(cue_prev_model) - BIC(cue_model)
+print(diff_aic_1)
+print(diff_bic_1)
+
+diff_aic_2 = AIC(cue_prev_int_model) - AIC(cue_prev_model)
+diff_bic_2 = BIC(cue_prev_int_model) - BIC(cue_prev_model)
+
+print(diff_aic_2)
+print(diff_bic_2)
 
 # save table to PDF
-table1 = sjPlot::tab_model(cue_model, cue_prev_model, cue_prev_int_model, show.aic=TRUE, show.loglik=TRUE)
+table1 = sjPlot::tab_model(cue_model, cue_prev_model, cue_prev_int_model, 
+                           show.aic=TRUE, show.loglik=TRUE)
 
 # Save the output as an HTML file
-output_file <- "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\table1.html"
+output_file <- "D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\table1.html"
 htmlTable(table1, file = output_file)
 
-######################## separate model for signal and noise trials only###############
+###########################separate models for signal and noise trials#############################
 
 signal = filter(behav, isyes==1)
 noise = filter(behav, isyes==0)
 
-cue_prev_int_signal_model = glmer(sayyes ~ prevsayyes*cue 
-                           + (prevsayyes*cue|ID), data=signal, 
+cue_prev_int_model_signal = glmer(sayyes ~ prevsayyes + cue + prevsayyes*cue +
+                             (prevsayyes + cue + prevsayyes*cue|ID), data=signal, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
 )
 
+check_collinearity(cue_prev_int_model_signal)
+check_convergence(cue_prev_int_model_signal)
 
-cue_prev_int_noise_model = glmer(sayyes ~ prevsayyes*cue 
-                                  + (prevsayyes*cue|ID), data=noise, 
+saveRDS(cue_prev_int_model_signal, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_signal.rda")
+cue_prev_int_model_signal <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_signal.rda")
+
+summary(cue_prev_int_model_signal)
+
+# noise model
+
+cue_prev_int_model_noise = glmer(sayyes ~ prevsayyes + cue + prevsayyes*cue +
+                                    (prevsayyes + cue + prevsayyes*cue|ID), data=noise, 
                                   family=binomial(link='probit'),
                                   control=glmerControl(optimizer="bobyqa",
                                                        optCtrl=list(maxfun=2e5)),
 )
 
-saveRDS(cue_prev_int_signal_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_signal_model.rda")
-saveRDS(cue_prev_int_noise_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_noise_model.rda")
+check_collinearity(cue_prev_int_model_noise)
+check_convergence(cue_prev_int_model_noise)
 
-cue_prev_int_signal_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_signal_model.rda")
-cue_prev_int_noise_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_noise_model.rda")
+saveRDS(cue_prev_int_model_noise, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_noise.rda")
+cue_prev_int_model_noise <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_noise.rda")
 
-summary(cue_prev_int_signal_model)
-summary(cue_prev_int_noise_model)
+summary(cue_prev_int_model_noise)
 
-est = sjPlot::plot_model(cue_prev_int_signal_model, type='est')
-int = sjPlot::plot_model(cue_prev_int_signal_model, type='int')
+int = sjPlot::plot_model(cue_prev_int_model_noise, type='int', title='Predicted probability of responding yes')+
+  theme(plot.background = element_blank(),
+        text = element_text(family = "Arial", size = 14)) +
+  ylab('detection response') +
+  xlab('previous choice')
 
-est = sjPlot::plot_model(cue_prev_int_noise_model, type='est')
-int = sjPlot::plot_model(cue_prev_int_noise_model, type='int')
+int
+
+# Save the plot as an SVG file
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_signal_model.svg", plot = int, device = "svg")
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_noise_model.svg", plot = int, device = "svg")
 
 ##################separate model for confident/unconfident previous response#######
+
+acc_conf_model = glmer(correct ~ conf + (conf|ID), data=behav, 
+                       family=binomial(link='probit'),
+                       control=glmerControl(optimizer="bobyqa",
+                                            optCtrl=list(maxfun=2e5)))
+
+summary(acc_conf_model)
 
 conf = filter(behav, prevconf==1)
 unconf = filter(behav, prevconf==0)
 
-
-cue_prev_int_conf_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue+ 
-                                  + (isyes*cue + prevsayyes*cue|ID), data=conf, 
-                                  family=binomial(link='probit'),
-                                  control=glmerControl(optimizer="bobyqa",
-                                                       optCtrl=list(maxfun=2e5)),
+cue_prev_int_model_conf = glmer(sayyes ~ isyes + prevsayyes + cue + isyes*cue+prevsayyes*cue +
+                             (isyes + prevsayyes + cue + isyes*cue + prevsayyes*cue|ID), data=conf, 
+                           family=binomial(link='probit'),
+                           control=glmerControl(optimizer="bobyqa",
+                                                optCtrl=list(maxfun=2e5)),
 )
 
+check_collinearity(cue_prev_int_model_conf)
+check_convergence(cue_prev_int_model_conf)
 
-cue_prev_int_unconf_model = glmer(sayyes ~ isyes*cue + prevsayyes*cue 
-                                 + (isyes*cue + prevsayyes*cue|ID), data=unconf, 
-                                 family=binomial(link='probit'),
-                                 control=glmerControl(optimizer="bobyqa",
-                                                      optCtrl=list(maxfun=2e5)),
+summary(cue_prev_int_model_conf)
+
+cue_prev_int_model_unconf = glmer(sayyes ~ isyes + prevsayyes + cue + isyes*cue+prevsayyes*cue +
+                             (isyes + prevsayyes + cue + isyes*cue + prevsayyes*cue|ID), 
+                             data=unconf, 
+                             family=binomial(link='probit'),
+                             control=glmerControl(optimizer="bobyqa",
+                                                optCtrl=list(maxfun=2e5)),
 )
 
+check_collinearity(cue_prev_int_model_unconf)
+check_convergence(cue_prev_int_model_unconf)
 
-saveRDS(cue_prev_int_conf_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_conf_model.rda")
-saveRDS(cue_prev_int_unconf_model, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_unconf_model.rda")
+summary(cue_prev_int_model_unconf)
 
-cue_prev_int_conf_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_conf_model.rda")
-cue_prev_int_unconf_model <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_unconf_model.rda")
+saveRDS(cue_prev_int_model_conf, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_conf.rda")
+saveRDS(cue_prev_int_model_unconf, "D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_unconf.rda")
 
-summary(cue_prev_int_conf_model)
-summary(cue_prev_int_unconf_model)
+cue_prev_int_model_conf <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_conf.rda")
+cue_prev_int_model_unconf <- readRDS("D:\\expecon_ms\\analysis_code\\behav\\linear_mixed_models\\cue_prev_int_model_unconf.rda")
 
-est = sjPlot::plot_model(cue_prev_int_conf_model, type='est')
-int = sjPlot::plot_model(cue_prev_int_conf_model, type='int')
 
-est = sjPlot::plot_model(cue_prev_int_unconf_model, type='est')
-int = sjPlot::plot_model(cue_prev_int_unconf_model, type='int')
+int = sjPlot::plot_model(cue_prev_int_model_unconf, type='int', title='Predicted probability of responding yes')
+
+int = int[[2]]+
+  theme(plot.background = element_blank(),
+        text = element_text(family = "Arial", size = 14)) +
+  ylab('detection response') +
+  xlab('previous choice')
+
+int
+
+# Save the plot as an SVG file
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_conf_model.svg", plot = int, device = "svg")
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_unconf_model.svg", plot = int, device = "svg")
 
 ######################################################################################
 
