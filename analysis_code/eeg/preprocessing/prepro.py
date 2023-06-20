@@ -146,7 +146,7 @@ def remove_trials(filename='raw_behav_data.csv'):
     df = pd.read_csv(filename)
 
     # remove trials where I started the EEG recording too late
-    # (38 trials in total, 35 trials without Tilmans toe data)
+    # (35 trials in total)
 
     # Create a list of tuples to store each condition
     conditions = [(7, 2, [1]),
