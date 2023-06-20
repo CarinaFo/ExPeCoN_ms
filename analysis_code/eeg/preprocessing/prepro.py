@@ -27,11 +27,10 @@ behavpath = r'D:\expecon_ms\data\behav\behav_df'
 save_dir_cue = r'D:\expecon_ms\data\eeg\prepro_cue'
 save_dir_stim = r'D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching'
 
-IDlist = (
-'007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017',
-'018', '019', '020', '021', '022', '023', '024', '025', '026', '027', '028', 
-'029', '030', '031', '032', '033', '034', '035', '036', '037', '038', '039',
-'040','041', '042', '043', '044', '045', '046', '047', '048', '049')
+IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017',
+          '018', '019', '020', '021', '022', '023', '024', '025', '026', '027', '028', 
+          '029', '030', '031', '032', '033', '034', '035', '036', '037', '038', '039',
+          '040','041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
 def concatenate():
@@ -175,7 +174,7 @@ def remove_trials(filename='raw_behav_data.csv'):
 
     df.to_csv('behav_cleaned_for_eeg.csv')
 
-def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
+def prepro(trigger=1, l_freq=1, h_freq=40, filter_method='iir',
            tmin=-1.5, tmax=1.5, resample_rate=250, laplace=0, sf=2500,
            detrend=1, ransac=1, autoreject=0):
 
@@ -212,11 +211,6 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
     # loop over participants
 
     for counter, i in enumerate(IDlist):
-
-        # skip those IDs as we anyway exclude them
-        #  
-        if i == '040' or i == '045':
-            continue
 
         # load raw data concatenated for all blocks
 
@@ -292,7 +286,7 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
         if ransac:
             
-            print('Run runsac for ' + i)
+            print('Run ransac for ' + i)
 
             ransac = Ransac(verbose='progressbar', picks=picks, n_jobs=3)
 
