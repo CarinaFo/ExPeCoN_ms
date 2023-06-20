@@ -29,7 +29,7 @@ def prepro_behavioral_data():
             if 'behav_cleaned_for_eeg.csv' in name:
                 data = pd.read_csv(os.path.join(root, name))
 
-    # Clean up the dataframe by dropping unneeded columns
+    # Clean up the dataframe by dropping unnecessary columns
     columns_to_drop = ["Unnamed: 0.2", 'Unnamed: 0.1', 'Unnamed: 0']
     data = data.drop(columns_to_drop, axis=1)
 
@@ -45,10 +45,8 @@ def prepro_behavioral_data():
     data['congruency_stim'] = ((data.cue == 0.25) & (data.isyes == 0)) | ((
                           data.cue == 0.75) & (data.isyes == 1))
     
-    data = data.reset_index()
-
-    # add a column that combines the confidence ratings and the detection response
-
+    # add a column that combines the confidence ratings and the 
+    # detection response
     conf_resp = [4 if data.loc[i, 'sayyes'] == 1 and
                  data.loc[i, 'conf'] == 1 else
                  3 if data.loc[i, 'sayyes'] == 0 and
@@ -57,6 +55,8 @@ def prepro_behavioral_data():
                  data.loc[i, 'conf'] == 0 else
                  1 for i in range(len(data))]
     
+    data = data.reset_index()
+
     data['conf_resp'] = conf_resp
 
     # add lagged variables
@@ -70,7 +70,7 @@ def prepro_behavioral_data():
     # remove no response trials or super fast responses
     data = data.drop(data[data.respt1 == 2.5].index)
     data = data.drop(data[data.respt1 < 0.1].index)
-    
+
     # save the preprocessing data
     os.chdir(behavpath)
     data.to_csv("prepro_behav_data.csv")
