@@ -12,7 +12,7 @@ from matplotlib.font_manager import FontProperties
 
 
 def prepro_behavioral_data():
-
+ 
     """ This function preprocesses the behavioral data.
     We remove trials with no response or super fast responses
     and add aditional columns to the dataframe.
@@ -55,8 +55,6 @@ def prepro_behavioral_data():
                  data.loc[i, 'conf'] == 0 else
                  1 for i in range(len(data))]
     
-    data = data.reset_index()
-
     data['conf_resp'] = conf_resp
 
     # add lagged variables
@@ -67,13 +65,16 @@ def prepro_behavioral_data():
     data['prevconf'] = data['conf'].shift(1)
     data['prevconf_resp'] = data['conf_resp'].shift(1)
 
+    excl_noresp = len(data[data.respt1 == 2.5])
+    excl_fastresp = len(data[data.respt1 < 0.1])
+
     # remove no response trials or super fast responses
     data = data.drop(data[data.respt1 == 2.5].index)
     data = data.drop(data[data.respt1 < 0.1].index)
 
     # save the preprocessing data
     os.chdir(behavpath)
-    data.to_csv("prepro_behav_data.csv")
+    data.to_csv("behav_data_exclrts.csv")
 
 
 def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition_col):
@@ -116,7 +117,7 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
                 false_alarm_rate = (false_alarms + 0.25) / (false_alarms + correct_rejections + 0.5)
             else:
                 hit_rate = (detect_hits + 0.25) / (detect_hits + detect_misses + 0.5)
-                false_alarm_rate = (false_alarms + 0.75) /(false_alarms + correct_rejections + 1.5)
+                false_alarm_rate = (false_alarms + 0.75) / (false_alarms + correct_rejections + 1.5)
 
             d_prime = stats.norm.ppf(hit_rate) - stats.norm.ppf(false_alarm_rate)
             criterion = -0.5 * (stats.norm.ppf(hit_rate) + stats.norm.ppf(false_alarm_rate))
@@ -146,7 +147,7 @@ def exclude_data():
     behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
     # Load data
-    data = pd.read_csv(behavpath + '\\prepro_behav_data.csv')
+    data = pd.read_csv(behavpath + "behav_data_exclrts.csv")
 
     # Calculate hit rates by participant and cue condition
     signal = data[data.isyes == 1]
@@ -157,11 +158,11 @@ def exclude_data():
     print(f"Minimum hit rate: {np.min(hitrate_per_subject):.2f}")
     print(f"Maximum hit rate: {np.max(hitrate_per_subject):.2f}")
 
-    # Calculate hit rates by participant and cue condition
+    # Calculate hit rates by participant and block condition
     hitrate_per_block = signal.groupby(['ID', 'block']).mean()['sayyes']
 
     # Filter the grouped object based on hit rate conditions
-    filtered_groups = hitrate_per_block[(hitrate_per_block > 0.9) | (hitrate_per_block < 0.3)]
+    filtered_groups = hitrate_per_block[(hitrate_per_block > 0.9) | (hitrate_per_block < 0.2)]
 
     # Extract the ID and block information from the filtered groups
     remove_hitrates = filtered_groups.reset_index()
@@ -565,11 +566,11 @@ def calc_stats():
 
     """ Calculate statistics and effect sizes for the behavioral data."""
 
-    out = prepare_for_plotting()
+    conditions,_ = prepare_for_plotting()
 
     # only for dprime, crit, hitrate, farate and confidence congruency
-    df_sdt = out[0]
-    conf = out[1]
+    df_sdt = conditions[0]
+    conf = conditions[1]
 
     cond_list = ['criterion', 'hit_rate', 'fa_rate', 'dprime']
     for cond in cond_list:
