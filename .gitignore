@@ -13,3 +13,4 @@ experimental_code\expeco\instr\
 *.rds
 *.npy
 *.pkl
+*.zip
