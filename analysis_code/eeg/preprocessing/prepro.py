@@ -174,7 +174,7 @@ def remove_trials(filename='raw_behav_data.csv'):
 
     df.to_csv('behav_cleaned_for_eeg.csv')
 
-def prepro(trigger=1, l_freq=1, h_freq=40, filter_method='iir',
+def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
            tmin=-1.5, tmax=1.5, resample_rate=250, laplace=0, sf=2500,
            detrend=1, ransac=1, autoreject=0):
 
@@ -340,6 +340,29 @@ def prepro(trigger=1, l_freq=1, h_freq=40, filter_method='iir',
 
     return ch_interp
 
+def channels_interp(df = None):
+    """
+    This function calculates the amount of channels interpolated per participant
+    and the mean, std, min and max of channels interpolated across participants
+    
+    Parameters
+    ----------
+    df : pandas dataframe
+        dataframe containing the amount of channels interpolated per participant
+    Returns
+    -------
+    None.
+    """
+
+    df = pd.read_csv("D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching\interpolated_channels.csv")
+    
+    df = df.drop(['Unnamed: 0'], axis=1)
+    df['count_ch'] = df.count(axis=1)
+
+    print(f"mean channels interpolated {df['count_ch'].mean()}")
+    print(f"std of channels interpolated: {df['count_ch'].std()}")
+    print(f"min channels interpolated: {df['count_ch'].min()}")
+    print(f"max channels interpolated: {df['count_ch'].max()}")
 
 def add_reaction_time_trigger():
 
