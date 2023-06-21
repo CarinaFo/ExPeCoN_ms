@@ -29,7 +29,6 @@ par(family = "Arial", cex = 1.2)
 
 behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\prepro_behav_data.csv")
 
-
 # make factors:
 
 behav$ID = as.factor(behav$ID)
@@ -45,9 +44,11 @@ behav <- behav[-1, ]
 
 setwd("D:\\expecon_ms\\data\\behav\\mixed_models\\brms\\")
 
+##################################### prev choice  models ##########################################
+
 cue_model = brm(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
                 family=bernoulli(link='probit'), 
-                cores = getOption("mc.cores", 10))
+                cores = getOption("mc.cores", 12))
 
 # posterior predictive
 pp_check(cue_model)
@@ -67,19 +68,21 @@ ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\sdt_int_cue_brms_mode
 
 # save and read RDS model
 saveRDS(object = cue_model, file = "cue_model_brms.rds")
-cue_model = readRDS("cue_model_brms.rds")
+summary(cue_model)
 
-plot(cue_model)
+cue_model = readRDS("cue_model_brms.rds")
 
 cue_prev_model = brm(sayyes ~ prevsayyes+isyes+cue+isyes*cue + (prevsayyes+isyes+cue+isyes*cue|ID),
                      data=behav, family=bernoulli(link='probit'), 
-                     cores = getOption("mc.cores", 10))
+                     cores = getOption("mc.cores", 12))
 
 # posterior predictive
 pp_check(cue_prev_model)
 
 saveRDS(object = cue_prev_model, file = "cue_prev_model_brms.rds")
+
 cue_prev_model = readRDS(file = "cue_prev_model_brms.rds")
+summary(cue_prev_model)
 
 cue_prev_int_model = brm(sayyes ~ prevsayyes+isyes+cue+isyes*cue+cue*prevsayyes +
                            (prevsayyes+isyes+cue+isyes*cue+cue*prevsayyes|ID),
@@ -87,6 +90,7 @@ cue_prev_int_model = brm(sayyes ~ prevsayyes+isyes+cue+isyes*cue+cue*prevsayyes 
                      cores = getOption("mc.cores", 12))
 
 saveRDS(object = cue_prev_int_model, file = "cue_prev_int_model_brms.rds")
+
 cue_prev_int_model = readRDS(file = "cue_prev_int_model_brms.rds")
 
 # extract variables
@@ -112,6 +116,13 @@ bayes_R2(cue_prev_int_model)
 # looo
 waic_comp = loo(cue_model, cue_prev_model, cue_prev_int_model, 'waic')
 
+# save supplementary table 1
+
+# save model output as table to html file
+table1 = sjPlot::tab_model(cue_model, cue_prev_model, cue_prev_int_model)
+output_file <- "D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\table1_supplm.html"
+htmlTable(table1, file = output_file)
+
 #########################################signal vs. noise##########################################
 # Signal vs. noise 
 
@@ -136,22 +147,13 @@ summary(cue_prev_int_model_noise)
 
 saveRDS(object = cue_prev_int_model_noise, file = "cue_prev_int_model_noise_brms.rds")
 
-# save supplementary table 1
-
-# save table to PDF
-table1 = sjPlot::tab_model(cue_model, cue_prev_model, cue_prev_int_model)
-
-# Save the output as an HTML file
-output_file <- "D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\table1_supplm.html"
-htmlTable(table1, file = output_file)
-
-# Confident vs. unconfident trials
+############################# Confident vs. unconfident trials ####################################
 
 conf = filter(behav, prevconf==1)
 unconf = filter(behav, prevconf==0)
 
-cue_prev_int_model_conf = brm(sayyes ~ prevsayyes+cue+cue*prevsayyes +
-                                  (prevsayyes+cue+cue*prevsayyes|ID),
+cue_prev_int_model_conf = brm(sayyes ~ isyes + prevsayyes + cue + isyes*cue+prevsayyes*cue +
+                                  (isyes + prevsayyes + cue + isyes*cue+prevsayyes*cue|ID),
                                 data=conf, family=bernoulli(link='probit'), 
                               cores = getOption("mc.cores", 12))
 
@@ -160,8 +162,8 @@ summary(cue_prev_int_model_conf)
 saveRDS(object = cue_prev_int_model_conf, file = "cue_prev_int_model_conf_brms.rds")
 cue_prev_int_model_conf = readRDS(file = "cue_prev_int_model_conf_brms.rds")
 
-cue_prev_int_model_unconf = brm(sayyes ~ prevsayyes+cue+cue*prevsayyes +
-                                (prevsayyes+cue+cue*prevsayyes|ID),
+cue_prev_int_model_unconf = brm(sayyes ~ isyes + prevsayyes + cue + isyes*cue+prevsayyes*cue +
+                                (isyes + prevsayyes + cue + isyes*cue+prevsayyes*cue|ID),
                               data=unconf, family=bernoulli(link='probit'), 
                               cores = getOption("mc.cores", 12))
 

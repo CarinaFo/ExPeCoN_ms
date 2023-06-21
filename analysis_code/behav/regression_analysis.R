@@ -317,11 +317,9 @@ diff_bic_2 = BIC(cue_prev_int_model) - BIC(cue_prev_model)
 print(diff_aic_2)
 print(diff_bic_2)
 
-# save table to PDF
+# save table to html
 table1 = sjPlot::tab_model(cue_model, cue_prev_model, cue_prev_int_model, 
                            show.aic=TRUE, show.loglik=TRUE)
-
-# Save the output as an HTML file
 output_file <- "D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\table1.html"
 htmlTable(table1, file = output_file)
 
