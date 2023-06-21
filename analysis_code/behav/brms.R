@@ -82,6 +82,7 @@ pp_check(cue_prev_model)
 saveRDS(object = cue_prev_model, file = "cue_prev_model_brms.rds")
 
 cue_prev_model = readRDS(file = "cue_prev_model_brms.rds")
+
 summary(cue_prev_model)
 
 cue_prev_int_model = brm(sayyes ~ prevsayyes+isyes+cue+isyes*cue+cue*prevsayyes +
