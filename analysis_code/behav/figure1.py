@@ -8,7 +8,11 @@ import pandas as pd
 import scipy.stats as stats
 import seaborn as sns
 import statsmodels.api as sm
-from matplotlib.font_manager import FontProperties
+from matplotlib.font_manager import FontProperties as fm
+
+# Set Arial as the default font
+plt.rcParams['font.family'] = 'Arial'
+plt.rcParams['font.size'] = 14
 
 
 def prepro_behavioral_data():
@@ -299,6 +303,72 @@ def prepare_for_plotting(exclude_high_fa=False):
                  conf_con_no, rt_con, rt_con_yes, rt_con_incorrect
     
     return conditions, exclude_high_fa
+
+def correlate_sdt_with_questionnaire():
+    
+    # load questionarre data (uncertainty of intolerance)
+    q_data = pd.read_csv(r"D:\expecon_ms\questionnaire\q_clean.csv")
+
+    data = exclude_data()
+
+    df_sdt = calculate_sdt_dataframe(data, "isyes", "sayyes", "ID", "cue")
+
+    high_c = list(df_sdt.criterion[df_sdt.cue ==0.75])
+    low_c = list(df_sdt.criterion[df_sdt.cue == 0.25])
+
+    high_d = list(df_sdt.dprime[df_sdt.cue ==0.75])
+    low_d = list(df_sdt.dprime[df_sdt.cue == 0.25])
+
+    diff_c= [x - y for x, y in zip(low_c, high_c)]
+    diff_d = [x - y for x, y in zip(low_d, high_d)]
+
+    import scipy.stats as stats
+
+    # Assuming diff_c and q_data are numpy arrays or pandas Series
+
+    # Filter the arrays based on the condition q_data['iu_sum'] > 0
+    filtered_diff_c = np.array(diff_c)[q_data['iu_sum'] > 0]
+    filtered_iu_sum = q_data['iu_sum'][q_data['iu_sum'] > 0]
+
+    df = pd.DataFrame({'y': filtered_diff_c, 'X': filtered_iu_sum})
+
+    # Select columns representing questionnaire score and criterion change
+    X = df['X']
+    y = df['y']
+
+    # Drop missing values if necessary
+    df.dropna(subset=['X', 'y'], inplace=True)
+
+    # Fit the linear regression model
+    X = sm.add_constant(X)  # Add constant term for intercept
+    regression_model = sm.OLS(y, X)
+    regression_results = regression_model.fit()
+
+    # Extract slope, intercept, and p-value
+    slope = regression_results.params[1]
+    intercept = regression_results.params[0]
+    p_value = regression_results.pvalues[1]
+
+    # Make predictions
+    predictions = regression_results.predict(X)
+
+    # Set black or gray colors for the plot
+    data_color = 'black'
+    regression_line_color = 'gray'
+    text_color = 'black'
+
+    # Plot the regression line using seaborn regplot
+    sns.regplot(data=df, x='X', y='y', color=data_color)
+    plt.xlabel('Intolerance of Uncertainty score (zscored)', color=text_color)
+    plt.ylabel('Criterion Change', color=text_color)
+    plt.annotate(f'Slope: {slope:.2f}\n p-value: {p_value:.2f}', 
+                 xy=(0.05, 0.85), xycoords='axes fraction',
+                 color=text_color)
+    
+    plt.savefig(r"D:\expecon_ms\figs\manuscript_figures\Figure2B\linreg_c_q.png", dpi=300)
+    plt.savefig(r"D:\expecon_ms\figs\manuscript_figures\Figure2B\linreg_c_q.svg", dpi=300)
+    plt.show()
+
 
 def diff_from_optimal_criterion():
 
