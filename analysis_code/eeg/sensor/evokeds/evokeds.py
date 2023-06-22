@@ -19,12 +19,12 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 import os
 import pandas as pd
 
-# set font to Arial and font size to 22
-plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
+# set font to Arial and font size to 14
+plt.rcParams.update({'font.size': 14, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
 
 # set paths
-dir_cleanepochs = r"D:\expecon_ms\data\eeg\prepro_ica\clean_epochs"
-behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
+dir_cleanepochs = r"D:\expecon_ms\data\eeg\prepro_ica\clean_epochs_corr"
+behavpath = r'D:\expecon_ms\data\behav\behav_df'
 
 # save cluster figures as svg and png files
 save_dir_cluster_output = r"D:\expecon_ms\figs\eeg\sensor\evokeds"
@@ -35,21 +35,23 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(tmin=0, tmax=0.5, cond='signalnoise', cond_a='hit',
-                    cond_b='miss', laplace=True):
+def create_contrast(cond='highlow_hit', cond_a='0.75_hit',
+                    cond_b='0.25_hit', laplace=False, save_drop_log=False,
+                    reject_criteria=dict(eeg=200e-6),
+                    flat_criteria=dict(eeg=1e-6)):
 
     """ this function runs a cluster permutation test over electrodes and timepoints
     in sensor space and plots the output and saves it
     input: 
-    perm: how many permutations for cluster test
-    tmin: crop the epochs at this time in seconds
-    tmax: crop the data until this time in seconds
     cond: condition to be analyzed (highlow, signalnoise, highsignal, highnoise)
     cond_a: name of condition a
     cond_b: name of condition b
     laplace: apply laplace transform to data
+    save_drop_log: save drop log output
     output:
     saves the cluster figures as svg and png files """
+
+    perc = []
 
     all_trials, trials_removed = [], []
 
@@ -57,36 +59,31 @@ def create_contrast(tmin=0, tmax=0.5, cond='signalnoise', cond_a='hit',
 
     for idx, subj in enumerate(IDlist):
 
-        # print participant ID
-        print('Analyzing ' + subj)
-        # skip those participants
-        if subj == '040' or subj == '045' or subj == '032' or subj == '016':
-            continue
+        # print participant idx
+        print(f'Participant {str(idx)}')
 
         # load cleaned epochs
         epochs = mne.read_epochs(f"{dir_cleanepochs}/P{subj}_epochs_after_ica-epo.fif")
-
-        # Remove 5 blocks with hitrates < 0.2 or > 0.8
-
-        if subj == '010':
-            epochs = epochs[epochs.metadata.block != 6]
-        if subj == '012':
-            epochs = epochs[epochs.metadata.block != 6]
-        if subj == '026':
-            epochs = epochs[epochs.metadata.block != 4]
-        if subj == '030':
-            epochs = epochs[epochs.metadata.block != 3]
-        if subj == '039':
-            epochs = epochs[epochs.metadata.block != 3]
         
+        ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
+        blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
+
+        # Check if the participant ID is in the list of IDs to delete
+        if pd.unique(epochs.metadata.ID) in ids_to_delete:
+
+            # Get the corresponding blocks to delete for the current participant
+            participant_blocks_to_delete = [block for id_, block in
+                                            zip(ids_to_delete, blocks_to_delete)
+                                            if id_ == pd.unique(epochs.metadata.ID)]
+            
+            # Drop the rows with the specified blocks from the dataframe
+            epochs = epochs[~epochs.metadata.block.isin(participant_blocks_to_delete)]
+            
         # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
         before_rt_removal = len(epochs.metadata)
         epochs = epochs[epochs.metadata.respt1 >= 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
 
-        # remove first trial of each block (trigger delays)
-        epochs = epochs[epochs.metadata.trial != 1]
-        
         # save n_trials per participant
         all_trials.append(len(epochs.metadata))
 
@@ -96,17 +93,33 @@ def create_contrast(tmin=0, tmax=0.5, cond='signalnoise', cond_a='hit',
             epochs = mne.preprocessing.compute_current_source_density(epochs)
 
         # load behavioral data
-        os.chdir(behavpath)
+        data = pd.read_csv(f'{behavpath}//prepro_behav_data.csv')
 
-        data = pd.read_csv("prepro_behav_data.csv")
         subj_data = data[data.ID == idx+7]
 
-        if ((idx == 5) or (idx == 13) or (idx == 21) or (idx == 28)):  # first epoch has no data
-            epochs.metadata = subj_data.iloc[1:, :]
-        elif idx == 17:
-            epochs.metadata = subj_data.iloc[3:, :]
+        # get drop log from epochs
+        drop_log = epochs.drop_log
+
+        search_string = 'IGNORED'
+
+        indices = [index for index, tpl in enumerate(drop_log) if tpl and search_string not in tpl]
+
+        # drop bad epochs (too late recordings)
+        if indices:
+            epochs.metadata = subj_data.reset_index().drop(indices)
         else:
             epochs.metadata = subj_data
+
+        # drop bad epochs
+        epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
+
+        if save_drop_log:
+            # percentage of trials removed
+            perc.append(epochs.drop_log_stats())
+
+            epochs.plot_drop_log(show=False)
+
+            plt.savefig(f'D:\expecon_ms\data\eeg\prepro_ica\droplog\P{subj}_drop_log.png', dpi=300)
 
         if cond == 'highlow':
             epochs_a = epochs[(epochs.metadata.cue == 0.75)]
@@ -127,37 +140,43 @@ def create_contrast(tmin=0, tmax=0.5, cond='signalnoise', cond_a='hit',
             epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 0))]
             epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.isyes == 0))]
         elif cond == 'hitmiss':
-            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1))]
-            epochs_b = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0))]
-
+            epochs_a = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1))]
+            epochs_b = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0))]
+        elif cond == 'highlow_hit':
+            epochs_a = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1) & (epochs.metadata.cue == 0.75))]
+            epochs_b = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1) & (epochs.metadata.cue == 0.25))]
 
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
         # average and crop in prestimulus window
-        evokeds_a = epochs_a.average().crop(tmin, tmax)
-        evokeds_b = epochs_b.average().crop(tmin, tmax)
+        evokeds_a = epochs_a.average()
+        evokeds_b = epochs_b.average()
 
         evokeds_a_all.append(evokeds_a)
         evokeds_b_all.append(evokeds_b)
         
         # save trial number and trials removed to csv file
+        pd.DataFrame(trials_removed).to_csv(f'D:\expecon_ms\data\eeg\prepro_ica\droplog\\trials_removed.csv')
+        pd.DataFrame(all_trials).to_csv(f'D:\expecon_ms\data\eeg\prepro_ica\droplog\\trials_per_subject.csv')
 
-        pd.DataFrame(trials_removed).to_csv('trials_removed.csv')
-        pd.DataFrame(all_trials).to_csv('trials_per_subject.csv')
-
-    return evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b
+    return evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b, perc
 
 def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
 
-    evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b = create_contrast()
+    evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b, perc = create_contrast()
 
     # get grand average over all subjects for plotting the results later
 
-    a = [ax.copy().crop(tmin, tmax) for ax in evokeds_a_all]
-    b = [bx.copy().crop(tmin, tmax) for bx in evokeds_b_all]
+    a = [ax.copy().crop(tmin, tmax).apply_baseline((-0.1,0)).pick_channels(['C4']) for ax in evokeds_a_all]
+    b = [bx.copy().crop(tmin, tmax).apply_baseline((-0.1,0)).pick_channels(['C4']) for bx in evokeds_b_all]
+
+    fig = mne.viz.plot_compare_evokeds({'0.75_hit': a, '0.25_hit': b}, picks='C4')
+    fig[0].savefig(f'D:\expecon_ms\\figs\manuscript_figures\Figure4_evokeds\evoked_{cond_a}_{cond_b}.svg')
 
     a_gra = mne.grand_average(a)
     b_gra = mne.grand_average(b)
+
+    diff = mne.combine_evoked([a_gra,b_gra], weights=[1,-1])
 
     X = np.array([ax.data-bx.data for ax,bx in zip(a,b)])
 
@@ -175,13 +194,19 @@ def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
 
     ch_adjacency,_ = mne.channels.find_ch_adjacency(epochs.info, ch_type='eeg')
 
-    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X[:,:,:], n_permutations=perm,
+    # 2D cluster test
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X, n_permutations=perm,
                                                                                     adjacency=ch_adjacency, 
-                                                                                    #threshold=threshold_tfce, 
+                                                                                    tail=0, n_jobs=-1
+                                                                                    )
+    
+    # 1D cluster test
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X, n_permutations=perm,
                                                                                     tail=0, n_jobs=-1
                                                                                     )
 
-    good_cluster_inds = np.where(cluster_p_values < 0.001)[0] # times where something significant happened
+
+    good_cluster_inds = np.where(cluster_p_values < 0.05)[0] # times where something significant happened
 
     print(len(good_cluster_inds))
     print(cluster_p_values)
