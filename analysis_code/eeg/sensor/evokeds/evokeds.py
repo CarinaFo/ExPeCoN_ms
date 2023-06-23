@@ -27,7 +27,7 @@ dir_cleanepochs = r"D:\expecon_ms\data\eeg\prepro_ica\clean_epochs_corr"
 behavpath = r'D:\expecon_ms\data\behav\behav_df'
 
 # save cluster figures as svg and png files
-save_dir_cluster_output = r"D:\expecon_ms\figs\eeg\sensor\evokeds"
+save_dir_cluster_output = r"D:\expecon_ms\figs\manuscript_figures\Figure4_evokeds"
 
 # participant index
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
@@ -35,8 +35,8 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(cond='highlow_hit', cond_a='0.75_hit',
-                    cond_b='0.25_hit', laplace=False, save_drop_log=False,
+def create_contrast(cond='hit_prevchoice', cond_a='hit_yes',
+                    cond_b='hit_no', laplace=False, save_drop_log=False,
                     reject_criteria=dict(eeg=200e-6),
                     flat_criteria=dict(eeg=1e-6)):
 
@@ -124,11 +124,11 @@ def create_contrast(cond='highlow_hit', cond_a='0.75_hit',
         if cond == 'highlow':
             epochs_a = epochs[(epochs.metadata.cue == 0.75)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-        if cond == 'high_prevchoice':
-            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.prevsayyes == 1))]
-            epochs_b = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.prevsayyes == 0))]
-        if cond == 'low_prevchoice':
-            epochs_a = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.prevsayyes == 1))]
+        if cond == 'prevchoice':
+            epochs_a = epochs[epochs.metadata.prevsayyes == 1]
+            epochs_b = epochs[epochs.metadata.prevsayyes == 0]
+        if cond == 'highlow_prevchoiceno':
+            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.prevsayyes == 0))]
             epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.prevsayyes == 0))]
         elif cond == 'signalnoise':
             epochs_a = epochs[(epochs.metadata.isyes == 1)]
@@ -142,9 +142,9 @@ def create_contrast(cond='highlow_hit', cond_a='0.75_hit',
         elif cond == 'hitmiss':
             epochs_a = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1))]
             epochs_b = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0))]
-        elif cond == 'highlow_hit':
-            epochs_a = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1) & (epochs.metadata.cue == 0.75))]
-            epochs_b = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1) & (epochs.metadata.cue == 0.25))]
+        elif cond == 'hit_prevchoice':
+            epochs_a = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1) & (epochs.metadata.prevsayyes == 1))]
+            epochs_b = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1) & (epochs.metadata.prevsayyes == 0))]
 
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
@@ -167,10 +167,10 @@ def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
 
     # get grand average over all subjects for plotting the results later
 
-    a = [ax.copy().crop(tmin, tmax).apply_baseline((-0.1,0)).pick_channels(['C4']) for ax in evokeds_a_all]
-    b = [bx.copy().crop(tmin, tmax).apply_baseline((-0.1,0)).pick_channels(['C4']) for bx in evokeds_b_all]
+    a = [ax.copy().crop(tmin, tmax)for ax in evokeds_a_all]
+    b = [bx.copy().crop(tmin, tmax) for bx in evokeds_b_all]
 
-    fig = mne.viz.plot_compare_evokeds({'0.75_hit': a, '0.25_hit': b}, picks='C4')
+    fig = mne.viz.plot_compare_evokeds({'0.75_prev_no': a, '0.25_prev_no': b}, picks='C4')
     fig[0].savefig(f'D:\expecon_ms\\figs\manuscript_figures\Figure4_evokeds\evoked_{cond_a}_{cond_b}.svg')
 
     a_gra = mne.grand_average(a)
@@ -277,6 +277,6 @@ def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
         mne.viz.tight_layout(fig=fig)
         fig.subplots_adjust(bottom=.05)
         os.chdir(save_dir_cluster_output)
-        plt.savefig('cluster_highlow_pre' + str(i_clu) + '.svg')
-        plt.savefig('cluster_highlow_pre' + str(i_clu) + '.png')
+        plt.savefig('cluster_hit_prev' + str(i_clu) + '.svg')
+        plt.savefig('cluster_hit_prev' + str(i_clu) + '.png')
         plt.show()
