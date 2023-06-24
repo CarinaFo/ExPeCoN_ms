@@ -2,12 +2,22 @@
 
 
 import os
+import sys
+
+import matplotlib.pyplot as plt
+import mne
 import numpy as np
 import pandas as pd
-import mne
-from fooof import FOOOF
+import seaborn as sns
+import stats
 from fooof import FOOOF, FOOOFGroup
+import fooof
 from fooof.bands import Bands
+
+# add path to sys.path.append() if package isn't found
+sys.path.append('D:\\expecon_ms\\analysis_code')
+
+from behav import figure1
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '017', '018', '019', '020', '021','022', '023', '024', '025', '026',
@@ -81,10 +91,14 @@ for idx, subj in enumerate(IDlist):
             epochs = epochs.subtract_evoked()
 
         # calculate PSD per epoch (inherits metadata from epochs)
-        psd = epochs.compute_psd(fmin=3, fmax=40, tmin=-0.5, tmax=0)
+        psd = epochs.compute_psd(fmin=3, fmax=40, tmin=-0.4, tmax=0)
 
         psd_all.append(psd)
 
+# save freqs
+freqs = psd_all[0].freqs
+
+# contrast conditions and average over epochs
 psd_a_all = []
 psd_b_all = []
 
@@ -93,6 +107,9 @@ for psd in psd_all:
         # get high and low probability trials 
         psd_a = psd[((psd.metadata.cue == 0.75))]
         psd_b = psd[((psd.metadata.cue == 0.25))]
+
+        psd_a = psd[((psd.metadata.isyes == 1) & (psd.metadata.sayyes == 1))]
+        psd_b = psd[((psd.metadata.isyes == 1) & (psd.metadata.sayyes == 0))]
 
         evoked_psd_a = psd_a.average()
         evoked_psd_b = psd_b.average()
@@ -104,12 +121,15 @@ for psd in psd_all:
 psd_a = np.array([np.squeeze(psd[24,:]) for psd in psd_a_all])
 psd_b = np.array([np.squeeze(psd[24,:]) for psd in psd_b_all])
 
-plt.plot(psd_all[0].freqs, np.log10(psd_a[25]), label='0.75 prob')
-plt.plot(psd_all[0].freqs, np.log10(psd_b[25]), label= '0.25 prob')
+# plot an example PSD
+
+plt.plot(freqs, np.log10(psd_a[25]), label='Hit')
+plt.plot(freqs, np.log10(psd_b[25]), label= 'Miss')
 plt.legend()
+plt.savefig('D:\\expecon_ms\\figs\\manuscript_figures\\Figure5\\example_psd.svg',
+             dpi=300)
 
-
-def calc_fooof(psd_array=psd_a):
+def calc_fooof(psd_array=psd_a, fmin=3, fmax=40, freqs=freqs):
     
     # Initialize a FOOOFGroup object, specifying some parameters
     fg = FOOOFGroup(peak_width_limits=[1, 8], min_peak_height=0.05)
@@ -117,11 +137,11 @@ def calc_fooof(psd_array=psd_a):
     # Fit FOOOF model across the matrix of power spectra
     # pick C4 as channel of interest
 
-    fg.fit(psd_a_all[0].freqs, psd_array, [3, 40])
+    fg.fit(freqs, psd_array, [fmin, fmax])
 
     return fg
 
-fg_dict = {'0.75_prob': fg_high, '0.25_prob': fg_low}
+fg_dict = {'Hit': fg_hit, 'Miss': fg_miss}
 
 off_all, exps_all, peaks_all = [], [],[]
 cfs_all, errors_all, r2s_all = [], [], []
@@ -151,19 +171,20 @@ for  keys, fg in fg_dict.items():
     fg.save(file_name=f'D:\expecon_ms\\figs\manuscript_figures\Figure5\\fooof_group_results_{keys}.csv', save_results=True)
 
 # extract participant fooof
-fm = fg_all[0].get_fooof(ind=20, regenerate=True)
+fm = fg_hit.get_fooof(ind=20, regenerate=True)
+fm.plot(save_fig=True, file_name=f'D:\expecon_ms\\figs\manuscript_figures\Figure5\\fooof_example_participant.svg')
 
 # compare R2 between conditions
 
 scipy.stats.wilcoxon(r2s_all[0], r2s_all[1]) # n.s.
 scipy.stats.wilcoxon(off_all[0], off_all[1]) # n.s.
 scipy.stats.wilcoxon(exps_all[0], exps_all[1]) # n.s.
+
 # extract alpha and beta peaks per participant and condition
 # Import the Bands object, which is used to define frequency bands
 
-
 peaks = np.empty((0, 3))
-for f_res in fg_low:  
+for f_res in fg_hit:  
     peaks = np.vstack((peaks, get_band_peak(f_res.peak_params, (17,35), select_highest=True)))
 
 # Create a boolean mask indicating NaN values
@@ -183,3 +204,74 @@ power_low = peaks_low_beta[:,1][~nan_mask]
 scipy.stats.wilcoxon(fpeaks_high, fpeaks_low, nan_policy='omit') # n.s.
 scipy.stats.wilcoxon(power_high, power_low, nan_policy='omit') # n.s.
 
+
+# subtract 1/f slope and offset from power spectra
+
+
+def extract_aperiodic(psd=None):
+
+    """extract aperiodic parameters from fooof object (exponent and intercept) """
+    # Compute aperiodic component for one PSD
+
+    aperiodic_psd = []
+
+    for offset, slope in zip(off_all[1], exps_all[1]):
+        aperiodic_psd.append(offset - np.log10(freqs ** slope))
+
+    aperiodic = np.array(aperiodic_psd)
+
+    #now subtract aperiodic component from full PSD
+
+    periodic = np.log10(psd)-aperiodic
+
+    #plot 3 random flat PSDs
+
+    random_indices = np.random.randint(42, size=3)
+
+    for indices in random_indices:
+
+        plt.plot(freqs, aperiodic[indices,])
+        plt.show()
+
+    for indices in random_indices:
+
+        plt.plot(freqs, periodic[indices,])
+        plt.show()
+
+    return aperiodic, periodic
+
+
+# Assuming the residual PSDs after subtracting 1/f are stored in the 'fooof_results' list
+def compare_periodic_power(a_per=None, b_per=None, freqs=None):
+
+    # Step 1: Define the frequency ranges for alpha and beta bands
+    alpha_band = (8, 13)  # Alpha frequency range (7-13 Hz)
+    beta_band = (18, 22)  # Beta frequency range (18-27 Hz)
+
+    # Step 2: Calculate power in the specified frequency bands
+    alpha_power_low = []
+    beta_power_low = []
+    alpha_power_high = []
+    beta_power_high = []
+
+    for l,h in zip(a_per, b_per):
+        # Calculate power in alpha band
+        alpha_indices = np.logical_and(freqs >= alpha_band[0], freqs <= alpha_band[1])
+        alpha_power_low.append(np.trapz(l[alpha_indices], freqs[alpha_indices]))
+        alpha_power_high.append(np.trapz(h[alpha_indices], freqs[alpha_indices]))
+
+        # Calculate power in beta band
+        beta_indices = np.logical_and(freqs >= beta_band[0], freqs <= beta_band[1])
+        beta_power_low.append(np.trapz(l[beta_indices], freqs[beta_indices]))
+        beta_power_high.append(np.trapz(h[beta_indices], freqs[beta_indices]))
+
+    # Step 3: Calculate alpha/beta power ratio
+
+    alpha_beta_ratio_low = np.array(alpha_power_low) / np.array(beta_power_low)
+    alpha_beta_ratio_high = np.array(alpha_power_high) / np.array(beta_power_high)
+
+    # check significance of alpha/beta ratio difference
+
+    scipy.stats.wilcoxon(alpha_beta_ratio_low, alpha_beta_ratio_high) # n.s.
+    scipy.stats.wilcoxon(alpha_power_low, alpha_power_high) # n.s.
+    scipy.stats.wilcoxon(beta_power_low, beta_power_high) # n.s.
