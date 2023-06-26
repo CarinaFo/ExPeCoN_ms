@@ -9,15 +9,27 @@ import mne
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import stats
-from fooof import FOOOF, FOOOFGroup
-import fooof
+import scipy
+
+# Import the FOOOF object
+from fooof import FOOOF
+
+# Import utility, and plotting tools
 from fooof.bands import Bands
+from fooof.utils import trim_spectrum
+from fooof.analysis import get_band_peak_fm
+from fooof.sim.gen import gen_power_spectrum
+from fooof.plts.spectra import plot_spectra_shading
 
 # add path to sys.path.append() if package isn't found
 sys.path.append('D:\\expecon_ms\\analysis_code')
 
 from behav import figure1
+
+# Define our frequency bands of interest
+bands = Bands({'alpha' : [7, 13],
+               'beta' : [15, 25]})
+
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '017', '018', '019', '020', '021','022', '023', '024', '025', '026',
@@ -25,7 +37,7 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046',
           '047', '048', '049')
 
-dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs_corr"
+dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs_iclabel"
 behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 laplace=0
 induced_power=1
@@ -42,7 +54,7 @@ for idx, subj in enumerate(IDlist):
 
         # load cleaned epochs
         epochs = mne.read_epochs(f"{dir_cleanepochs}"
-                                 f"/P{subj}_epochs_after_ica-epo.fif")
+                                 f"/P{subj}_epochs_after_ic-label-epo.fif")
 
         ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
         blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
@@ -108,8 +120,8 @@ for psd in psd_all:
         psd_a = psd[((psd.metadata.cue == 0.75))]
         psd_b = psd[((psd.metadata.cue == 0.25))]
 
-        psd_a = psd[((psd.metadata.isyes == 1) & (psd.metadata.sayyes == 1))]
-        psd_b = psd[((psd.metadata.isyes == 1) & (psd.metadata.sayyes == 0))]
+        #psd_a = psd[((psd.metadata.isyes == 1) & (psd.metadata.sayyes == 1))]
+        #psd_b = psd[((psd.metadata.isyes == 1) & (psd.metadata.sayyes == 0))]
 
         evoked_psd_a = psd_a.average()
         evoked_psd_b = psd_b.average()
@@ -123,11 +135,49 @@ psd_b = np.array([np.squeeze(psd[24,:]) for psd in psd_b_all])
 
 # plot an example PSD
 
-plt.plot(freqs, np.log10(psd_a[25]), label='Hit')
-plt.plot(freqs, np.log10(psd_b[25]), label= 'Miss')
+plt.plot(freqs, np.log10(psd_a[25]), label='High')
+plt.plot(freqs, np.log10(psd_b[25]), label= 'Low')
 plt.legend()
 plt.savefig('D:\\expecon_ms\\figs\\manuscript_figures\\Figure5\\example_psd.svg',
              dpi=300)
+
+# Define plot settings
+t_settings = {'fontsize' : 24, 'fontweight' : 'bold'}
+shade_cols = ['#e8dc35', '#46b870', '#1882d9', '#a218d9', '#e60026']
+labels = ['Group-1', 'Group-2']
+
+# General simulation settings
+f_range = [1, 50]
+nlv = 0
+
+# Define some template strings for reporting
+exp_template = "The difference of aperiodic exponent is: \t {:1.2f}"
+pw_template = ("The difference of {:5} power is  {: 1.2f}\t"
+               "with peaks or  {: 1.2f}\t with bands.")
+
+def compare_exp(fm1, fm2):
+    """Compare exponent values."""
+
+    exp1 = fm1.get_params('aperiodic_params', 'exponent')
+    exp2 = fm2.get_params('aperiodic_params', 'exponent')
+
+    return exp1 - exp2
+
+def compare_peak_pw(fm1, fm2, band_def):
+    """Compare the power of detected peaks."""
+
+    pw1 = get_band_peak_fm(fm1, band_def)[1]
+    pw2 = get_band_peak_fm(fm2, band_def)[1]
+
+    return pw1 - pw2
+
+def compare_band_pw(fm1, fm2, band_def):
+    """Compare the power of frequency band ranges."""
+
+    pw1 = np.mean(trim_spectrum(fm1.freqs, fm1.power_spectrum, band_def)[1])
+    pw2 = np.mean(trim_spectrum(fm1.freqs, fm2.power_spectrum, band_def)[1])
+
+    return pw1 - pw2
 
 def calc_fooof(psd_array=psd_a, fmin=3, fmax=40, freqs=freqs):
     
@@ -141,7 +191,7 @@ def calc_fooof(psd_array=psd_a, fmin=3, fmax=40, freqs=freqs):
 
     return fg
 
-fg_dict = {'Hit': fg_hit, 'Miss': fg_miss}
+fg_dict = {'High': fg_high, 'Low': fg_low}
 
 off_all, exps_all, peaks_all = [], [],[]
 cfs_all, errors_all, r2s_all = [], [], []
@@ -171,42 +221,49 @@ for  keys, fg in fg_dict.items():
     fg.save(file_name=f'D:\expecon_ms\\figs\manuscript_figures\Figure5\\fooof_group_results_{keys}.csv', save_results=True)
 
 # extract participant fooof
-fm = fg_hit.get_fooof(ind=20, regenerate=True)
+fm = fg_high.get_fooof(ind=20, regenerate=True)
 fm.plot(save_fig=True, file_name=f'D:\expecon_ms\\figs\manuscript_figures\Figure5\\fooof_example_participant.svg')
 
 # compare R2 between conditions
-
 scipy.stats.wilcoxon(r2s_all[0], r2s_all[1]) # n.s.
 scipy.stats.wilcoxon(off_all[0], off_all[1]) # n.s.
 scipy.stats.wilcoxon(exps_all[0], exps_all[1]) # n.s.
 
-# extract alpha and beta peaks per participant and condition
-# Import the Bands object, which is used to define frequency bands
+# Plot the power spectra differences
+plot_spectra_shading(freqs, [fg_high.get_fooof(ind=20, regenerate=True)._spectrum_flat,
+                             fg_low.get_fooof(ind=20, regenerate=True)._spectrum_flat],
+                     log_powers=False, linewidth=3,
+                     shades=bands.definitions, shade_colors=shade_cols,
+                     labels=labels)
 
-peaks = np.empty((0, 3))
-for f_res in fg_hit:  
-    peaks = np.vstack((peaks, get_band_peak(f_res.peak_params, (17,35), select_highest=True)))
+plt.xlim(f_range)
 
-# Create a boolean mask indicating NaN values
-nan_mask = np.isnan(peaks_high_beta[:,0])
+plt.title('Band-by-Band - Flattened', t_settings)
 
-print("Participants without peak:", sum(nan_mask))
 
-# Drop NaN values from the array
-fpeaks_high = peaks_high_beta[:,0][~nan_mask]
-fpeaks_low = peaks_low_beta[:,0][~nan_mask]
+diff_all_subs_pow, diff_all_subs_peaks = [], []
 
-# Extract power per peak
-power_high = peaks_high_beta[:,1][~nan_mask]
-power_low = peaks_low_beta[:,1][~nan_mask]
+for idx, subj in enumerate(IDlist):
+    diff_all_peaks, diff_all_pow = [], []
+    # Check the difference in periodic activity, across bands, between groups
+    for label, definition in bands:
+        diff_peak = compare_peak_pw(fg_high.get_fooof(ind=idx), 
+                        fg_low.get_fooof(ind=idx), definition)
+        diff_pow = compare_band_pw(fg_high.get_fooof(ind=idx), 
+                        fg_low.get_fooof(ind=idx), definition)
+        diff_all_peaks.append(diff_peak)
+        diff_all_pow.append(diff_pow)
+    diff_all_subs_peaks.append(diff_all_peaks)
+    diff_all_subs_pow.append(diff_all_pow)
+
+scipy.stats.wilcoxon(np.array(diff_all_subs_pow)[:, 0])
+scipy.stats.wilcoxon(np.array(diff_all_subs_pow)[:, 1])
 
 # compare alpha peak frequencies and power
 scipy.stats.wilcoxon(fpeaks_high, fpeaks_low, nan_policy='omit') # n.s.
 scipy.stats.wilcoxon(power_high, power_low, nan_policy='omit') # n.s.
 
-
 # subtract 1/f slope and offset from power spectra
-
 
 def extract_aperiodic(psd=None):
 
