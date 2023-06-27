@@ -35,8 +35,9 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(cond='hit_prevchoice', cond_a='hit_yes',
-                    cond_b='hit_no', laplace=False, save_drop_log=False,
+def create_contrast(cond='highlow', cond_a='high',
+                    cond_b='low', laplace=False, subtract_evoked=True,
+                    save_drop_log=False,
                     reject_criteria=dict(eeg=200e-6),
                     flat_criteria=dict(eeg=1e-6)):
 
@@ -47,9 +48,10 @@ def create_contrast(cond='hit_prevchoice', cond_a='hit_yes',
     cond_a: name of condition a
     cond_b: name of condition b
     laplace: apply laplace transform to data
+    subtract_evoked: boolean, subtract evoked signal from each epoch
     save_drop_log: save drop log output
     output:
-    saves the cluster figures as svg and png files """
+    None """
 
     perc = []
 
@@ -89,9 +91,6 @@ def create_contrast(cond='hit_prevchoice', cond_a='hit_yes',
 
         trials_removed.append(before_rt_removal - len(epochs.metadata))
 
-        if laplace == True:
-            epochs = mne.preprocessing.compute_current_source_density(epochs)
-
         # load behavioral data
         data = pd.read_csv(f'{behavpath}//prepro_behav_data.csv')
 
@@ -121,6 +120,9 @@ def create_contrast(cond='hit_prevchoice', cond_a='hit_yes',
 
             plt.savefig(f'D:\expecon_ms\data\eeg\prepro_ica\droplog\P{subj}_drop_log.png', dpi=300)
 
+        if laplace:
+            epochs = mne.preprocessing.compute_current_source_density(epochs)
+
         if cond == 'highlow':
             epochs_a = epochs[(epochs.metadata.cue == 0.75)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)]
@@ -148,6 +150,10 @@ def create_contrast(cond='hit_prevchoice', cond_a='hit_yes',
 
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
+        if subtract_evoked:
+            epochs_a = epochs_a.subtract_evoked()
+            epochs_b = epochs_b.subtract_evoked()
+
         # average and crop in prestimulus window
         evokeds_a = epochs_a.average()
         evokeds_b = epochs_b.average()
@@ -170,7 +176,7 @@ def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
     a = [ax.copy().crop(tmin, tmax)for ax in evokeds_a_all]
     b = [bx.copy().crop(tmin, tmax) for bx in evokeds_b_all]
 
-    fig = mne.viz.plot_compare_evokeds({'0.75_prev_no': a, '0.25_prev_no': b}, picks='C4')
+    fig = mne.viz.plot_compare_evokeds({'high': a, 'low': b}, picks='C4')
     fig[0].savefig(f'D:\expecon_ms\\figs\manuscript_figures\Figure4_evokeds\evoked_{cond_a}_{cond_b}.svg')
 
     a_gra = mne.grand_average(a)
