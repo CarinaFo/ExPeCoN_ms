@@ -94,6 +94,28 @@ saveRDS(object = cue_prev_int_model, file = "cue_prev_int_model_brms.rds")
 
 cue_prev_int_model = readRDS(file = "cue_prev_int_model_brms.rds")
 
+# Obtain fixed effects estimates
+fixed_effects <- fixef(cue_prev_int_model)
+
+
+# Create a new data frame with the predictor variables and their corresponding values
+new_data <- data.frame(cue = behav$cue,
+                       prevsayyes = behav$prevsayyes)
+
+# Predict the response variable using the fixed effects estimates and new data
+predicted_values <- predict(cue_prev_int_model, newdata = new_data, type = "response")
+
+# Create new variables representing the mediated pathway
+mediator <- your_data$mediator_variable
+outcome <- your_data$response_var
+
+# Fit the mediation models
+med_model <- lm(mediator ~ predictor1 + predictor2, data = your_data)
+out_model <- lm(outcome ~ mediator + predictor1 + predictor2, data = your_data)
+
+# Run the mediation analysis
+mediation_result <- mediate(med_model, out_model, treat = "mediator", mediator = "outcome")
+
 # extract variables
 get_variables(cue_prev_int_model)
 
