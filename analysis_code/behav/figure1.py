@@ -116,12 +116,13 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
             correct_rejections = subset[(subset[signal_col] == False) &
                                         (subset[response_col] == False)].shape[0]
             
+            # log linear correction (Hautus, 1995)
             if condition == 0.75:
-                hit_rate = (detect_hits + 0.75) / (detect_hits + detect_misses + 1.5)
-                false_alarm_rate = (false_alarms + 0.25) / (false_alarms + correct_rejections + 0.5)
+                hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
+                false_alarm_rate = (false_alarms + 0.5) / (false_alarms + correct_rejections + 1)
             else:
-                hit_rate = (detect_hits + 0.25) / (detect_hits + detect_misses + 0.5)
-                false_alarm_rate = (false_alarms + 0.75) / (false_alarms + correct_rejections + 1.5)
+                hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
+                false_alarm_rate = (false_alarms + 0.5) / (false_alarms + correct_rejections + 1)
 
             d_prime = stats.norm.ppf(hit_rate) - stats.norm.ppf(false_alarm_rate)
             criterion = -0.5 * (stats.norm.ppf(hit_rate) + stats.norm.ppf(false_alarm_rate))
@@ -415,7 +416,7 @@ def plot_figure1_grid(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\F
     """
 
     # load data
-    conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=False)
+    conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=True)
 
     # unpack data
     df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, \
