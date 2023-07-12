@@ -17,7 +17,7 @@ import pandas as pd
 import scipy
 import scipy.stats as stats
 import seaborn as sns
-from behavioral_data_analysis import figure1
+from behav import figure1
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
@@ -25,7 +25,7 @@ plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 'font.sans-se
 # datapaths
 
 behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
-tfr_single_trial_power_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\single_trial_power"
+tfr_single_trial_power_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\tfr"
 brain_behav_path = "D:\\expecon_ms\\figs\\brain_behavior"
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
@@ -34,57 +34,44 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
 
 freq_list = np.arange(6, 35, 1)
 
-freq_bands = {'alpha': (6, 13), 'low_beta': (14, 20), 'beta_gamma': (20, 35)}
+freq_bands = {'alpha': (7, 13), 'beta': (15, 25)}
 
-
-def save_band_power_per_trial(tmin, tmax):
+def save_band_power_per_trial(time_intervals={'800to500': (-0.8,-0.5), '400to100': (-0.4,-0.1)}):
 
     """This function saves the power per trial per frequency band in a csv file. 
-    The power is calculated for the prestimulus period (-400 to -200ms) and
-    averaged over the channels CP4, C4, C6, CP6.
+    The power is calculated for the prestimulus period and averaged over the channel C4.
     The power is calculated for the following frequency bands:
-        - theta (6-9 Hz)
         - alpha (8-14 Hz)
-        - low beta (14-21 Hz)
-        - beta gamma (20-36 Hz)
+        - beta (14-21 Hz)
     """
 
     # load behavioral data
-    os.chdir(behavpath)
-
-    data = pd.read_csv("prepro_behav_data_after_rejectepochs.csv")
+    data = pd.read_csv(f"{behavpath}//prepro_behav_data_after_dropbads.csv")
 
     # save single subject dataframes in a list
     brain_behav = []
 
     for counter, subj in enumerate(IDlist):
 
-        # skip those participants
-        if subj == '040' or subj == '045' or subj == '032' or subj == '016':
-            continue
+        # load single trial power
+        power = mne.time_frequency.read_tfrs(f"{tfr_single_trial_power_dir}\\{subj}_power_per_trial_induced-tfr.h5")[0]
 
-        power = mne.time_frequency.read_tfrs(f"{tfr_single_trial_power_dir}\\{subj}_power_per_trial-tfr.h5")[0]
-        
         # add metadata
         subj_data = data[data.ID == counter+7]
         power.metadata = subj_data
 
-        # save power per trial per frequency band
-        # strongest effects between -400 and -200ms prestimulus
-        # ROI channels selected
+        for keys, values in time_intervals.items():
 
-        power.crop(tmin, tmax).pick_channels(['CP4', 'C4', 'C6', 'CP6'])
+            power_crop = power.copy().crop(tmin=values[0], tmax=values[1]).pick_channels(['C4'])
 
-        # now we average over time and channels
+            # now we average over time and channels
+            power_crop.data = np.mean(power_crop.data, axis=(1, 3))
 
-        power.data = np.mean(power.data, axis=(1,3))
-
-        # now we average over the frequency bands and add the column to the 
-        # behavioral data frame
-
-        subj_data['alpha_pw'] = np.mean(power.data[:,:8], axis=1)  # 8-14 Hz
-        subj_data['beta'] = np.mean(power.data[:,8:21], axis=1) # 14-21 Hz
-        #subj_data['beta_gamma_pw'] = np.mean(power.data[:,15:], axis=1) # 20-36 Hz
+            # now we average over the frequency band and time interval 
+            # and add the column to the 
+            # behavioral data frame
+            subj_data[f'alpha_{keys}'] = np.mean(power_crop.data[:, 1:8], axis=1)  # 7-14 Hz
+            subj_data[f'beta_{keys}'] = np.mean(power_crop.data[:, 9:20], axis=1) # 15-25 Hz
 
         # save the data in a list
         brain_behav.append(subj_data)
@@ -102,7 +89,7 @@ def power_criterion_corr():
 
     df = pd.read_csv(f"{brain_behav_path}\\brain_behav.csv")
 
-    freqs = ['alpha_pw', 'beta']
+    freqs = ['alpha_400to100', 'beta_400to100']
 
     diff_p_list = []
 
@@ -119,24 +106,29 @@ def power_criterion_corr():
         diff_p_list.append(diff_p)
 
     power_dict = {'alpha': diff_p_list[0], 'beta': diff_p_list[1]}
+
+    #load random effects
+    re = pd.read_csv("D:\expecon_ms\data\\behav\mixed_models\\brms\\random_effects.csv")
     
-    out = figure1.prepare_behav_data()
+    out = figure1.prepare_for_plotting()
         
-    dprime = out[0]
+    sdt = out[0][0]
 
-    crit = out[1]   
+    c_diff = np.array(sdt.criterion[sdt.cue == 0.25]) - np.array(sdt.criterion[sdt.cue == 0.75])
+    dprime_diff = np.array(sdt.dprime[sdt.cue == 0.25]) - np.array(sdt.dprime[sdt.cue == 0.75])
 
-    sdt_params = {'dprime': dprime, 'criterion': crit}
+    sdt_params = {'dprime': dprime_diff, 'criterion': c_diff}
 
     for p_key, p_value in power_dict.items(): # loop over the power difference
         for keys, values in sdt_params.items(): # loop over the criterion and dprime difference
 
-            fig = sns.regplot(p_value[values>0], values[values>0])
+            fig = sns.regplot(p_value, values)
 
             plt.xlabel(f'{p_key} power difference')
             plt.ylabel(f'{keys} difference')
+            plt.show()
 
-            print(scipy.stats.spearmanr(p_value[values>0], values[values>0]))
+            print(scipy.stats.spearmanr(p_value, values))
 
             os.chdir(r"D:\expecon_ms\\figs\brain_behavior")
 
