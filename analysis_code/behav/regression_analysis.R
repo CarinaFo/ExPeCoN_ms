@@ -199,6 +199,7 @@ cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=
                   control=glmerControl(optimizer="bobyqa",
                   optCtrl=list(maxfun=2e5)),
                   )
+emmeans::emmeans(cue_model, 'cue')
 
 check_collinearity(cue_model)
 check_convergence(cue_model)
