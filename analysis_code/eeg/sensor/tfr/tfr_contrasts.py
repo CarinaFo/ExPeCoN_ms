@@ -16,36 +16,36 @@ import mne
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from behavioral_data_analysis import figure1
+from behav import figure1
 from permutation_tests import cluster_correlation
 import pyvistaqt  # for proper 3D plotting
-from behavioral_data_analysis import figure1
+
 
 # for plots in new windows
 # %matplotlib qt
 
 # set font to Arial and font size to 22
-plt.rcParams.update({'font.size': 22, 'font.family': 'sans-serif', 
+plt.rcParams.update({'font.size': 14, 'font.family': 'sans-serif', 
                      'font.sans-serif': 'Arial'})
 
 # datapaths
-tfr_single_trial_power_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\single_trial_power"
-tfr_contrast_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\induced_tfr\\condition_contrasts"
+tfr_single_trial_power_dir = r"D:\expecon_ms\data\\eeg\sensor\tfr"
+
+tfr_contrast_dir = "D:\\expecon_ms\\data\\eeg\\sensor\\tfr\\contrasts_corr"
 savedir_figure4 = 'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4'
-dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs"
+dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs_iclabel"
 behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
-          '017', '018', '019', '020', '021','022', '023', '024', '025', '026',
+          '017', '018', '019', '020', '021', '022', '023', '024', '025', '026',
           '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046',
           '047', '048', '049')
 
 
-def calculate_power_per_trial(tmin=-1, tmax=0.5,
-                              zero_pad=0, reject_criteria=dict(eeg=200e-6),
-                              flat_criteria=dict(eeg=1e-6), 
-                              induced_power=0):
+def calculate_power_per_trial(tmin=-1.5, tmax=1.5, laplace=0, induced=True,
+                              zero_pad=0, save=1, reject_criteria=dict(eeg=200e-6),
+                              flat_criteria=dict(eeg=1e-6)):
 
     '''calculate prestimulus time-frequency representations per trial
       (induced power) using multitaper method. Data is cut between tmin and
@@ -67,75 +67,68 @@ def calculate_power_per_trial(tmin=-1, tmax=0.5,
 
         '''
     
-    freq_list = np.arange(6, 35, 1)
-    n_cycles = freq_list / 2.0  # different number of cycle per frequency
+    df_all, spectra = [], []
 
-    df_all = []
-
-    for counter, subj in enumerate(IDlist):
+    for idx, subj in enumerate(IDlist):
 
         # print participant ID
         print('Analyzing ' + subj)
-        # skip those participants
-        if subj == '040' or subj == '045' or subj == '032' or subj == '016':
-            continue
 
         # load cleaned epochs
         epochs = mne.read_epochs(f"{dir_cleanepochs}"
-                                 f"/P{subj}_epochs_after_ica-epo.fif")
+                                 f"/P{subj}_epochs_after_ic-label-epo.fif")
 
-        # Remove 5 blocks with hitrates < 0.2 or > 0.8
+        ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
+        blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
 
-        if subj == '010':
-            epochs = epochs[epochs.metadata.block != 6]
-        if subj == '012':
-            epochs = epochs[epochs.metadata.block != 6]
-        if subj == '026':
-            epochs = epochs[epochs.metadata.block != 4]
-        if subj == '030':
-            epochs = epochs[epochs.metadata.block != 3]
-        if subj == '039':
-            epochs = epochs[epochs.metadata.block != 3]
-        
-        # remove trials with rts >= 2.5 (no response trials) 
-        # and trials with rts < 0.1
-        epochs = epochs[epochs.metadata.respt1 > 0.1]
+        # Check if the participant ID is in the list of IDs to delete
+        if pd.unique(epochs.metadata.ID) in ids_to_delete:
+
+            # Get the corresponding blocks to delete for the current participant
+            participant_blocks_to_delete = [block for id_, block in
+                                            zip(ids_to_delete, blocks_to_delete)
+                                            if id_ == pd.unique(epochs.metadata.ID)]
+            
+            # Drop the rows with the specified blocks from the dataframe
+            epochs = epochs[~epochs.metadata.block.isin(participant_blocks_to_delete)]
+            
+        # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
+        epochs = epochs[epochs.metadata.respt1 >= 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
 
-        # remove first trial of each block (trigger delays)
-        epochs = epochs[epochs.metadata.trial != 1]
-
-        if induced_power == 1:
-            # subtract evoked response
-            epochs = epochs.subtract_evoked()
+        if laplace:
+            epochs = mne.preprocessing.compute_current_source_density(epochs)
 
         # load behavioral data
-        data = pd.read_csv(f"{behavpath}//prepro_behav_data.csv")
+        data = pd.read_csv(f'{behavpath}//prepro_behav_data.csv')
 
-        subj_data = data[data.ID == counter+7]
+        subj_data = data[data.ID == idx+7]
 
-        if ((counter == 5) or (counter == 13) or
-           (counter == 21) or (counter == 28)):  # first epoch has no data
-            epochs.metadata = subj_data.iloc[1:, :]
-        elif counter == 17:
-            epochs.metadata = subj_data.iloc[3:, :]
+        # get drop log from epochs
+        drop_log = epochs.drop_log
+
+        search_string = 'IGNORED'
+
+        indices = [index for index, tpl in enumerate(drop_log) if tpl and search_string not in tpl]
+
+        # drop bad epochs (too late recordings)
+        if indices:
+            epochs.metadata = subj_data.reset_index().drop(indices)
         else:
             epochs.metadata = subj_data
 
         # drop bad epochs
-        epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
+        #epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
 
         metadata = epochs.metadata
 
+        # save metadata after dropping bad epochs
         df_all.append(metadata)
 
-        # crop the data in the pre-stimulus window
-        epochs.crop(tmin, tmax)
+        if zero_pad:
 
-        # zero pad the data on both sides to avoid leakage and edge artifacts
-        data = epochs.get_data()
-
-        if zero_pad == 1:
+            # zero pad the data on both sides to avoid leakage and edge artifacts
+            data = epochs.get_data()
 
             data = zero_pad_data(data)
 
@@ -143,117 +136,95 @@ def calculate_power_per_trial(tmin=-1, tmax=0.5,
 
             epochs = mne.EpochsArray(data, epochs.info, tmin=tmin * 2)
 
+        mne.epochs.equalize_epoch_counts([epochs])
+
+        # subtract evoked response for each condition
+        if induced:
+            epochs = epochs.subtract_evoked()
+        
         # calculate prestimulus power per trial
-        power = mne.time_frequency.tfr_multitaper(epochs, n_cycles=n_cycles, freqs=freq_list, return_itc=False,
-                                                  n_jobs=-1, average=False)
-        # save the tfr object to disk
-        mne.time_frequency.write_tfrs(f"{tfr_single_trial_power_dir}//{subj}_power_per_trial_evoked_nozeropad-tfr.h5", power)
+        spectrum = epochs.compute_psd(fmin=2, fmax=40, tmin=-0.4, tmax=0, n_jobs=-1)
+        spec_data = spectrum.get_data()
+
+        np.save(f"D:/expecon_ms/data/eeg/sensor/psd/{subj}_psd.npy", spec_data)
+
+        spectra.append(spectrum)
 
     df = pd.concat(df_all)
-    df.to_csv(f"{behavpath}//prepro_behav_data_after_rejectepochs.csv")
 
-def contrast_conditions(cond='highlow', cond_a='high',
-                        cond_b='low', induced_power=0,
-                        tmin=-1, tmax=0.5):
-    
-    '''calculate the difference between conditions for each subject
-    average across trials and calculate grand average over participants
-    for each frequency and time point. Data is saved to disk as a .h5 file.
-    
-    Parameters
-    ----------
-    cond : str
-        condition to be contrasted
-    cond_a : str
-    cond_b : str
-    induced_power : int
-        1 if induced power should be calculated, 0 if evoked power should be calculated
-    tmin : float
-    tmax : float
-    Returns
-    -------
-    None
-    '''
+    df.to_csv(f"{behavpath}//prepro_behav_data_after_dropbads.csv")
 
-    evokeds_high, evokeds_low = [], []
+    return spectra
 
-    # load behavioral data 
-    # (make sure has the same amount of trials as epochs)
+def extract_band_power():
 
-    data = pd.read_csv(f"{behavpath}//prepro_behav_data_after_rejectepochs.csv")
+    df = [s.metadata for s in spectra]
+    df = pd.concat(df)
 
-    for counter, subj in enumerate(IDlist):
-       
-        # save induced power
-        power_induced_all = []
+    # average over frequency bands and log 10 transform
+    theta_pow = [np.log10(np.mean(s.get_data()[:,:,:2], axis=2)) for s in spectra]
+    alpha_pow = [np.log10(np.mean(s.get_data()[:,:,2:5], axis=2)) for s in spectra]
+    beta_pow = [np.log10(np.mean(s.get_data()[:,:,6:-2], axis=2)) for s in spectra]
+    gamma_pow = [np.log10(np.mean(s.get_data()[:,:,-2:], axis=2)) for s in spectra]
 
-        # skip those participants
-        if subj == '040' or subj == '045' or subj == '032' or subj == '016':
-            continue
+    # extract band power from the power spectrum in channel C4
 
-        power = mne.time_frequency.read_tfrs(f"{tfr_single_trial_power_dir}\\{subj}_power_per_trial_evoked_nozeropad-tfr.h5")[0]
-        
-        # add metadata
-        subj_data = data[data.ID == counter+7]
+    spectra[0].ch_names.index('C4')
+    # extract power for channel C4 only
+    theta_pow = [p[:,22] for p in theta_pow]
+    alpha_pow = [p[:,22] for p in alpha_pow]
+    beta_pow = [p[:,22] for p in beta_pow]
+    gamma_pow = [p[:,22] for p in gamma_pow]
 
-        power.metadata = subj_data
+    # Flatten the list of tuples into one long list
+    theta_pow = [item for sublist in theta_pow for item in sublist]
+    alpha_pow = [item for sublist in alpha_pow for item in sublist]
+    beta_pow = [item for sublist in beta_pow for item in sublist]
+    gamma_pow = [item for sublist in gamma_pow for item in sublist]
 
-        power = power.copy().crop(tmin, tmax)
+    # add band power to dataframe
+    df['theta_pow'] = theta_pow
+    df['alpha_pow'] = alpha_pow
+    df['beta_pow'] = beta_pow
+    df['gamma_pow'] = gamma_pow
 
-        if induced_power == 1:
+    # save dataframe
+    df.to_csv(f"{behavpath}//behav_power_df.csv")
 
-            # subtract evoked response
-            power_evoked = power.average()
+    beta_gr = df.groupby(['ID', 'cue'])['beta_pow'].mean()
+    alpha_gr = df.groupby(['ID', 'cue'])['alpha_pow'].mean()
+    theta_gr = df.groupby(['ID', 'cue'])['theta_pow'].mean()
+    gamma_gr = df.groupby(['ID', 'cue'])['gamma_pow'].mean()
 
-            for epoch in range(power.data.shape[0]):
-                power_trial = power.data[epoch,:,:,:]
-                power_induced = power_trial - power_evoked.data
-                power_induced_all.append(power_induced)
-            
-            power_epochs = np.array(power_induced_all)
+    power_gr = {'theta': theta_gr, 'alpha': alpha_gr, 'beta': beta_gr, 'gamma': gamma_gr}
 
-            # put back into epochs structure
+    for keys, values in power_gr.items():
+        # Extract values for low and high expectation conditions
+        low_expectation = values.loc[:, 0.25]
+        high_expectation = values.loc[:, 0.75]
 
-            power = mne.time_frequency.EpochsTFR(data=power_epochs,
-                                                 info=power.info,
-                                                 times=power.times,
-                                                 freqs=power.freqs,
-                                                 metadata=power.metadata)
+        # Perform paired t-test
+        t_statistic, p_value = scipy.stats.wilcoxon(low_expectation, high_expectation)
 
-        if cond == 'highlow':
-            # get high and low probability trials 
-            power_a = power[((power.metadata.cue == 0.75))]
-            power_b = power[((power.metadata.cue == 0.25))]
-        elif cond == 'prevchoice':
-            # get previous no and previous yes trials
-            power_a = power[(power.metadata.prevsayyes == 1)]
-            power_b = power[(power.metadata.prevsayyes == 0)]
-        elif cond == 'hitmiss':
-            # get hit and miss trials
-            power_a = power[((power.metadata.isyes == 1) &
-                            (power.metadata.sayyes == 1))]
-            power_b = power[((power.metadata.isyes == 1) &
-                            (power.metadata.sayyes == 0))]
-        
-        # average across trials
-        evoked_power_a = power_a.average()
-        evoked_power_b = power_b.average()
+        # Print the t-test results
+        print("Paired t-test results:")
+        print("t-statistic:", t_statistic)
+        print("p-value:", p_value)
 
-        evokeds_high.append(evoked_power_a)
-        evokeds_low.append(evoked_power_b)
+        plt.boxplot([low_expectation, high_expectation], labels=['Low Expectation', 'High Expectation'])
 
-    # Save the list to a file
-    with open(f'{tfr_contrast_dir}//{cond_a}_all_subs_evoked_nzp.pickle', 'wb') as file:
-        pickle.dump(evokeds_high, file)
+        # Set plot title and labels
+        plt.title(f'{keys} Power Comparison')
+        plt.xlabel('Condition')
+        plt.ylabel(f'{keys} Power')
 
-    with open(f'{tfr_contrast_dir}//{cond_b}_all_subs_evoked_nzp.pickle', 'wb') as file:
-        pickle.dump(evokeds_low, file)
+        # Display the plot
+        plt.show()
 
-    return evokeds_high, evokeds_low
 
-def plot_grand_average(cond_a='high', cond_b='low',
-                       tmin=-0.8, tmax=0.2,
-                       channel_names=['CP4', 'C4', 'C6', 'CP6']):
+def visualize_contrasts(cond_a='high', cond_b='low',
+                       tmin=-0.6, tmax=0.6,
+                       channel_names=['C4']):
 
     '''plot the grand average of the difference between conditions
     after loading the contrast data using pickle
@@ -269,63 +240,71 @@ def plot_grand_average(cond_a='high', cond_b='low',
     None
     '''
 
-    # Load the list from the file
-    with open(f'{tfr_contrast_dir}\\'
-              f'{cond_a}_all_subs_evoked_nzp.pickle', 'rb') as file:
-        evokeds_high = pickle.load(file)
+    power_a_all, power_b_all = [], []
 
-    with open(f'{tfr_contrast_dir}\\'
-              f'{cond_b}_all_subs_evoked_nzp.pickle', 'rb') as file:
-        evokeds_low = pickle.load(file)
-
+    # load single trial power
+    for idx, subj in enumerate(IDlist):
         
-    out = figure1.prepare_behav_data()
-        
-    dprime = out[0]
+        # load power
+        power_a = mne.time_frequency.read_tfrs(f"{tfr_single_trial_power_dir}//{subj}_{cond_a}_power_per_trial_induced-tfr.h5")
 
-    crit = out[1]   
+        power_b = mne.time_frequency.read_tfrs(f"{tfr_single_trial_power_dir}//{subj}_{cond_b}_power_per_trial_induced-tfr.h5")
+
+        # average over epochs per condition
+        evoked_a = power_a[0].average()
+        evoked_b = power_b[0].average()
+
+        power_a_all.append(evoked_a)
+        power_b_all.append(evoked_b)
     
-    # baseline correction
-    evokeds_high = [e.apply_baseline((-0.8,-0.6), mode='zscore') for e in evokeds_high]
-    evokeds_low = [e.apply_baseline((-0.8,-0.6), mode='zscore') for e in evokeds_low]
+    # average over participants
+    gra_a = mne.grand_average(power_a_all)
+    gra_b = mne.grand_average(power_b_all)
 
+    diff = gra_a - gra_b
+
+    # load signal detection dataframe
+    out = figure1.prepare_for_plotting()
+        
+    sdt = out[0][0]
+    
     # contrast data
-    contrast_data = np.array([h.crop(tmin,tmax).pick_channels(channel_names).data-l.crop(tmin,tmax).pick_channels(['CP4']).data for h,l in zip (evokeds_high, evokeds_low)])
-    times = evokeds_high[0].times
+    contrast_data = np.array([h.data-l.data for h, l in zip(power_a_all, power_b_all)])
+    times = power_a_all[0].times
 
-    high_data = np.array([h.crop(tmin,tmax).pick_channels(channel_names).data for h in evokeds_high])
-    low_data = np.array([l.crop(tmin,tmax).pick_channels(channel_names).data for l in evokeds_low])
+    high_data = np.array([h.pick_channels(['C4']).data for h in power_a_all])
+    low_data = np.array([l.pick_channels(['C4']).data for l in power_b_all])
 
     # average over alpha band and participants
-    alpha_high = np.mean(high_data[:,:,2:8,:], axis=(0,1,2))
-    alpha_low = np.mean(low_data[:,:,2:8,:], axis=(0,1,2))
+    alpha_high = np.mean(high_data[:,:,1:7,:], axis=(0,1,2))
+    alpha_low = np.mean(low_data[:,:,1:7,:], axis=(0,1,2))
 
-    alpha_high_sub = np.mean(high_data[:,:,2:8,:], axis=(1,2))
-    alpha_low_sub = np.mean(low_data[:,:,2:8,:], axis=(1,2))
+    alpha_high_sub = np.mean(high_data[:,:,1:7,:], axis=(1 ,2))
+    alpha_low_sub = np.mean(low_data[:,:,1:7,:], axis=(1, 2))
 
     diff = alpha_high_sub-alpha_low_sub
     
     t,p,H = mne.stats.permutation_t_test(diff)
 
-    print(f'{times[np.where(p<0.05)]} alpha')
+    print(f'{power_a_all[0].times[np.where(p<0.05)]} alpha')
 
-    alpha_sd_high = np.std(high_data[:,:,2:8,:], axis=(0,1,2))
-    alpha_sd_low = np.std(low_data[:,:,2:8,:], axis=(0,1,2))
+    alpha_sd_high = np.std(high_data[:,:,1:7,:], axis=(0,1,2))
+    alpha_sd_low = np.std(low_data[:,:,1:7,:], axis=(0,1,2))
 
-    beta_high = np.mean(high_data[crit>0,:,14:20,:], axis=(0,1,2))
-    beta_low = np.mean(low_data[crit>0,:,14:20,:], axis=(0,1,2))
+    beta_high = np.mean(high_data[:,:,9:,:], axis=(0,1,2))
+    beta_low = np.mean(low_data[:,:,9:,:], axis=(0,1,2))
 
-    beta_high_sub = np.mean(high_data[:,:,14:20,:], axis=(1,2))
-    beta_low_sub = np.mean(low_data[:,:,14:20,:], axis=(1,2))
+    beta_high_sub = np.mean(high_data[:,:,9:,:], axis=(1,2))
+    beta_low_sub = np.mean(low_data[:,:,9:,:], axis=(1,2))
 
     diff = beta_high_sub-beta_low_sub
 
     t,p,H = mne.stats.permutation_t_test(diff)
 
-    print(f'{times[np.where(p<0.05)]} beta')
+    print(f'{power_a_all[0].times[np.where(p<0.05)]} beta')
 
-    beta_sd_high = np.std(high_data[:,:,2:8,:], axis=(0,1,2))
-    beta_sd_low = np.std(low_data[:,:,2:8,:], axis=(0,1,2))
+    beta_sd_high = np.std(high_data[:,:,12:16,:], axis=(0,1,2))
+    beta_sd_low = np.std(low_data[:,:,12:16,:], axis=(0,1,2))
 
     plt.plot(np.linspace(tmin, tmax, alpha_high.shape[0]), alpha_high, label='alpha 0.75')
     plt.plot(np.linspace(tmin, tmax, alpha_high.shape[0]), alpha_low, label='alpha 0.25')
@@ -353,26 +332,22 @@ def plot_grand_average(cond_a='high', cond_b='low',
                                           info=evokeds_high[0].info)
     X_tfr.crop(-0.5,0).plot(picks=['CP4'])
 
-    high_gra = mne.grand_average(evokeds_high)
-    low_gra = mne.grand_average(evokeds_low)
+    topo = gra_a.plot_topo()
+    topo = gra_b.plot_topo()
 
-    topo = high_gra.plot_topo()
-    topo = low_gra.plot_topo()
-
-    tfr = high_gra.plot(picks=channel_names, combine='mean')[0]
+    tfr = gra_a.plot(picks=channel_names, combine='mean')[0]
     tfr = low_gra.plot(picks=channel_names, combine='mean')[0]
 
-    diff = high_gra - low_gra
-
-    diff.crop(-0.8,0.3).plot(picks=channel_names,
+    topo = diff.plot_topo()
+    tfr = diff.copy().crop(-1,0).plot(picks=channel_names,
                                   combine='mean')[0]
 
     topo.savefig(f'{savedir_figure4}//{cond}_topo.svg')
     
-    tfr.savefig(f'{savedir_figure4}//{cond}_tfr.svg')
+    tfr.savefig(f'{savedir_figure4}//{cond}_baseline_tfr.svg')
 
 
-def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6'],
+def run_2D_cluster_perm_test(channel_names=['C4'],
                              n_perm=10000):
     
     '''run a 2D cluster permutation test on the difference between conditions
@@ -387,12 +362,12 @@ def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6'],
     None
     '''
 
-    contrast_data = np.array([h.crop(tmin,tmax).data-l.crop(tmin,tmax).data for h,l in zip (evokeds_high, evokeds_low)])
+    contrast_data = np.array([h.crop(tmin,tmax).data-l.crop(tmin,tmax).data for h,l in zip (power_a_all, power_b_all)])
 
     spec_channel_list = []
 
     for i, channel in enumerate(channel_names):
-        spec_channel_list.append(evokeds_high[15].ch_names.index(channel))
+        spec_channel_list.append(power_a_all[18].ch_names.index(channel))
     spec_channel_list
 
     mean_over_channels = np.mean(contrast_data[:, spec_channel_list, :, :], axis=1)
@@ -403,9 +378,7 @@ def run_2D_cluster_perm_test(channel_names=['CP4', 'CP6', 'C4', 'C6'],
                             mean_over_channels,
                             n_jobs=-1,
                             n_permutations=n_perm,
-                            threshold=threshold_tfce,
-                            tail=0, 
-                            seed=1234)
+                            tail=0)
     
     print(f'The minimum p-value is {min(cluster_p_values)}')
     
@@ -439,7 +412,7 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
     
     # add time on the x axis 
     x = np.linspace(tmin, tmax, mean_over_channels.shape[2])
-    y = np.arange(6, 35, 1)
+    y = np.arange(6, 36, 1)
 
     # Plot the original image
     fig = plt.imshow(T_obs, origin='lower',
@@ -447,11 +420,6 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
                      aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
     plt.colorbar()
 
-    # Plot the masked image on top with lower transparency
-    fig = plt.imshow(masked_img, origin='lower', alpha=0.7, 
-                     extent=[x[0], x[-1], y[0], y[-1]],
-                     aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
-    
     # Add x and y labels
     plt.xlabel('Time (s)')
     plt.ylabel('Freq (Hz)')
@@ -464,17 +432,23 @@ def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
     # Show the plot
     plt.show()
 
+        # Plot the masked image on top with lower transparency
+    fig = plt.imshow(masked_img, origin='lower', alpha=0.7, 
+                     extent=[x[0], x[-1], y[0], y[-1]],
+                     aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
+    
+
 # Works but now nice plotting implemented yet, potentially also overkill
 # to run 3D cluster permutation test
 
 def run_3D_cluster_perm_test(contrast_data=None):
 
-    X = np.array([d.crop(-0.5, 0).data for d in contrast_data])
+    X = np.array([d.data for d in contrast_data])
 
     # run 3D cluster permutation test
     # definde adjaceny matrix for cluster permutation test
    
-    ch_adjacency = mne.channels.find_ch_adjacency(contrast_data[0].info,
+    ch_adjacency = mne.channels.find_ch_adjacency(evokeds_high[0].info,
                                                   ch_type='eeg')
     # frequency, time and channel adjacency
     com_adjacency = mne.stats.combine_adjacency(X.shape[2],
@@ -499,14 +473,15 @@ def run_cluster_correlation_2D(cond='lowhigh', channel_names=['CP4', 'CP6', 'C4'
     # load behavioral data
     df = pd.read_csv(f"{behavpath}//prepro_behav_data.csv")
 
-    out = figure1.prepare_behav_data(exclude_high_fa=False)
-
     # low - high exp. condition
 
-    crit = out[0]
+    crit_diff = np.array(sdt.criterion[sdt.cue == 0.75]) - np.array(sdt.criterion[sdt.cue == 0.25])
 
-    dprime = out[1]
+    d_diff = np.array(sdt.dprime[sdt.cue == 0.75]) - np.array(sdt.dprime[sdt.cue == 0.25])
 
+    # load random effects from glmmer model
+    re = pd.read_csv("D:\expecon_ms\data\\behav\mixed_models\\brms\\brms_betaweights.csv")
+    
     # Load the contrast list from disk
 
     with open(f'{tfr_contrast_dir}\\'
@@ -522,7 +497,7 @@ def run_cluster_correlation_2D(cond='lowhigh', channel_names=['CP4', 'CP6', 'C4'
     mean_over_channels = np.mean(contrast_data[:, spec_channel_list, :, :], axis=1)
 
     out = cluster_correlation.permutation_cluster_correlation_test(mean_over_channels, 
-                                                             crit, threshold=0.05, 
+                                                             d_diff, threshold=0.05, 
                                                              test='pearson')
 
 ########################################################## Helper functions
@@ -588,3 +563,100 @@ def permutate_trials(n_permutations=500, power_a=None, power_b=None):
                                                         power.times, power.freqs, power_a.data.shape[0])
     evoked_power_b = mne.time_frequency.AverageTFR(power.info, evoked_power_b_perm_arr, 
                                                         power.times, power.freqs, power_b.data.shape[0])
+
+
+
+def contrast_conditions(cond='highlow', cond_a='high',
+                        cond_b='low', induced_power=0,
+                        tmin=-1, tmax=1):
+    
+    '''calculate the difference between conditions for each subject
+    average across trials and calculate grand average over participants
+    for each frequency and time point. Data is saved to disk as a .h5 file.
+    
+    Parameters
+    ----------
+    cond : str
+        condition to be contrasted
+    cond_a : str
+    cond_b : str
+    induced_power : int
+        1 if induced power should be calculated, 0 if evoked power should be calculated
+    tmin : float
+    tmax : float
+    Returns
+    -------
+    None
+    '''
+
+    evokeds_high, evokeds_low = [], []
+
+    # load behavioral data 
+    # (make sure has the same amount of trials as epochs)
+
+    data = pd.read_csv(f"{behavpath}//prepro_behav_data_after_dropbads.csv")
+
+    for counter, subj in enumerate(IDlist):
+       
+        # save induced power
+        power_induced_all = []
+
+        power = mne.time_frequency.read_tfrs(f"{tfr_single_trial_power_dir}//{subj}_power_per_trial_induced-tfr.h5")[0]
+        
+        # add metadata
+        subj_data = data[data.ID == counter+7]
+
+        power.metadata = subj_data
+
+        power = power.copy().crop(tmin, tmax)
+
+        if induced_power:
+
+            # subtract evoked response
+            power_evoked = power.average()
+
+            for epoch in range(power.data.shape[0]):
+                power_trial = power.data[epoch,:,:,:]
+                power_induced = power_trial - power_evoked.data
+                power_induced_all.append(power_induced)
+            
+            power_epochs = np.array(power_induced_all)
+
+            # put back into epochs structure
+
+            power = mne.time_frequency.EpochsTFR(data=power_epochs,
+                                                 info=power.info,
+                                                 times=power.times,
+                                                 freqs=power.freqs,
+                                                 metadata=power.metadata)
+
+        if cond == 'highlow':
+            # get high and low probability trials 
+            power_a = power[(power.metadata.cue == 0.75)]
+            power_b = power[((power.metadata.cue == 0.25))]
+        elif cond == 'prevchoice':
+            # get previous no and previous yes trials
+            power_a = power[(power.metadata.prevsayyes == 1)]
+            power_b = power[(power.metadata.prevsayyes == 0)]
+        elif cond == 'hitmiss':
+            # get hit and miss trials
+            power_a = power[((power.metadata.isyes == 1) &
+                            (power.metadata.sayyes == 1))]
+            power_b = power[((power.metadata.isyes == 1) &
+                            (power.metadata.sayyes == 0))]
+        
+        # average across trials
+        evoked_power_a = power_a.average()
+        evoked_power_b = power_b.average()
+
+        evokeds_high.append(evoked_power_a)
+        evokeds_low.append(evoked_power_b)
+
+    # Save the list to a file
+    with open(f'{tfr_contrast_dir}//{cond_a}_all_subs_induced.pickle', 'wb') as file:
+        pickle.dump(evokeds_high, file)
+
+    with open(f'{tfr_contrast_dir}//{cond_b}_all_subs_induced.pickle', 'wb') as file:
+        pickle.dump(evokeds_low, file)
+
+    return evokeds_high, evokeds_low
