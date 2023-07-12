@@ -13,6 +13,7 @@ import scipy
 
 # Import the FOOOF object
 from fooof import FOOOF
+from fooof import FOOOFGroup
 
 # Import utility, and plotting tools
 from fooof.bands import Bands
@@ -26,10 +27,6 @@ sys.path.append('D:\\expecon_ms\\analysis_code')
 
 from behav import figure1
 
-# Define our frequency bands of interest
-bands = Bands({'alpha' : [7, 13],
-               'beta' : [15, 25]})
-
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '017', '018', '019', '020', '021','022', '023', '024', '025', '026',
@@ -38,11 +35,13 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '047', '048', '049')
 
 dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs_iclabel"
-behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
+behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df'
 laplace=0
-induced_power=1
+subtract_evoked=1
 
-psd_all = []
+psd_a_all, psd_b_all = [], []
+fmin = 1
+fmax = 40
 
 reject_criteria=dict(eeg=200e-6)
 flat_criteria=dict(eeg=1e-6)
@@ -96,64 +95,57 @@ for idx, subj in enumerate(IDlist):
             epochs.metadata = subj_data
 
         # drop bad epochs
-        epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
+        #epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
 
-        if induced_power:
-            # subtract evoked response
-            epochs = epochs.subtract_evoked()
+        epochs_a = epochs[(epochs.metadata.cue == 0.75)]
+        epochs_b = epochs[(epochs.metadata.cue == 0.25)]
+
+        if subtract_evoked:
+            epochs_a = epochs_a.subtract_evoked()
+            epochs_b = epochs_b.subtract_evoked()
 
         # calculate PSD per epoch (inherits metadata from epochs)
-        psd = epochs.compute_psd(fmin=3, fmax=40, tmin=-0.4, tmax=0)
+        psd_a= epochs_a.compute_psd(fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax)
+        psd_b= epochs_b.compute_psd(fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax)
 
-        psd_all.append(psd)
+        psd_a_all.append(psd_a)
+        psd_b_all.append(psd_b)
 
 # save freqs
-freqs = psd_all[0].freqs
+freqs = psd_a_all[0].freqs
 
 # contrast conditions and average over epochs
-psd_a_all = []
-psd_b_all = []
+psd_evoked_a, psd_evoked_b = [], []
 
-for psd in psd_all:
+for psd_a, psd_b in zip(psd_a_all, psd_b_all):
         
-        # get high and low probability trials 
-        psd_a = psd[((psd.metadata.cue == 0.75))]
-        psd_b = psd[((psd.metadata.cue == 0.25))]
-
-        #psd_a = psd[((psd.metadata.isyes == 1) & (psd.metadata.sayyes == 1))]
-        #psd_b = psd[((psd.metadata.isyes == 1) & (psd.metadata.sayyes == 0))]
-
         evoked_psd_a = psd_a.average()
         evoked_psd_b = psd_b.average()
 
-        psd_a_all.append(evoked_psd_a)
-        psd_b_all.append(evoked_psd_b)
+        psd_evoked_a.append(evoked_psd_a)
+        psd_evoked_b.append(evoked_psd_b)
 
-# prepare for fooof (channel = C4)
-psd_a = np.array([np.squeeze(psd[24,:]) for psd in psd_a_all])
-psd_b = np.array([np.squeeze(psd[24,:]) for psd in psd_b_all])
+# prepare for fooof (channel = C4 = index 24)
+psd_a = np.array([np.squeeze(psd[24, :]) for psd in psd_evoked_a])
+psd_b = np.array([np.squeeze(psd[24, :]) for psd in psd_evoked_b])
 
 # plot an example PSD
-
-plt.plot(freqs, np.log10(psd_a[25]), label='High')
-plt.plot(freqs, np.log10(psd_b[25]), label= 'Low')
+plt.plot(freqs, np.log10(psd_a[25]), label='0.75')
+plt.plot(freqs, np.log10(psd_b[25]), label='0.25')
 plt.legend()
 plt.savefig('D:\\expecon_ms\\figs\\manuscript_figures\\Figure5\\example_psd.svg',
              dpi=300)
 
 # Define plot settings
-t_settings = {'fontsize' : 24, 'fontweight' : 'bold'}
+t_settings = {'fontsize': 24, 'fontweight': 'bold'}
 shade_cols = ['#e8dc35', '#46b870', '#1882d9', '#a218d9', '#e60026']
-labels = ['Group-1', 'Group-2']
-
-# General simulation settings
-f_range = [1, 50]
-nlv = 0
+labels = ['0.75', '0.25']
 
 # Define some template strings for reporting
 exp_template = "The difference of aperiodic exponent is: \t {:1.2f}"
 pw_template = ("The difference of {:5} power is  {: 1.2f}\t"
                "with peaks or  {: 1.2f}\t with bands.")
+
 
 def compare_exp(fm1, fm2):
     """Compare exponent values."""
@@ -163,6 +155,7 @@ def compare_exp(fm1, fm2):
 
     return exp1 - exp2
 
+
 def compare_peak_pw(fm1, fm2, band_def):
     """Compare the power of detected peaks."""
 
@@ -171,6 +164,7 @@ def compare_peak_pw(fm1, fm2, band_def):
 
     return pw1 - pw2
 
+
 def compare_band_pw(fm1, fm2, band_def):
     """Compare the power of frequency band ranges."""
 
@@ -178,6 +172,7 @@ def compare_band_pw(fm1, fm2, band_def):
     pw2 = np.mean(trim_spectrum(fm1.freqs, fm2.power_spectrum, band_def)[1])
 
     return pw1 - pw2
+
 
 def calc_fooof(psd_array=psd_a, fmin=3, fmax=40, freqs=freqs):
     
@@ -241,6 +236,10 @@ plt.xlim(f_range)
 plt.title('Band-by-Band - Flattened', t_settings)
 
 
+# Define our frequency bands of interest
+bands = Bands({'alpha' : [7, 13],
+               'beta' : [15, 30]})
+
 diff_all_subs_pow, diff_all_subs_peaks = [], []
 
 for idx, subj in enumerate(IDlist):
@@ -259,9 +258,9 @@ for idx, subj in enumerate(IDlist):
 scipy.stats.wilcoxon(np.array(diff_all_subs_pow)[:, 0])
 scipy.stats.wilcoxon(np.array(diff_all_subs_pow)[:, 1])
 
-# compare alpha peak frequencies and power
-scipy.stats.wilcoxon(fpeaks_high, fpeaks_low, nan_policy='omit') # n.s.
-scipy.stats.wilcoxon(power_high, power_low, nan_policy='omit') # n.s.
+
+scipy.stats.wilcoxon(np.array(diff_all_subs_peaks)[:, 0], nan_policy='omit')
+scipy.stats.wilcoxon(np.array(diff_all_subs_peaks)[:, 1], nan_policy='omit')
 
 # subtract 1/f slope and offset from power spectra
 
