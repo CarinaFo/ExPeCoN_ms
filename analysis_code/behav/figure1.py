@@ -586,7 +586,8 @@ def plot_figure1_grid(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\F
         conf_ax.plot([1, 2], [conf_con[0].iloc[index, 1], 
                              conf_con[1].iloc[index, 1]],
                      marker='', markersize=0, color='gray', alpha=.25)
-
+        
+    conf_ax .set_ylabel('high confidence', fontname="Arial", fontsize=14)
     conf_box = conf_ax.boxplot([conf_con[0].iloc[:, 1], conf_con[1].iloc[:, 1]],
                                patch_artist=True)
     
@@ -637,7 +638,7 @@ def calc_stats():
 
     """ Calculate statistics and effect sizes for the behavioral data."""
 
-    conditions,_ = prepare_for_plotting()
+    conditions,_ = prepare_for_plotting(exclude_high_fa=True)
 
     # only for dprime, crit, hitrate, farate and confidence congruency
     df_sdt = conditions[0]
@@ -728,7 +729,7 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     return ci_lower, ci_upper
 
 
-def supplementary_plots(data=None, savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\Figure1\\',
+def supplementary_plots(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\Figure1\\',
                         exclude_high_fa=False):
 
     # set colors for both conditions
@@ -738,9 +739,12 @@ def supplementary_plots(data=None, savepath_fig1='D:\\expecon_ms\\figs\\manuscri
     colors = [blue, red]
     medcolor = ['black', 'black']
 
+    # load data
+    conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=False)
+
     # unpack data
     df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, \
-    rt_con_yes, rt_con_incorrect = data
+    rt_con_yes, rt_con_incorrect = conditions
 
     # save accuracy and confidence for both conditions
     for index in range(len(acc_cue[0])):
