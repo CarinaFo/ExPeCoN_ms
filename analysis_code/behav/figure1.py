@@ -248,44 +248,44 @@ def prepare_for_plotting(exclude_high_fa=False):
 
     # Calculate mean confidence for each participant and congruency condition
     data_grouped = correct_only.groupby(['ID', 'congruency']).mean()['conf']
-    con_condition = data_grouped.unstack()[1].reset_index()
-    incon_condition = data_grouped.unstack()[0].reset_index()
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
     conf_con = [con_condition, incon_condition]
 
     # Calculate mean confidence for each participant and congruency condition
     data_grouped = yes_response.groupby(['ID', 'congruency']).mean()['conf']
-    con_condition = data_grouped.unstack()[1].reset_index()
-    incon_condition = data_grouped.unstack()[0].reset_index()
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
     conf_con_yes = [con_condition, incon_condition]
 
     # Calculate mean confidence for each participant and congruency condition
     data_grouped = no_response.groupby(['ID', 'congruency']).mean()['conf']
-    con_condition = data_grouped.unstack()[1].reset_index()
-    incon_condition = data_grouped.unstack()[0].reset_index()
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
     conf_con_no = [con_condition, incon_condition]
 
     # Calculate mean rts for each participant and congruency condition
     data_grouped = correct_only.groupby(['ID', 'congruency_stim']).mean()['respt1']
-    con_condition = data_grouped.unstack()[1].reset_index()
-    incon_condition = data_grouped.unstack()[0].reset_index()
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
     rt_con = [con_condition, incon_condition]
 
     # Calculate mean rts for each participant and congruency condition
     data_grouped = incorrect_only.groupby(['ID', 'congruency_stim']).mean()['respt1']
-    con_condition = data_grouped.unstack()[1].reset_index()
-    incon_condition = data_grouped.unstack()[0].reset_index()
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
     rt_con_incorrect = [con_condition, incon_condition]
 
     # Calculate mean rts for each participant and congruency condition
     data_grouped = yes_response.groupby(['ID', 'congruency_stim']).mean()['respt1']
-    con_condition = data_grouped.unstack()[1].reset_index()
-    incon_condition = data_grouped.unstack()[0].reset_index()
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
     rt_con_yes = [con_condition, incon_condition]
 
     # Calculate mean rts for each participant and congruency condition
     data_grouped = no_response.groupby(['ID', 'congruency_stim']).mean()['respt1']
-    con_condition = data_grouped.unstack()[1].reset_index()
-    incon_condition = data_grouped.unstack()[0].reset_index()
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
     rt_con_no = [con_condition, incon_condition]
 
     # Calculate mean accuracy for each participant and cue condition
