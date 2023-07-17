@@ -32,6 +32,7 @@ library(data.table) # for shift function
 library(sjPlot)
 library(ggplot2)
 library(htmlTable)
+library(emmeans)
 
 # Set the font family and size
 
@@ -268,8 +269,10 @@ cue_prev_int_model = glmer(sayyes ~ isyes + prevsayyes + cue + prevsayyes*cue + 
                            optCtrl=list(maxfun=2e5)),
 )
 
-emmeans::emmeans(cue_prev_int_model, ~ cue * isyes)
+emmeans::emmeans(cue_prev_int_model, pairwise ~ cue * prevsayyes)
 
+# Print the post hoc comparisons with adjusted p-values
+print(interaction_comparisons, adjust = "holm")
 check_collinearity(cue_prev_int_model)
 check_convergence(cue_prev_int_model)
 
@@ -338,7 +341,8 @@ cue_prev_int_model_signal = glmer(sayyes ~ prevsayyes + cue + prevsayyes*cue +
                                                 optCtrl=list(maxfun=2e5)),
 )
 
-emmeans::emmeans(cue_prev_int_model_signal, ~ cue * prevsayyes)
+emmeans::emmeans(cue_prev_int_model_signal, pairwise ~ cue * prevsayyes)
+
 
 check_collinearity(cue_prev_int_model_signal)
 check_convergence(cue_prev_int_model_signal)
@@ -356,7 +360,6 @@ cue_prev_int_model_noise = glmer(sayyes ~ prevsayyes + cue + prevsayyes*cue +
                                   control=glmerControl(optimizer="bobyqa",
                                                        optCtrl=list(maxfun=2e5)),
 )
-
 
 emmeans::emmeans(cue_prev_int_model_noise, ~ cue * prevsayyes)
 
