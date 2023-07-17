@@ -12,22 +12,31 @@
 # cluster_perm_space_time: runs a cluster permutation test over electrodes and timepoints
 # in sensor space and plots the output and saves it
 
+import os
+import sys
+
+import matplotlib.pyplot as plt
 import mne
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
-import os
 import pandas as pd
+import scipy
+import seaborn as sns
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+
+# add path to sys.path.append() if package isn't found
+sys.path.append('D:\\expecon_ms\\analysis_code')
+
+from behav import figure1
 
 # set font to Arial and font size to 14
 plt.rcParams.update({'font.size': 14, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
 
 # set paths
-dir_cleanepochs = r'D:\\expecon_ms\data\eeg\prepro_ica\\clean_epochs_iclabel'
+dir_cleanepochs = r'D:\expecon_ms\data\eeg\prepro_ica\clean_epochs_iclabel'
 behavpath = r'D:\expecon_ms\data\behav\behav_df'
 
 # save cluster figures as svg and png files
-save_dir_cluster_output = r"D:\expecon_ms\figs\manuscript_figures\Figure4_evokeds"
+save_dir_cluster_output = r"D:\expecon_ms\figs\manuscript_figures\Figure3"
 
 # participant index
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
@@ -35,10 +44,10 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
 
 
-def create_contrast(cond='highlow', cond_a='high',
-                    cond_b='low', fmin=7, fmax=13, 
+def create_contrast(cond='highlow', cond_a='0.75',
+                    cond_b='0.25', fmin=15, fmax=30,
                     envelope=False,
-                    laplace=False,
+                    laplace=True,
                     subtract_evoked=False,
                     save_drop_log=False,
                     reject_criteria=dict(eeg=200e-6),
@@ -123,6 +132,9 @@ def create_contrast(cond='highlow', cond_a='high',
 
             plt.savefig(f'D:\expecon_ms\data\eeg\prepro_ica\droplog\P{subj}_drop_log.png', dpi=300)
 
+        if subtract_evoked:
+            epochs.subtract_evoked()
+
         if laplace:
             epochs = mne.preprocessing.compute_current_source_density(epochs)
 
@@ -158,28 +170,23 @@ def create_contrast(cond='highlow', cond_a='high',
             epochs.apply_hilbert(envelope=True)
             epochs_all.append(epochs)
 
-        if cond != 'all_epochs':
-            if subtract_evoked:
-                epochs_a = epochs_a.subtract_evoked()
-                epochs_b = epochs_b.subtract_evoked()
+        if envelope:
+            # apply broadband filter
+            epochs_a = epochs_a.filter(fmin, fmax)       
+            epochs_b = epochs_b.filter(fmin, fmax)
 
-            if envelope:
-                # apply broadband filter
-                epochs_a = epochs_a.filter(fmin, fmax)       
-                epochs_b = epochs_b.filter(fmin, fmax)
+            # get analytic signal (envelope)
+            epochs_a.apply_hilbert(envelope=True)
+            epochs_b.apply_hilbert(envelope=True)
 
-                # get analytic signal (envelope)
-                epochs_a.apply_hilbert(envelope=True)
-                epochs_b.apply_hilbert(envelope=True)
+        mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
-            mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
+        # average and crop in prestimulus window
+        evokeds_a = epochs_a.average()
+        evokeds_b = epochs_b.average()
 
-            # average and crop in prestimulus window
-            evokeds_a = epochs_a.average()
-            evokeds_b = epochs_b.average()
-
-            evokeds_a_all.append(evokeds_a)
-            evokeds_b_all.append(evokeds_b)
+        evokeds_a_all.append(evokeds_a)
+        evokeds_b_all.append(evokeds_b)
         
         # save trial number and trials removed to csv file
         pd.DataFrame(trials_removed).to_csv(f'D:\expecon_ms\data\eeg\prepro_ica\droplog\\trials_removed.csv')
@@ -187,55 +194,28 @@ def create_contrast(cond='highlow', cond_a='high',
 
     return evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b, perc, cond
 
+def cluster_perm_space_time_plot(tmin=0, tmax=1, channel=['C4']):
 
-def compute_psd():
-
-    tmin = -1
-    tmax = -0.1
-    fmin = 7
-    fmax = 30
-
-    # compute PSD of evoked data
-    high_psd = [a.compute_psd(fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax, n_jobs=-1).get_data() for a in evokeds_a_all]
-    low_psd = [a.compute_psd(fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax, n_jobs=-1).get_data() for a in evokeds_b_all]
-
-    # convert to array
-    high_psd = np.array(high_psd)
-    low_psd = np.array(low_psd)
-
-    # extract PSD for C4 electrode
-    high_psd = high_psd[:, 22, :]
-    low_psd = low_psd[:, 22, :]
-
-    spectrum = evokeds_a_all[0].compute_psd(fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax, n_jobs=-1)
-    freqs = spectrum.freqs
-
-
-    plt.plot(freqs, np.log10(np.mean(high_psd, axis=0)), label='0.75')
-    plt.plot(freqs, np.log10(np.mean(low_psd, axis=0)), label='0.25')
-    plt.legend()
-    plt.xlabel('Freq (Hz)')
-    plt.ylabel('Power (log10)')
-
-
-
-def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
-
-    evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b, perc = create_contrast()
+    evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b, perc , cond = create_contrast()
 
     # get grand average over all subjects for plotting the results later
     
     a = [ax.copy().crop(tmin, tmax) for ax in evokeds_a_all]
     b = [bx.copy().crop(tmin, tmax) for bx in evokeds_b_all]
 
-    a = [ax.copy().pick_channels(['C4']).crop(tmin, tmax) for ax in evokeds_a_all]
-    b = [bx.copy().pick_channels(['C4']).crop(tmin, tmax) for bx in evokeds_b_all]
+    if tmax <= 0:
+        a = [ax.copy().pick_channels(channel).crop(tmin, tmax) for ax in evokeds_a_all]
+        b = [bx.copy().pick_channels(channel).crop(tmin, tmax) for bx in evokeds_b_all]
+    else:
+        a = [ax.copy().pick_channels(channel).crop(tmin, tmax).apply_baseline((-0.1,0)) for ax in evokeds_a_all]
+        b = [bx.copy().pick_channels(channel).crop(tmin, tmax).apply_baseline((-0.1,0)) for bx in evokeds_b_all]
 
     a_gra = mne.grand_average(a)
     b_gra = mne.grand_average(b)
 
-    fig = mne.viz.plot_compare_evokeds({'high': a_gra, 'low': b_gra}, combine='mean', picks=['C4'], show_sensors=True)
-    fig[0].savefig(f'D:\expecon_ms\\figs\manuscript_figures\Figure4_evokeds\{cond}.svg')
+    fig = mne.viz.plot_compare_evokeds({cond_a: a, cond_b: b}, combine='mean', picks=channel, show_sensors=False,
+                                       colors = ['#21918c', '#440154'])
+    fig[0].savefig(f'D:\expecon_ms\\figs\manuscript_figures\Figure3\{cond}.svg')
 
     diff = mne.combine_evoked([a_gra,b_gra], weights=[1,-1])
     topo = diff.plot_topo()
@@ -245,12 +225,13 @@ def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
 
     X = np.transpose(X, [0, 2, 1]) # channels should be last dimension
 
-    # load cleaned epochs
+    # load example epoch to extract channel adjacency matrix
     subj='007'
     epochs = mne.read_epochs(f"{dir_cleanepochs}/P{subj}_epochs_after_ic-label-epo.fif")
 
     ch_adjacency,_ = mne.channels.find_ch_adjacency(epochs.info, ch_type='eeg')
 
+    # threshold free cluster enhancement
     threshold_tfce = dict(start=0, step=0.01)
 
     # 2D cluster test
@@ -259,26 +240,141 @@ def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
                                                                                     tail=0, 
                                                                                     n_jobs=-1)
     
-    good_cluster_inds = np.where(cluster_p_values < 0.05) # times where something significant happened
-
-    print(len(good_cluster_inds))
-    print(cluster_p_values) # 1D cluster test
+    good_cluster_inds = np.where(cluster_p_values < 0.05)[0] # times where something significant happened
+    min(cluster_p_values)
+    print(cluster_p_values) 
+    
+    # 1D cluster test
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(np.squeeze(X[:,:,:]), n_permutations=10000,
                                                                                     tail=0, n_jobs=-1
                                                                                     )
 
-   
+    good_cluster_inds = np.where(cluster_p_values < 0.05)[0] # times where something significant happened
+    print(good_cluster_inds)
+    min(cluster_p_values)
+    print(cluster_p_values)
+
+    # load signal detection dataframe
+    out = figure1.prepare_for_plotting()
+        
+    sdt = out[0][0]
+
+    crit_diff = np.array(sdt.criterion[sdt.cue == 0.75]) - np.array(sdt.criterion[sdt.cue == 0.25])
+
+    d_diff = np.array(sdt.dprime[sdt.cue == 0.75]) - np.array(sdt.dprime[sdt.cue == 0.25])
+
+    # load brms beta weights
+    df = pd.read_csv(r"D:\expecon_ms\data\behav\behav_df\brms_betaweights.csv")
+
+    # average over significant timepoints
+    X_time = np.mean(X[:,np.unique(clusters[4][0]),:], axis=1)
+    # average over significant channels
+    X_timechannel = np.mean(X_time[:,np.unique(clusters[4][1])], axis=1)
+
+    # correlate with cluster
+    scipy.stats.pearsonr(crit_diff, df.cue)
+    x = X
+    y = df.cue
+
+    sns.regplot(x = x, y = y, fit_reg=True)
+
+    # Fit the linear regression model using statsmodels
+    model = sm.OLS(y, sm.add_constant(x))
+    results = model.fit()
+
+    # Extract the regression weights
+    intercept = results.params[0]
+    slope = results.params[1]
+
+    # Plot the regression line
+    plt.plot(x, intercept + slope * x, color='red')
+    plt.savefig(f'D:\expecon_ms\\figs\manuscript_figures\Figure3\\regplot.svg')
+    # Show the plot
+    plt.show()
 
     # now plot the significant cluster(s)
-    a = cond_a
-    b= cond_b
 
     # configure variables for visualization
-    colors = {a: "#ff2a2aff", b: '#2a95ffff'}
+    colors = {cond_a: "#ff2a2aff", cond_b: '#2a95ffff'}
 
     # organize data for plotting
     # instead of grand average we could use the evoked data per subject so that we can plot CIs
-    grand_average = {a: a_gra, b: b_gra}
+    grand_average = {cond_a: a, cond_b: b}
+
+        # loop over clusters
+    for i_clu, clu_idx in enumerate(good_cluster_inds):
+        # unpack cluster information, get unique indices
+        time_inds, space_inds = np.squeeze(clusters[clu_idx])
+        ch_inds = np.unique(space_inds)
+        time_inds = np.unique(time_inds)
+
+        # get topography for F stat
+        t_map = T_obs[time_inds, ...].mean(axis=0)
+
+        # get signals at the sensors contributing to the cluster
+        sig_times = a_gra.times[time_inds]
+
+        # create spatial mask
+        mask = np.zeros((t_map.shape[0], 1), dtype=bool)
+        mask[ch_inds, :] = True
+
+        # initialize figure
+        fig, ax_topo = plt.subplots(1, 1, figsize=(10, 3))
+
+        # plot average test statistic and mark significant sensors
+        f_evoked = mne.EvokedArray(t_map[:, np.newaxis], a_gra.info, tmin=0)
+        f_evoked.plot_topomap(
+            times=0,
+            mask=mask,
+            axes=ax_topo,
+            show=False,
+            colorbar=False,
+            mask_params=dict(markersize=10),
+        )
+        image = ax_topo.images[0]
+
+        # remove the title that would otherwise say "0.000 s"
+        ax_topo.set_title("")
+
+        # create additional axes (for ERF and colorbar)
+        divider = make_axes_locatable(ax_topo)
+
+        # add axes for colorbar
+        ax_colorbar = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(image, cax=ax_colorbar)
+        ax_topo.set_xlabel(
+            "Averaged t-map ({:0.3f} - {:0.3f} s)".format(*sig_times[[0, -1]])
+        )
+
+        # add new axis for time courses and plot time courses
+        ax_signals = divider.append_axes("right", size="300%", pad=1.2)
+        title = "Cluster #{0}, {1} sensor".format(i_clu + 1, len(ch_inds))
+        if len(ch_inds) > 1:
+            title += "s (mean)"
+
+        mne.viz.plot_compare_evokeds(
+            grand_average,
+            title=title,
+            picks=ch_inds, 
+            combine='mean',
+            axes=ax_signals,
+            colors=colors,
+            show=False,
+            split_legend=True,
+            truncate_yaxis="auto",
+        )
+
+        # plot temporal cluster extent
+        ymin, ymax = ax_signals.get_ylim()
+        ax_signals.fill_betweenx(
+            (ymin, ymax), sig_times[0], sig_times[-1], color="orange", alpha=0.3
+        )
+
+        # clean up viz
+        mne.viz.tight_layout(fig=fig)
+        fig.subplots_adjust(bottom=0.05)
+        plt.show()
+
 
     # # loop over clusters
     for i_clu, clu_idx in enumerate(good_cluster_inds):
@@ -303,9 +399,10 @@ def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
         # plot average test statistic and mark significant sensors
         t_evoked = mne.EvokedArray(t_map[:, np.newaxis], a_gra.info, tmin=0)
 
-        t_evoked.plot_topomap(times=0, mask=mask, axes=ax_topo,
+        t_evoked.plot_topomap(times=0, mask=mask, 
                             show=False,
-                                colorbar=False, mask_params=dict(markersize=10))
+                            colorbar=False, mask_params=dict(markersize=10),
+                            vlim=(np.min, np.max))
         image = ax_topo.images[0]
 
         # create additional axes (for ERF and colorbar)
@@ -334,5 +431,5 @@ def cluster_perm_space_time_plot(perm=10000, contrast='signalnoise'):
         # clean up viz
         mne.viz.tight_layout(fig=fig)
         fig.subplots_adjust(bottom=.05)
-        plt.savefig(f'D:\\expecon_ms\\figs\\manuscript_figures\\Figure4_evokeds\\cluster_{cond}_prev_{str(i_clu)}_.svg')
+        plt.savefig(f'D:\\expecon_ms\\figs\\manuscript_figures\\Figure3\\{cond}_{str(clu_idx)}_prestim_.svg')
         plt.show()
