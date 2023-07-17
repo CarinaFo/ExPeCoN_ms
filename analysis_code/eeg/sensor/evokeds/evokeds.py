@@ -2,15 +2,10 @@
 
 
 # Author: Carina Forster
-# Date: 2023-04-03
+# Date: 2023-07-17
 
-# This script plots grand average evoked responses for high and low cue conditions
-# and runs a paired ttest between the two conditions with a cluster based permutation test
-# to correct for multiple comparisons
+# This script plots evoked responses for two conditions and runs permutation test statistics
 
-# Functions used:
-# cluster_perm_space_time: runs a cluster permutation test over electrodes and timepoints
-# in sensor space and plots the output and saves it
 
 import os
 import sys
@@ -21,6 +16,7 @@ import numpy as np
 import pandas as pd
 import scipy
 import seaborn as sns
+import statsmodels.api as sm
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
 # add path to sys.path.append() if package isn't found
@@ -38,32 +34,38 @@ behavpath = r'D:\expecon_ms\data\behav\behav_df'
 # save cluster figures as svg and png files
 save_dir_cluster_output = r"D:\expecon_ms\figs\manuscript_figures\Figure3"
 
-# participant index
-IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
-          '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
-          '037', '038', '039', '040', '041', '042', '043', '044', '045', '046', '047', '048', '049')
+# participant index list
+
+IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
+          '017', '018', '019', '020', '021','022', '023', '024', '025', '026',
+          '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
+          '037', '038', '039', '040', '041', '042', '043', '044', '045', '046',
+          '047', '048', '049']
 
 
 def create_contrast(cond='highlow', cond_a='0.75',
                     cond_b='0.25', fmin=15, fmax=30,
                     envelope=False,
                     laplace=True,
-                    subtract_evoked=False,
-                    save_drop_log=False,
-                    reject_criteria=dict(eeg=200e-6),
-                    flat_criteria=dict(eeg=1e-6)):
+                    subtract_evoked=False):
 
-    """ this function runs a cluster permutation test over electrodes and timepoints
-    in sensor space and plots the output and saves it
+    """ this function loads cleaned epoched data and creates contrasts
     input: 
-    cond: condition to be analyzed (highlow, signalnoise, highsignal, highnoise)
+    cond: condition to be analyzed
     cond_a: name of condition a
     cond_b: name of condition b
-    laplace: apply laplace transform to data
+    fmin: minimum frequency
+    fmax: maximum frequency
+    envelope: boolean, if True, compute envelope of signal
+    laplace: apply CSD to data if boolean is True
     subtract_evoked: boolean, subtract evoked signal from each epoch
-    save_drop_log: save drop log output
     output:
-    None """
+    evokeds_a_all: evoked data for condition a, list with length = n_participants
+    evokeds_b_all: evoked data for condition b, list with length = n_participants
+    cond_a: name of condition a
+    cond_b: name of condition b
+    cond: which condition is analyzed
+       """
 
     perc = []
 
@@ -192,11 +194,22 @@ def create_contrast(cond='highlow', cond_a='0.75',
         pd.DataFrame(trials_removed).to_csv(f'D:\expecon_ms\data\eeg\prepro_ica\droplog\\trials_removed.csv')
         pd.DataFrame(all_trials).to_csv(f'D:\expecon_ms\data\eeg\prepro_ica\droplog\\trials_per_subject.csv')
 
-    return evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b, perc, cond
+    return evokeds_a_all, evokeds_b_all, cond_a, cond_b, cond
 
 def cluster_perm_space_time_plot(tmin=0, tmax=1, channel=['C4']):
-
-    evokeds_a_all, evokeds_b_all, all_trials, trials_removed, cond_a, cond_b, perc , cond = create_contrast()
+    """Plot cluster permutation results in space and time. This function prepares the
+    data for stats tests in 1D (permutation over timepoints) or 2D (permutation over
+    timepoints and channels). 
+    Significant cluster are plotted
+    Cluster output is correlated with behavioral outcome.
+    input:
+    tmin: start time of time window
+    tmax: end time of time window
+    channel: channel to plot
+    output:
+    None
+    """
+    evokeds_a_all, evokeds_b_all,  cond_a, cond_b, cond = create_contrast()
 
     # get grand average over all subjects for plotting the results later
     
@@ -219,7 +232,7 @@ def cluster_perm_space_time_plot(tmin=0, tmax=1, channel=['C4']):
 
     diff = mne.combine_evoked([a_gra,b_gra], weights=[1,-1])
     topo = diff.plot_topo()
-    topo.savefig(f'D:\expecon_ms\\figs\manuscript_figures\Figure5_envelope\\topo_hitmiss_alpha.svg')
+    topo.savefig(f'D:\expecon_ms\\figs\manuscript_figures\Figure3\\{cond}.svg')
    
     X = np.array([ax.data-bx.data for ax,bx in zip(a,b)])
 
@@ -269,14 +282,15 @@ def cluster_perm_space_time_plot(tmin=0, tmax=1, channel=['C4']):
     # average over significant timepoints
     X_time = np.mean(X[:,np.unique(clusters[4][0]),:], axis=1)
     # average over significant channels
-    X_timechannel = np.mean(X_time[:,np.unique(clusters[4][1])], axis=1)
+    X_time_channel = np.mean(X_time[:,np.unique(clusters[4][1])], axis=1)
 
     # correlate with cluster
     scipy.stats.pearsonr(crit_diff, df.cue)
+
     x = X
     y = df.cue
 
-    sns.regplot(x = x, y = y, fit_reg=True)
+    sns.regplot(x, y, fit_reg=True)
 
     # Fit the linear regression model using statsmodels
     model = sm.OLS(y, sm.add_constant(x))
@@ -287,7 +301,7 @@ def cluster_perm_space_time_plot(tmin=0, tmax=1, channel=['C4']):
     slope = results.params[1]
 
     # Plot the regression line
-    plt.plot(x, intercept + slope * x, color='red')
+    plt.plot(x, intercept + slope * x, color='blue')
     plt.savefig(f'D:\expecon_ms\\figs\manuscript_figures\Figure3\\regplot.svg')
     # Show the plot
     plt.show()
@@ -373,63 +387,7 @@ def cluster_perm_space_time_plot(tmin=0, tmax=1, channel=['C4']):
         # clean up viz
         mne.viz.tight_layout(fig=fig)
         fig.subplots_adjust(bottom=0.05)
-        plt.show()
 
-
-    # # loop over clusters
-    for i_clu, clu_idx in enumerate(good_cluster_inds):
-        # unpack cluster information, get unique indices
-        time_inds, space_inds = np.squeeze(clusters[clu_idx])
-        ch_inds = np.unique(space_inds)
-        time_inds = np.unique(time_inds)
-
-        # get topography for t stat
-        t_map = T_obs[time_inds, ...].mean(axis=0)
-
-        # get signals at the sensors contributing to the cluster
-        sig_times = a_gra.times[time_inds]
-
-        # create spatial mask
-        mask = np.zeros((t_map.shape[0], 1), dtype=bool)
-        mask[ch_inds, :] = True
-
-        # initialize figure
-        fig, ax_topo = plt.subplots(1, 1, figsize=(10, 3))
-
-        # plot average test statistic and mark significant sensors
-        t_evoked = mne.EvokedArray(t_map[:, np.newaxis], a_gra.info, tmin=0)
-
-        t_evoked.plot_topomap(times=0, mask=mask, 
-                            show=False,
-                            colorbar=False, mask_params=dict(markersize=10),
-                            vlim=(np.min, np.max))
-        image = ax_topo.images[0]
-
-        # create additional axes (for ERF and colorbar)
-        divider = make_axes_locatable(ax_topo)
-
-        # add axes for colorbar
-        ax_colorbar = divider.append_axes('right', size='5%', pad=0.05)
-        plt.colorbar(image, cax=ax_colorbar)
-        ax_topo.set_xlabel('Averaged t-map ({:0.3f} - {:0.3f} s)'.format(*sig_times[[0, -1]]))
-
-        # add new axis for time courses and plot time courses
-        ax_signals = divider.append_axes('right', size='300%', pad=1.2)
-        title = 'Cluster #{0}, {1} sensor'.format(i_clu + 1, len(ch_inds))
-        if len(ch_inds) > 1:
-            title += "s (mean)"
-
-        mne.viz.plot_compare_evokeds(grand_average, title=title, picks=ch_inds, axes=ax_signals,
-                                        colors=colors, show=False, ci=True, combine='mean',
-                                        split_legend=True, legend='lower right', truncate_yaxis='auto')
-
-        # plot temporal cluster extent
-        ymin, ymax = ax_signals.get_ylim()
-        ax_signals.fill_betweenx((ymin, ymax), sig_times[0], sig_times[-1],
-                                    color='darkgreen', alpha=0.3)
-
-        # clean up viz
-        mne.viz.tight_layout(fig=fig)
-        fig.subplots_adjust(bottom=.05)
+        #save figure before showing the figure
         plt.savefig(f'D:\\expecon_ms\\figs\\manuscript_figures\\Figure3\\{cond}_{str(clu_idx)}_prestim_.svg')
         plt.show()
