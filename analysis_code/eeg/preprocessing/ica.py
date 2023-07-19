@@ -111,8 +111,11 @@ def label_icacorr():
 
     for subj in IDlist:
 
+        file_path = ('D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching\\'
+                    f'P{subj}_epochs_stim-epo.fif')
+        
         # load epochs
-        epochs = mne.read_epochs(f'{clean_epochs_dir}//P{subj}_epochs_stim-epo.fif')
+        epochs = mne.read_epochs(file_path, preload=True)
 
         # load ica solution
         ica_sol = load_pickle(f'{save_dir_ica_sol}//icas_{subj}.pkl')
@@ -128,29 +131,35 @@ def label_icacorr():
                              show=False, picks=list(range(21)))
 
         os.chdir(save_dir_ica_comps)
-        plt.savefig(f'ica_sources_{subj}')
+        plt.savefig(f'ica_sources_01Hzfilter_{subj}')
 
         ica_sol.plot_components(inst=epochs, show=False, picks=list(range(21)))
-        plt.savefig(f'ica_comps_{subj}')
+        plt.savefig(f'ica_comps_01Hzfilter_{subj}')
 
         ica_sol.plot_components(inst=epochs, show=False, picks=inds_to_exclude)
-        plt.savefig(f'ica_del_{subj}')
+        plt.savefig(f'ica_del_01Hzfilter_{subj}')
 
         ica_sol.exclude = inds_to_exclude
 
         comps_removed.append(len(inds_to_exclude))
 
-        ica_sol.apply(epochs)
+        # now load the highpass filtered data
+        filt_path = (f'D:\expecon_ms\data\eeg\prepro_stim\\filter_0.1Hz\\' 
+                            f'P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
+        
+        epochs_filt = mne.read_epochs(filt_path, preload=True)
+        
+        ica_sol.apply(epochs_filt)
 
         # rereference to average
-        epochs.set_eeg_reference('average', ch_type="eeg")
+        epochs_filt.set_eeg_reference('average', ch_type="eeg")
 
-        epochs.save(f'{save_dir_ica}//P{subj}_epochs_after_ica-epo.fif')
+        epochs_filt.save(f'{save_dir_ica}//clean_epochs_corr//P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif')
 
         print(f'Saved ica cleaned epochs for participant {subj}.')
 
     # save a dataframe with info on how many components were removed
-    pd.DataFrame(comps_removed).to_csv('ica_components.csv')
+    pd.DataFrame(comps_removed).to_csv('ica_components_0.1Hzfilter.csv')
 
     return comps_removed
 
