@@ -20,7 +20,7 @@ from mne_icalabel import label_components
 # %matplotlib qt
 
 # directory where to find the cleaned, epoched data
-clean_epochs_dir = r'D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching'
+clean_epochs_dir = r'D:\expecon_ms\data\eeg\prepro_stim\filter_0.1Hz'
 
 # directory where to save the ica cleaned epochs
 save_dir_ica = r'D:\expecon_ms\data\eeg\prepro_ica'
@@ -31,7 +31,7 @@ save_dir_ica_sol = r'D:\expecon_ms\data\eeg\prepro_ica\ica_solution'
 save_dir_ica_comps = r'D:\expecon_ms\data\eeg\prepro_ica\ica_comps'
 
 # raw EEG data
-raw_dir = r'D:\expecon_EEG\raw'
+raw_dir = 'D:\expecon_ms\data\eeg\raw_concatenated'
 
 IDlist = (
     '007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
@@ -56,10 +56,10 @@ def run_ica(infomax=1, save_psd=0):
 
     """
 
-    for counter, subj_id in enumerate(IDlist):
+    for subj in IDlist:
 
         # Read the epochs data for the current participant
-        epochs = mne.read_epochs(f'{clean_epochs_dir}//P{subj_id}_epochs_stim-epo.fif')
+        epochs = mne.read_epochs(f'{clean_epochs_dir}//P{subj}_epochs_stim-epo.fif')
 
         # Pick EEG channels for ICA
         picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
@@ -68,7 +68,7 @@ def run_ica(infomax=1, save_psd=0):
             # Compute and plot the power spectral density (PSD)
             epochs.compute_psd(fmax=40, picks=picks).plot(show=False)
 
-            plt.savefig(f'{save_dir_psd}//PSD_{str(counter)}.png')
+            plt.savefig(f'{save_dir_psd}//PSD_{subj}.png')
 
         if infomax == 1:
             # Fit ICA using infomax method with extended parameters
@@ -80,7 +80,7 @@ def run_ica(infomax=1, save_psd=0):
             ica = mne.preprocessing.ICA(method='fastica').fit(
                 epochs, picks=picks)
 
-        save_data(data=ica, id=subj_id)  # Save the ICA solution for the participant
+        save_data(data=ica, id=subj)  # Save the ICA solution for the participant
 
     return "Done with ICA"
 
@@ -109,13 +109,13 @@ def label_icacorr():
 
     comps_removed = []
 
-    for subj_id in IDlist:
+    for subj in IDlist:
 
         # load epochs
-        epochs = mne.read_epochs(f'{clean_epochs_dir}//P{subj_id}_epochs_stim-epo.fif')
+        epochs = mne.read_epochs(f'{clean_epochs_dir}//P{subj}_epochs_stim-epo.fif')
 
         # load ica solution
-        ica_sol = load_pickle(f'{save_dir_ica_sol}//icas_{subj_id}.pkl')
+        ica_sol = load_pickle(f'{save_dir_ica_sol}//icas_{subj}.pkl')
 
         eog_inds, _ = ica_sol.find_bads_eog(epochs, ch_name=ch_name_blinks)
         ecg_inds, _ = ica_sol.find_bads_ecg(epochs, ch_name=ch_name_ecg, 
@@ -128,13 +128,13 @@ def label_icacorr():
                              show=False, picks=list(range(21)))
 
         os.chdir(save_dir_ica_comps)
-        plt.savefig(f'ica_sources_{subj_id}')
+        plt.savefig(f'ica_sources_{subj}')
 
         ica_sol.plot_components(inst=epochs, show=False, picks=list(range(21)))
-        plt.savefig(f'ica_comps_{subj_id}')
+        plt.savefig(f'ica_comps_{subj}')
 
         ica_sol.plot_components(inst=epochs, show=False, picks=inds_to_exclude)
-        plt.savefig(f'ica_del_{subj_id}')
+        plt.savefig(f'ica_del_{subj}')
 
         ica_sol.exclude = inds_to_exclude
 
@@ -145,9 +145,9 @@ def label_icacorr():
         # rereference to average
         epochs.set_eeg_reference('average', ch_type="eeg")
 
-        epochs.save(f'{save_dir_ica}//P{i}_epochs_after_ica-epo.fif')
+        epochs.save(f'{save_dir_ica}//P{subj}_epochs_after_ica-epo.fif')
 
-        print(f'Saved ica cleaned epochs for participant {i}.')
+        print(f'Saved ica cleaned epochs for participant {subj}.')
 
     # save a dataframe with info on how many components were removed
     pd.DataFrame(comps_removed).to_csv('ica_components.csv')
@@ -158,6 +158,7 @@ def label_icacorr():
 def label_icalabel():
     """
     Apply automatic labeling of ICA components using the iclabel function.
+    # works now with python 3.10.11 and mne 0.23.0
     
     Args:
         None
@@ -168,41 +169,54 @@ def label_icalabel():
     # Store the count of removed ICA components for each participant
     icalist = []
 
-    for subj_id in IDlist:
+    for subj in IDlist:
+        
+        if subj == '014':
+            continue
+        
+        file_path = ('D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching\\'
+                    f'P{subj}_epochs_stim-epo.fif')
 
-        # Load the clean epochs
-        epochs = mne.read_epochs(f'{clean_epochs_dir}//P{subj_id}_epochs_stim-epo.fif')
+        # Load the clean epochs (1 Hz filtered)
+        epochs_ica = mne.read_epochs(file_path)
+        
+        #epochs_ica.set_eeg_reference('average', ch_type="eeg")
 
-        # Load the ICA solution
-        ica_sol = mne.preprocessing.read_ica(f'{save_dir_ica_sol}/icas_{subj_id}.pkl')
+        # load ica solution
+        ica_sol = load_pickle(f'{save_dir_ica_sol}//icas_{subj}.pkl')
 
-        # Apply icalabel to label the ICA components
-        ic_labels = ica_sol.labels_
+        # use icalabel to label components
+        y_pred_proba, labels = label_components(epochs_ica, ica_sol, method='iclabel')
 
         # Get indices of non-brain or other labeled components to exclude
-        exclude_idx = [idx for idx, label in enumerate(ic_labels) if label not in ["brain", "other"]]
+        exclude_idx = [idx for idx, label in enumerate(labels) if label not in ["brain", "other"]]
 
-        print(f"Excluding these ICA components for participant {subj_id}: {exclude_idx}")
+        print(f"Excluding these ICA components for participant {subj}: {exclude_idx}")
 
-        # Save the count of excluded components
+        # Save the count of excluded components per participant for methods part
         icalist.append(len(exclude_idx))
 
+        # now load the highpass filtered data
+        epochs_filt_path = (f'D:\expecon_ms\data\eeg\prepro_stim\\filter_0.1Hz\\' 
+                            f'P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
+        
+        epochs_filt = mne.read_epochs(epochs_filt_path)
+        
         # Remove the non-brain components from the clean epochs
-        ica_sol.apply(epochs)
+        ica_sol.apply(epochs_filt)
 
         # Rereference to average
-        epochs.set_eeg_reference('average', ch_type="eeg")
+        epochs_filt.set_eeg_reference('average', ch_type="eeg")
 
         # Save the cleaned data
-        epochs.save(f'{save_dir_ica}//P{subj_id}_epochs_after_ic-label-epo.fif')
+        epochs_filt.save(f'{save_dir_ica}//P{subj}_epochs_after_ic-label_0.1Hz-epo.fif')
 
-        print(f'Saved ICA cleaned epochs for participant {subj_id}')
+        print(f'Saved ICA cleaned epochs for participant {subj}')
 
     # Save a dataframe with info on how many components were removed
-    pd.DataFrame(icalist).to_csv('ica_components_deleted_icalabel.csv')
+    pd.DataFrame(icalist).to_csv(f'{save_dir_ica}//ica_components_deleted_icalabel_0.1Hzfilter.csv')
 
     return "Done with removing ICA components"
-
 
 def save_data(data, id):
     """
