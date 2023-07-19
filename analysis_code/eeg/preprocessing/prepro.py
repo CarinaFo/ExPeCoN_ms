@@ -336,7 +336,7 @@ def channels_interp(df = None):
     None.
     """
 
-    df = pd.read_csv("D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching\interpolated_channels.csv")
+    df = pd.read_csv(f'{save_dir_stim}\\interpolated_channels.csv')
     
     df = df.drop(['Unnamed: 0'], axis=1)
     df['count_ch'] = df.count(axis=1)
