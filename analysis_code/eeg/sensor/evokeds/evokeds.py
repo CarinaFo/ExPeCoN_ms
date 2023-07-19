@@ -28,7 +28,7 @@ from behav import figure1
 plt.rcParams.update({'font.size': 14, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
 
 # set paths
-dir_cleanepochs = r'D:\expecon_ms\data\eeg\prepro_ica\clean_epochs_iclabel'
+dir_cleanepochs = r'D:\expecon_ms\data\eeg\prepro_ica\clean_epochs_corr'
 behavpath = r'D:\expecon_ms\data\behav\behav_df'
 
 # save cluster figures as svg and png files
@@ -43,9 +43,9 @@ IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '047', '048', '049']
 
 
-def create_contrast(cond='highlow', cond_a='0.75',
-                    cond_b='0.25', fmin=15, fmax=30,
-                    envelope=False,
+def create_contrast(cond='hitmiss', cond_a='hit',
+                    cond_b='miss', fmin=15, fmax=30,
+                    envelope=False, drop_bads=False,
                     laplace=True,
                     subtract_evoked=False):
 
@@ -67,11 +67,12 @@ def create_contrast(cond='highlow', cond_a='0.75',
     cond: which condition is analyzed
        """
 
-    perc = []
-
     all_trials, trials_removed = [], []
 
     evokeds_a_all, evokeds_b_all, epochs_all = [], [], []
+
+    # metadata after epoch cleaning
+    metadata_allsubs = []
 
     for idx, subj in enumerate(IDlist):
 
@@ -79,7 +80,7 @@ def create_contrast(cond='highlow', cond_a='0.75',
         print(f'Participant {str(idx)}')
 
         # load cleaned epochs
-        epochs = mne.read_epochs(f"{dir_cleanepochs}/P{subj}_epochs_after_ic-label-epo.fif")
+        epochs = mne.read_epochs(f'{dir_cleanepochs}/P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif')
         
         ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
         blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
@@ -123,19 +124,15 @@ def create_contrast(cond='highlow', cond_a='0.75',
         else:
             epochs.metadata = subj_data
 
-        # drop bad epochs
-        #epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
-
-        if save_drop_log:
-            # percentage of trials removed
-            perc.append(epochs.drop_log_stats())
-
-            epochs.plot_drop_log(show=False)
-
-            plt.savefig(f'D:\expecon_ms\data\eeg\prepro_ica\droplog\P{subj}_drop_log.png', dpi=300)
-
         if subtract_evoked:
             epochs.subtract_evoked()
+
+        if drop_bads:
+                epochs.drop_bad(reject=dict(eeg=200e-6))
+                droplog_fig = epochs.plot_drop_log(show=False)
+                droplog_fig.savefig(f'{dir_cleanepochs}//drop_log_{subj}.png')
+
+        metadata_allsubs.append(epochs.metadata)
 
         if laplace:
             epochs = mne.preprocessing.compute_current_source_density(epochs)
@@ -252,10 +249,21 @@ def cluster_perm_space_time_plot(tmin=0, tmax=1, channel=['C4']):
                                                                                     adjacency=ch_adjacency, 
                                                                                     tail=0, 
                                                                                     n_jobs=-1)
-    
+
     good_cluster_inds = np.where(cluster_p_values < 0.05)[0] # times where something significant happened
     min(cluster_p_values)
     print(cluster_p_values) 
+
+    cluster_channel = np.unique(clusters[good_cluster_inds[0]][1])
+    cluster1_channel = np.unique(clusters[good_cluster_inds[1]][1])
+
+    ch_names_cluster0 = [evokeds_a_all[0].ch_names[c] for c in cluster_channel]
+    ch_names_cluster1 = [evokeds_a_all[0].ch_names[c] for c in cluster1_channel]
+
+    # cluster previous yes
+
+    cluster_channel = np.unique(clusters[good_cluster_inds[0]][1])
+    ch_names_cluster_prevyes = [evokeds_a_all[0].ch_names[c] for c in cluster_channel]
     
     # 1D cluster test
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(np.squeeze(X[:,:,:]), n_permutations=10000,
