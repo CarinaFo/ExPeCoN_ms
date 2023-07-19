@@ -17,21 +17,27 @@ from autoreject import AutoReject, Ransac  # Jas et al., 2016
 # set directories
 
 # raw EEG data
-raw_dir = r'D:\expecon_EEG\raw'
+raw_dir = r'D:\backup_expecon_EEG\expeco_EEG_201021\expecon_eeg'
+
 # EEG cap layout file
-filename_montage = r'D:\expecon_EEG\CACS-64_REF.bvef'
+filename_montage = r'D:\expecon_ms\data\eeg\prepro_stim\CACS-64_REF.bvef'
+
 # raw behavioral data
 behavpath = r'D:\expecon_ms\data\behav\behav_df'
 
 # save cleaned EEG data
+save_dir_stim = r'D:\expecon_ms\data\eeg\prepro_stim\filter_0.1Hz'
+
+if not os.path.exists(save_dir_stim):
+    os.makedirs(save_dir_stim)
+    print("Directory created:", save_dir_stim)
+
 save_dir_cue = r'D:\expecon_ms\data\eeg\prepro_cue'
-save_dir_stim = r'D:\expecon_ms\data\eeg\prepro_stim\downsample_after_epoching'
 
 IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017',
           '018', '019', '020', '021', '022', '023', '024', '025', '026', '027', '028', 
           '029', '030', '031', '032', '033', '034', '035', '036', '037', '038', '039',
           '040','041', '042', '043', '044', '045', '046', '047', '048', '049')
-
 
 def concatenate():
 
@@ -39,44 +45,37 @@ def concatenate():
     reads the event triggers from annotations
     and concatenates the raw data files to one big .fif file"""
 
-    for counter, i in enumerate(IDlist):
+    trigger_per_block = []
 
-        os.chdir(raw_dir)
+    for index, subj in enumerate(IDlist):
+        # if file exists, skip
+        if os.path.exists(f'D:\expecon_ms\data\eeg\\raw_concatenated\P{subj}_concatenated_raw.fif'):
+            continue
+        else:
+            if subj == '018':
+                raw_fname1 = f'expecon_EEG_{subj}_train.vhdr'  # wrongly named the first experimental block
+                raw_fname2 = f'expecon_EEG_{subj}_02.vhdr'
+                raw_fname3 = f'expecon_EEG_{subj}_03.vhdr'
+                raw_fname4 = f'expecon_EEG_{subj}_04.vhdr'
+                raw_fname5 = f'expecon_EEG_{subj}_05.vhdr'
 
-        if os.path.isfile('P' + i + '_concatenated_raw.fif') == 0:
-
-            print('concatenated file does not exist and participant ' + i + ' will be analyzed')
-
-            if i == '018':
-
-                raw_fname1 = 'expecon_EEG_' + i + '_train.vhdr'  # wrongly named the first experimental block
-                raw_fname2 = 'expecon_EEG_' + i + '_02.vhdr'
-                raw_fname3 = 'expecon_EEG_' + i + '_03.vhdr'
-                raw_fname4 = 'expecon_EEG_' + i + '_04.vhdr'
-                raw_fname5 = 'expecon_EEG_' + i + '_05.vhdr'
-
-            elif i == '031':  # only 4 blocks
-
-                raw_fname1 = 'expecon_EEG_' + i + '_01.vhdr'
-                raw_fname2 = 'expecon_EEG_' + i + '_02.vhdr'
-                raw_fname3 = 'expecon_EEG_' + i + '_03.vhdr'
-                raw_fname4 = 'expecon_EEG_' + i + '_04.vhdr'
+            elif subj == '031':  # only 4 blocks
+                raw_fname1 = f'expecon_EEG_{subj}_01.vhdr'
+                raw_fname2 = f'expecon_EEG_{subj}_02.vhdr'
+                raw_fname3 = f'expecon_EEG_{subj}_03.vhdr'
+                raw_fname4 = f'expecon_EEG_{subj}_04.vhdr'
 
             else:
+                raw_fname1 = f'expecon_EEG_{subj}_01.vhdr'
+                raw_fname2 = f'expecon_EEG_{subj}_02.vhdr'
+                raw_fname3 = f'expecon_EEG_{subj}_03.vhdr'
+                raw_fname4 = f'expecon_EEG_{subj}_04.vhdr'
+                raw_fname5 = f'expecon_EEG_{subj}_05.vhdr'
 
-                raw_fname1 = 'expecon_EEG_' + i + '_01.vhdr'
-                raw_fname2 = 'expecon_EEG_' + i + '_02.vhdr'
-                raw_fname3 = 'expecon_EEG_' + i + '_03.vhdr'
-                raw_fname4 = 'expecon_EEG_' + i + '_04.vhdr'
-                raw_fname5 = 'expecon_EEG_' + i + '_05.vhdr'
-
-            datapath = r'D:\expeco_EEG'
-
-            os.chdir(datapath)
-
-            # Construct Epochs
-
-            if i == '031':
+            # extract events from annotations and store trigger counts in list
+            os.chdir(raw_dir)
+                
+            if subj == '031':
 
                 raw_1 = mne.io.read_raw_brainvision(raw_fname1)
                 raw_2 = mne.io.read_raw_brainvision(raw_fname2)
@@ -88,14 +87,13 @@ def concatenate():
                 events_3, event_dict = mne.events_from_annotations(raw_3, regexp='Stimulus/S  2')
                 events_4, event_dict = mne.events_from_annotations(raw_4, regexp='Stimulus/S  2')
 
-                print(len(events_1), len(events_2), len(events_3), len(events_4))
+                trigger_per_block.append([len(events_1), len(events_2), len(events_3), len(events_4),
+                  len(events_5)])
 
                 raw = mne.concatenate_raws([raw_1, raw_2, raw_3, raw_4])
 
             else:
-
-                # get the header to extract events
-
+    
                 raw_1 = mne.io.read_raw_brainvision(raw_fname1)
                 raw_2 = mne.io.read_raw_brainvision(raw_fname2)
                 raw_3 = mne.io.read_raw_brainvision(raw_fname3)
@@ -116,18 +114,15 @@ def concatenate():
                 # check if we have 144 trigger per block (trials)
                 # if not I forgot to turn on the EEG recording (or turned it on too late)
 
-            print(len(events_1), len(events_2), len(events_3), len(events_4),
-                  len(events_5))
+                trigger_per_block.append([len(events_1), len(events_2), len(events_3), len(events_4),
+                  len(events_5)])
 
-            raw = mne.concatenate_raws([raw_1, raw_2, raw_3, raw_4, raw_5])
+                raw = mne.concatenate_raws([raw_1, raw_2, raw_3, raw_4, raw_5])
 
-            os.chdir(raw_dir)
-
-            raw.save('P' + i + '_concatenated_raw.fif', overwrite=True)
-
-        else:
-
-            print('Participant' + i + 'already analyzed')
+            # save concatenated raw data
+            raw.save(f'D:\expecon_ms\data\eeg\\raw_concatenated\P{subj}_concatenated_raw.fif')
+    
+    return trigger_per_block
 
 def remove_trials(filename='raw_behav_data.csv'):  
 
@@ -174,7 +169,7 @@ def remove_trials(filename='raw_behav_data.csv'):
 
     df.to_csv('behav_cleaned_for_eeg.csv')
 
-def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
+def prepro(trigger=0, l_freq=0.1, h_freq=40,
            tmin=-1.5, tmax=1.5, resample_rate=250, laplace=0, sf=2500,
            detrend=1, ransac=1, autoreject=0):
 
@@ -210,16 +205,17 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
     # loop over participants
 
-    for counter, i in enumerate(IDlist):
+    for index, subj in enumerate(IDlist):
 
+        # if file exists, skip
+        if os.path.exists(f'{save_dir_stim}\\P{subj}_epochs_stim_0.1Hzfilter-epo.fif'):
+            continue
+        
         # load raw data concatenated for all blocks
-
-        os.chdir(raw_dir)
-
-        raw = mne.io.read_raw_fif('P' + i + '_concatenated_raw.fif')
+        raw = mne.io.read_raw_fif(f'D:\expecon_ms\data\eeg\\raw_concatenated\P{subj}_concatenated_raw.fif',
+                                  preload=True)
         
         # save the annotations (trigger) information
-
         anot.append(raw.annotations.to_data_frame())
 
         raw.set_channel_types({'VEOG': 'eog', 'ECG': 'ecg'})
@@ -228,8 +224,10 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
         raw.set_montage(montage)
 
-        # load stimulus trigger events
+        # filter the data
+        raw.filter(l_freq=l_freq, h_freq=h_freq, method='iir')
 
+        # load stimulus trigger events
         events, event_dict = mne.events_from_annotations(raw, regexp='Stimulus/S  2')
 
         # add cue as a trigger to event structure
@@ -248,21 +246,18 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
         # add dataframe as metadata to epochs
 
-        df_sub = df[df.ID == counter + 7]
+        df_sub = df[df.ID == index + 7]
 
         metadata = df_sub
 
         # lock the data to the specified trigger and create epochs
-
         if trigger == 1:
 
             epochs = mne.Epochs(raw, cue_events, event_id=2, tmin=tmin,
                                 tmax=tmax, preload=True, baseline=None, 
                                 detrend=detrend, metadata=metadata)
         # or stimulus onset
-
         else:
-
             epochs = mne.Epochs(raw, events, event_id=1, tmin=tmin, tmax=tmax,
                                 preload=True, baseline=None, detrend=detrend,
                                 metadata=metadata)
@@ -271,12 +266,7 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
         epochs.resample(resample_rate)
 
-        # now filter the epochs 
-
-        epochs.filter(l_freq=l_freq, h_freq=h_freq, method=filter_method)
-
         # pick only EEG channels for Ransac bad channel detection 
-
         picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
 
         # use RANSAC to detect bad channels
@@ -286,7 +276,7 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
         if ransac:
             
-            print('Run ransac for ' + i)
+            print(f'Run ransac for {subj}')
 
             ransac = Ransac(verbose='progressbar', picks=picks, n_jobs=3)
 
@@ -310,35 +300,27 @@ def prepro(trigger=0, l_freq=1, h_freq=40, filter_method='iir',
 
             os.chdir(save_dir_stim)
 
-            reject_log.save('P_' + i + '_reject_log.npz')
-
-        # laplace filter
-
-        if laplace == 1:
-
-            epochs = mne.preprocessing.compute_current_source_density(epochs)
+            reject_log.save(f'P_{subj}_reject_log.npz')
 
         if trigger == 1:
 
             os.chdir(save_dir_cue)
 
-            epochs.save('P' + i + '_epochs_cue-epo.fif', overwrite=True)
+            epochs.save(f'P{subj}_epochs_cue-epo.fif')
 
         else:
 
-            os.chdir(save_dir_stim)
+            epochs.save(f'{save_dir_stim}\\P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
 
-            epochs.save('P' + i + '_epochs_stim-epo.fif', overwrite=True)
-
-            print('saved epochs for participant ' + i)
+            print(f'saved epochs for participant {subj}')
 
     ch_df = pd.DataFrame(ch_interp)
 
-    ch_df.to_csv('interpolated_channels.csv')
+    ch_df.to_csv(f'{save_dir_stim}\\interpolated_channels.csv')
 
-    print("Done with preprocessing and creating clean epochs")
+    print('Done with preprocessing and creating clean epochs')
 
-    return ch_interp
+    return ch_interp, anot
 
 def channels_interp(df = None):
     """
