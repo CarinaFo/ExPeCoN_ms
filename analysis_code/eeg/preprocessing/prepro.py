@@ -6,8 +6,10 @@
 
 # last update: 15.02.2023
 
-import os
 import copy
+import os
+from pathlib import Path
+
 import mne
 import pandas as pd
 
@@ -16,28 +18,29 @@ from autoreject import AutoReject, Ransac  # Jas et al., 2016
 
 # set directories
 
-# raw EEG data
-raw_dir = r'D:\backup_expecon_EEG\expeco_EEG_201021\expecon_eeg'
+save_dir_concatenated_raw = Path('D:/expecon_ms/data/eeg/raw_concatenated/')
 
 # EEG cap layout file
-filename_montage = r'D:\expecon_ms\data\eeg\prepro_stim\CACS-64_REF.bvef'
+filename_montage = Path('D:/expecon_ms/data/eeg/prepro_stim/CACS-64_REF.bvef')
 
 # raw behavioral data
-behavpath = r'D:\expecon_ms\data\behav\behav_df'
+behavpath = Path('D:/expecon_ms/data/behav/behav_df/')
 
 # save cleaned EEG data
-save_dir_stim = r'D:\expecon_ms\data\eeg\prepro_stim\filter_0.1Hz'
+save_dir_stim = Path('D:/expecon_ms/data/eeg/prepro_stim/filter_0.1Hz/')
 
 if not os.path.exists(save_dir_stim):
     os.makedirs(save_dir_stim)
     print("Directory created:", save_dir_stim)
 
-save_dir_cue = r'D:\expecon_ms\data\eeg\prepro_cue'
+save_dir_cue = Path('D:/expecon_ms/data/eeg/prepro_cue/')
 
-IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017',
-          '018', '019', '020', '021', '022', '023', '024', '025', '026', '027', '028', 
-          '029', '030', '031', '032', '033', '034', '035', '036', '037', '038', '039',
-          '040','041', '042', '043', '044', '045', '046', '047', '048', '049')
+IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
+          '017','018', '019', '020', '021', '022', '023', '024', '025', '026',
+          '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
+          '037', '038', '039', '040','041', '042', '043', '044', '045', '046',
+          '047', '048', '049']
+
 
 def concatenate():
 
@@ -48,8 +51,9 @@ def concatenate():
     trigger_per_block = []
 
     for index, subj in enumerate(IDlist):
+
         # if file exists, skip
-        if os.path.exists(f'D:\expecon_ms\data\eeg\\raw_concatenated\P{subj}_concatenated_raw.fif'):
+        if os.path.exists(f'{save_dir_concatenated_raw}\P{subj}_concatenated_raw.fif'):
             continue
         else:
             if subj == '018':
@@ -73,8 +77,7 @@ def concatenate():
                 raw_fname5 = f'expecon_EEG_{subj}_05.vhdr'
 
             # extract events from annotations and store trigger counts in list
-            os.chdir(raw_dir)
-                
+
             if subj == '031':
 
                 raw_1 = mne.io.read_raw_brainvision(raw_fname1)
@@ -120,11 +123,11 @@ def concatenate():
                 raw = mne.concatenate_raws([raw_1, raw_2, raw_3, raw_4, raw_5])
 
             # save concatenated raw data
-            raw.save(f'D:\expecon_ms\data\eeg\\raw_concatenated\P{subj}_concatenated_raw.fif')
+            raw.save(f'{save_dir_concatenated_raw}P{subj}_concatenated_raw.fif')
     
     return trigger_per_block
 
-def remove_trials(filename='raw_behav_data.csv'):  
+def remove_trials(filename=Path('/raw_behav_data.csv')):  
 
     """this function drops trials from the behavioral data that do not
     have a matching trigger in the EEG recording due to human error
@@ -133,11 +136,8 @@ def remove_trials(filename='raw_behav_data.csv'):
     return: None
     """
 
-    os.chdir(behavpath)
-
     # load the preprocessed dataframe from R (already removed the trainingsblock)
-
-    df = pd.read_csv(filename)
+    df = pd.read_csv(f'{behavpath}{filename}')
 
     # remove trials where I started the EEG recording too late
     # (35 trials in total)
@@ -167,7 +167,7 @@ def remove_trials(filename='raw_behav_data.csv'):
         df.drop(df.index[(df["ID"] == cond[0]) & (df["block"] == cond[1]) &
                          (df["trial"].isin(cond[2]))], inplace=True)
 
-    df.to_csv('behav_cleaned_for_eeg.csv')
+    df.to_csv(f'{behavpath}{Path("/behav_cleaned_for_eeg.csv")}')
 
 def prepro(trigger=0, l_freq=0.1, h_freq=40,
            tmin=-1.5, tmax=1.5, resample_rate=250, laplace=0, sf=2500,
@@ -190,11 +190,8 @@ def prepro(trigger=0, l_freq=0.1, h_freq=40,
       might create trigger jitter)
       """
 
-    os.chdir(behavpath)
-
     # load the cleaned behavioral data for EEG preprocessing
-
-    df = pd.read_csv('behav_cleaned_for_eeg.csv')
+    df = pd.read_csv(f'{behavpath}{Path("/behav_cleaned_for_eeg.csv")}')
     
     montage = mne.channels.read_custom_montage(filename_montage)
 
@@ -208,11 +205,12 @@ def prepro(trigger=0, l_freq=0.1, h_freq=40,
     for index, subj in enumerate(IDlist):
 
         # if file exists, skip
-        if os.path.exists(f'{save_dir_stim}\\P{subj}_epochs_stim_0.1Hzfilter-epo.fif'):
+        if os.path.exists(f'{save_dir_stim}{Path("/")}P{subj}_epochs_stim_0.1Hzfilter-epo.fif'):
+            print(f'{subj} already exists')
             continue
         
         # load raw data concatenated for all blocks
-        raw = mne.io.read_raw_fif(f'D:\expecon_ms\data\eeg\\raw_concatenated\P{subj}_concatenated_raw.fif',
+        raw = mne.io.read_raw_fif(f'{save_dir_concatenated_raw}{Path("/")}P{subj}_concatenated_raw.fif',
                                   preload=True)
         
         # save the annotations (trigger) information
@@ -298,31 +296,27 @@ def prepro(trigger=0, l_freq=0.1, h_freq=40,
 
             epochs, reject_log = ar.fit_transform(epochs)
 
-            os.chdir(save_dir_stim)
-
-            reject_log.save(f'P_{subj}_reject_log.npz')
+            reject_log.save(f'{save_dir_stim}{Path("/")}P_{subj}_reject_log.npz')
 
         if trigger == 1:
 
-            os.chdir(save_dir_cue)
-
-            epochs.save(f'P{subj}_epochs_cue-epo.fif')
+            epochs.save(f'{save_dir_cue}{Path("/")}P{subj}_epochs_cue-epo.fif')
 
         else:
 
-            epochs.save(f'{save_dir_stim}\\P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
+            epochs.save(f'{save_dir_stim}{Path("/")}P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
 
             print(f'saved epochs for participant {subj}')
 
     ch_df = pd.DataFrame(ch_interp)
 
-    ch_df.to_csv(f'{save_dir_stim}\\interpolated_channels.csv')
+    ch_df.to_csv(f'{save_dir_stim}{Path("/")}interpolated_channels.csv')
 
     print('Done with preprocessing and creating clean epochs')
 
     return ch_interp, anot
 
-def channels_interp(df = None):
+def channels_interp(df=None):
     """
     This function calculates the amount of channels interpolated per participant
     and the mean, std, min and max of channels interpolated across participants
@@ -336,7 +330,7 @@ def channels_interp(df = None):
     None.
     """
 
-    df = pd.read_csv(f'{save_dir_stim}\\interpolated_channels.csv')
+    df = pd.read_csv(f'{save_dir_stim}{Path("/")}interpolated_channels.csv')
     
     df = df.drop(['Unnamed: 0'], axis=1)
     df['count_ch'] = df.count(axis=1)
