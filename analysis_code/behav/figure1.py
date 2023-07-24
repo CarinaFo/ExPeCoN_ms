@@ -425,8 +425,8 @@ def plot_figure1_grid(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figures/
     rt_con_yes, rt_con_incorrect = conditions
     
     # set colors for both conditions
-    blue = '#2166acff'  # 0.25 cue
-    red = '#d73027ff' # 0.75 cue
+    blue = '#0571b0'  # 0.25 cue
+    red = '#ca0020' # 0.75 cue
 
     colors = [blue, red]
     medcolor = ['black', 'black']
