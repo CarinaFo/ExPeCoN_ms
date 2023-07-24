@@ -1,5 +1,6 @@
 import math
 import os
+from pathlib import Path
 
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -24,7 +25,7 @@ def prepro_behavioral_data():
     data: pandas dataframe containing the preprocessed behavioral data
     """
 
-    behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
+    behavpath = Path('D:/expecon_ms/data/behav/behav_df/')
 
     # Load the behavioral data from the specified path
     data = []
@@ -77,8 +78,7 @@ def prepro_behavioral_data():
     data = data.drop(data[data.respt1 < 0.1].index)
 
     # save the preprocessing data
-    os.chdir(behavpath)
-    data.to_csv("behav_data_exclrts.csv")
+    data.to_csv(f'{behavpath}behav_data_exclrts.csv')
 
 
 def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition_col):
@@ -149,10 +149,10 @@ def exclude_data():
     """
 
     # Set up data path
-    behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
+    behavpath = Path('D:/expecon_ms/data/behav/behav_df/')
 
     # Load data
-    data = pd.read_csv(behavpath + "behav_data_exclrts.csv")
+    data = pd.read_csv(f'{behavpath}behav_data_exclrts.csv')
 
     # Calculate hit rates by participant and cue condition
     signal = data[data.isyes == 1]
@@ -204,7 +204,7 @@ def exclude_data():
     # Remove the '_merge' column
     data = filtered_df.drop('_merge', axis=1)
 
-    data.to_csv(behavpath + '\\prepro_behav_data.csv')
+    data.to_csv(f'{behavpath}prepro_behav_data.csv')
     
     return data
 
@@ -308,7 +308,9 @@ def prepare_for_plotting(exclude_high_fa=False):
 def correlate_sdt_with_questionnaire():
     
     # load questionarre data (uncertainty of intolerance)
-    q_data = pd.read_csv(r"D:\expecon_ms\questionnaire\q_clean.csv")
+    q_path = Path('D:/expecon_ms/questionnaire/q_clean.csv')
+
+    q_data = pd.read_csv(q_path)
 
     data = exclude_data()
 
@@ -322,8 +324,6 @@ def correlate_sdt_with_questionnaire():
 
     diff_c= [x - y for x, y in zip(low_c, high_c)]
     diff_d = [x - y for x, y in zip(low_d, high_d)]
-
-    import scipy.stats as stats
 
     # Assuming diff_c and q_data are numpy arrays or pandas Series
 
@@ -366,8 +366,10 @@ def correlate_sdt_with_questionnaire():
                  xy=(0.05, 0.85), xycoords='axes fraction',
                  color=text_color)
     
-    plt.savefig(r"D:\expecon_ms\figs\manuscript_figures\Figure2B\linreg_c_q.png", dpi=300)
-    plt.savefig(r"D:\expecon_ms\figs\manuscript_figures\Figure2B\linreg_c_q.svg", dpi=300)
+    savefig_path = Path('D:/expecon_ms/figs/manuscript_figures/Figure2B/')
+                        
+    plt.savefig(f'{savefig_path}linreg_c_q.png', dpi=300)
+    plt.savefig(f'{savefig_path}linreg_c_q.svg', dpi=300)
     plt.show()
 
 
@@ -401,7 +403,7 @@ def diff_from_optimal_criterion():
     print(std_high)
 
 
-def plot_figure1_grid(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\Figure1\\'):
+def plot_figure1_grid(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figures/Figure1/')):
 
     """Plot the figure 1 grid and the behavioral data
 
@@ -423,8 +425,8 @@ def plot_figure1_grid(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\F
     rt_con_yes, rt_con_incorrect = conditions
     
     # set colors for both conditions
-    blue = '#2a95ffff'  # 0.25 cue
-    red = '#ff2a2aff'
+    blue = '#2166acff'  # 0.25 cue
+    red = '#d73027ff' # 0.75 cue
 
     colors = [blue, red]
     medcolor = ['black', 'black']
@@ -531,7 +533,7 @@ def plot_figure1_grid(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\F
         patch.set_color(color)
 
     dprime_ax .set_ylabel('dprime', fontname="Arial", fontsize=14)
-    dprime_ax.text(1.4, 3, 'n.s', verticalalignment='center', fontname='Arial',
+    dprime_ax.text(1.4, 3, 'ns', verticalalignment='center', fontname='Arial',
                    fontsize='13')
     dprime_ax.set_ylim(0, 3.0)
     dprime_ax.set_yticks([0, 1.5, 3.0])
@@ -626,10 +628,12 @@ def plot_figure1_grid(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\F
             plots.set_xlabel('')
 
     if exclude_high_fa is True:
-        fig.savefig(savepath_fig1 + "\\figure1_exclhighfa.svg", dpi=300, bbox_inches='tight',
+        fig.savefig(f'{savepath_fig1}figure1_exclhighfa.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     else:
-        fig.savefig(savepath_fig1 + "\\figure1.svg", dpi=300, bbox_inches='tight',
+        fig.savefig(f'{savepath_fig1}figure1.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     plt.show()
 
@@ -649,7 +653,7 @@ def calc_stats():
         ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(x1=df_sdt[cond][df_sdt.cue == 0.25].reset_index(drop=True), 
                                                             x2=df_sdt[cond][df_sdt.cue == 0.75].reset_index(drop=True))
 
-    ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(conf[0].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0]
+        ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(conf[0].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0]
                                                                     ,conf[1].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0])
 
 def effect_wilcoxon(x1, x2):
@@ -729,7 +733,7 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     return ci_lower, ci_upper
 
 
-def supplementary_plots(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\\Figure1\\',
+def supplementary_plots(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figures/Figure1/'),
                         exclude_high_fa=False):
 
     # set colors for both conditions
@@ -776,11 +780,13 @@ def supplementary_plots(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\
     plt.ylabel('accuracy', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(savepath_fig1 + "\\acc_cue_exclhighfa.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}acc_cue_exclhighfa.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(savepath_fig1 + "\\acc_cue.svg", dpi=300, bbox_inches='tight',
-                        format='svg')
+        plt.savefig(f'{savepath_fig1}acc_cue.svg', dpi=300,
+                    bbox_inches='tight',
+                    format='svg')
     plt.show()
 
     # is confidence higher for correct than incorrect responses?
@@ -815,10 +821,12 @@ def supplementary_plots(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\
     plt.ylabel('confidence', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(savepath_fig1 + "\\conf_cue_exclhighfa.svg", dpi=300, bbox_inches='tight',
-                format='svg')
+        plt.savefig(f'{savepath_fig1}conf_cue_exclhighfa.svg', dpi=300,
+                    bbox_inches='tight',
+                    format='svg')
     else:
-        plt.savefig(savepath_fig1 + "\\conf_cue.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}conf_cue.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     plt.show()
 
@@ -856,10 +864,12 @@ def supplementary_plots(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\
     plt.ylabel('Confidence', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(savepath_fig1 + "\\conf_con_yes_exclhighfa.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}conf_con_yes_exclhighfa.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(savepath_fig1 + "\\conf_con_yes.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}conf_con_yes.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     plt.show()
 
@@ -894,10 +904,12 @@ def supplementary_plots(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\
     plt.ylabel('Mean confidence', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(savepath_fig1 + "\\conf_con_no_exclhighfa.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}conf_con_no_exclhighfa.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(savepath_fig1 + "\\conf_con_no.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}conf_con_no.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     plt.show()
 
@@ -932,10 +944,12 @@ def supplementary_plots(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\
     plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(savepath_fig1 + "\\rt_con_exclhighfa.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}rt_con_exclhighfa.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(savepath_fig1 + "\\rt_con.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}rt_con.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     plt.show()
 
@@ -970,10 +984,12 @@ def supplementary_plots(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\
     plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(savepath_fig1 + "\\rt_con_incorrect_exclhighfa.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}rt_con_incorrect_exclhighfa.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(savepath_fig1 + "\\rt_con_incorrect.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}rt_con_incorrect.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     plt.show()
 
@@ -1008,9 +1024,11 @@ def supplementary_plots(savepath_fig1='D:\\expecon_ms\\figs\\manuscript_figures\
     plt.ylabel('c 0.75', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(savepath_fig1 + "\\dprime_c_exclhighfa.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}dprime_c_exclhighfa.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(savepath_fig1 + "\\dprime_c.svg", dpi=300, bbox_inches='tight',
+        plt.savefig(f'{savepath_fig1}dprime_c.svg', dpi=300,
+                    bbox_inches='tight',
                     format='svg')
  
