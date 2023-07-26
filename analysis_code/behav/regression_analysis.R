@@ -44,6 +44,11 @@ par(family = "Arial", cex = 1.2)
 
 behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\prepro_behav_data.csv")
 
+# only the first 6 trials of each miniblock
+behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\df_after_tfr_analysis.csv")
+
+behav <- behav[behav$trial_count < 6, ]
+
 ###############manual SDT calculation#####################################################
 
 # without cue
@@ -200,6 +205,7 @@ cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=
                   control=glmerControl(optimizer="bobyqa",
                   optCtrl=list(maxfun=2e5)),
                   )
+
 emmeans::emmeans(cue_model, 'cue')
 
 check_collinearity(cue_model)

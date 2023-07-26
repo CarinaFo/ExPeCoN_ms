@@ -29,6 +29,11 @@ par(family = "Arial", cex = 1.2)
 
 behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\prepro_behav_data.csv")
 
+# only the first 6 trials of each miniblock
+behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\df_after_tfr_analysis.csv")
+
+behav <- behav[behav$trial_count < 6, ]
+
 # make factors:
 
 behav$ID = as.factor(behav$ID)
@@ -67,7 +72,7 @@ ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\sdt_int_cue_brms_mode
        plot = me_int, device = "svg")
 
 # save and read RDS model
-saveRDS(object = cue_model, file = "cue_model_brms.rds")
+saveRDS(object = cue_model, file = "cue_model_brms_firstsixtrialsonly.rds")
 summary(cue_model)
 
 cue_model = readRDS("cue_model_brms.rds")
@@ -79,7 +84,7 @@ cue_prev_model = brm(sayyes ~ prevsayyes+isyes+cue+isyes*cue + (prevsayyes+isyes
 # posterior predictive
 pp_check(cue_prev_model)
 
-saveRDS(object = cue_prev_model, file = "cue_prev_model_brms.rds")
+saveRDS(object = cue_prev_model, file = "cue_prev_model_brms_firstsixtrialsonly.rds")
 
 cue_prev_model = readRDS(file = "cue_prev_model_brms.rds")
 
@@ -90,13 +95,12 @@ cue_prev_int_model = brm(sayyes ~ prevsayyes+isyes+cue+isyes*cue+cue*prevsayyes 
                      data=behav, family=bernoulli(link='probit'), 
                      cores = getOption("mc.cores", 12))
 
-saveRDS(object = cue_prev_int_model, file = "cue_prev_int_model_brms.rds")
+saveRDS(object = cue_prev_int_model, file = "cue_prev_int_model_brms_firstsixtrialsonly.rds")
 
 cue_prev_int_model = readRDS(file = "cue_prev_int_model_brms.rds")
 
 # Obtain fixed effects estimates
 fixed_effects <- fixef(cue_prev_int_model)
-
 
 # Create a new data frame with the predictor variables and their corresponding values
 new_data <- data.frame(cue = behav$cue,
