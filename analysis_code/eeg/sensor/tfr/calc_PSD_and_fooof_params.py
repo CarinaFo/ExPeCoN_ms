@@ -37,14 +37,12 @@ IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
 dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs_iclabel"
 behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df'
 laplace=0
-subtract_evoked=1
 
-psd_a_all, psd_b_all = [], []
-fmin = 1
+spectra = []
+fmin = 4
 fmax = 40
-
-reject_criteria=dict(eeg=200e-6)
-flat_criteria=dict(eeg=1e-6)
+tmin=-0.4
+tmax = 0
 
 for idx, subj in enumerate(IDlist):
 
@@ -94,44 +92,35 @@ for idx, subj in enumerate(IDlist):
         else:
             epochs.metadata = subj_data
 
-        # drop bad epochs
-        #epochs.drop_bad(reject=reject_criteria, flat=flat_criteria)
+        epochs = epochs.subtract_evoked()
 
-        epochs_a = epochs[(epochs.metadata.cue == 0.75)]
-        epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-
-        if subtract_evoked:
-            epochs_a = epochs_a.subtract_evoked()
-            epochs_b = epochs_b.subtract_evoked()
-
-        # calculate PSD per epoch (inherits metadata from epochs)
-        psd_a= epochs_a.compute_psd(fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax)
-        psd_b= epochs_b.compute_psd(fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax)
-
-        psd_a_all.append(psd_a)
-        psd_b_all.append(psd_b)
+        # calculate prestimulus power per trial
+        spectrum = epochs.compute_psd(method='welch', fmin=fmin, fmax=fmax, 
+                                      tmin=tmin, tmax=tmax, n_jobs=-1,
+                                      n_per_seg=512)
+        
+        spectra.append(spectrum)
 
 # save freqs
-freqs = psd_a_all[0].freqs
+freqs = spectra[0].freqs
 
-# contrast conditions and average over epochs
-psd_evoked_a, psd_evoked_b = [], []
-
-for psd_a, psd_b in zip(psd_a_all, psd_b_all):
-        
-        evoked_psd_a = psd_a.average()
-        evoked_psd_b = psd_b.average()
-
-        psd_evoked_a.append(evoked_psd_a)
-        psd_evoked_b.append(evoked_psd_b)
+# contrast conditions
+spectra_high = [spectrum[spectrum.metadata.cue == 0.75] for spectrum in spectra]
+spectra_low = [spectrum[spectrum.metadata.cue == 0.25] for spectrum in spectra]
 
 # prepare for fooof (channel = C4 = index 24)
-psd_a = np.array([np.squeeze(psd[24, :]) for psd in psd_evoked_a])
-psd_b = np.array([np.squeeze(psd[24, :]) for psd in psd_evoked_b])
+ch_index = spectra[0].ch_names.index('C4')
+
+spectra_high_c4 = np.array([np.mean(psd.get_data()[:, ch_index, :], axis=0) for psd in spectra_high])
+spectra_low_c4 = np.array([np.mean(psd.get_data()[:, ch_index, :], axis=0) for psd in spectra_low])
+
+# gramd average over participants
+gra_high = np.mean(spectra_high_c4, axis=0)
+gra_low = np.mean(spectra_low_c4, axis=0)
 
 # plot an example PSD
-plt.plot(freqs, np.log10(psd_a[25]), label='0.75')
-plt.plot(freqs, np.log10(psd_b[25]), label='0.25')
+plt.plot(freqs, gra_high, label='0.75')
+plt.plot(freqs, gra_low, label='0.25')
 plt.legend()
 plt.savefig('D:\\expecon_ms\\figs\\manuscript_figures\\Figure5\\example_psd.svg',
              dpi=300)
@@ -174,7 +163,7 @@ def compare_band_pw(fm1, fm2, band_def):
     return pw1 - pw2
 
 
-def calc_fooof(psd_array=psd_a, fmin=3, fmax=40, freqs=freqs):
+def calc_fooof(psd_array=spectra_high_c4, fmin=3, fmax=40, freqs=freqs):
     
     # Initialize a FOOOFGroup object, specifying some parameters
     fg = FOOOFGroup(peak_width_limits=[1, 8], min_peak_height=0.05)

@@ -117,7 +117,7 @@ def power_criterion_corr():
     power_dict = {'alpha': diff_p_list[0], 'beta': diff_p_list[1]}
 
     # load random effects
-    re = pd.read_csv(f'{Path("D:/expecon_ms/data/behav/mixed_models/brms/random_effects.csv")}')
+    #re = pd.read_csv(f'{Path("D:/expecon_ms/data/behav/mixed_models/brms/random_effects.csv")}')
     
     # load behavioral SDT data
     out = figure1.prepare_for_plotting()

@@ -45,11 +45,11 @@ savedir_figure4 = Path('D:/expecon_ms/figs/manuscript_figures/Figure4')
 dir_cleanepochs = Path('D:/expecon_ms/data/eeg/prepro_ica/clean_epochs_corr')
 behavpath = Path('D:/expecon_ms/data/behav/behav_df')
 
-IDlist = ('007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
+IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '017', '018', '019', '020', '021', '022', '023', '024', '025', '026',
           '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
           '037', '038', '039', '040', '041', '042', '043', '044', '045', '046',
-          '047', '048', '049')
+          '047', '048', '049']
 
 
 def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
@@ -80,7 +80,7 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
     cycles = freqs/4.0
     
     # store behavioral data
-    df_all = []
+    df_all, spectra_all = [], []
 
     # now loop over participants
     for idx, subj in enumerate(IDlist):
@@ -137,17 +137,23 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
         # drop epochs with abnormal strong signal (> 200 mikrovolts)
         epochs.drop_bad(reject=dict(eeg=200e-6))
 
+        # crop epopchs in desired time window
+        epochs.crop(tmin=tmin, tmax=tmax)
+
         # avoid leakage and edge artifacts by zero padding the data
         if zero_pad:
-
+            
+            metadata = epochs.metadata
             # zero pad the data on both sides to avoid leakage and edge artifacts
             data = epochs.get_data()
 
-            data = zero_pad_data(data)
+            data = zero_pad_or_mirror_data(data, zero_pad=False)
 
             # put back into epochs structure
-
             epochs = mne.EpochsArray(data, epochs.info, tmin=tmin * 2)
+
+            # add metadta back
+            epochs.metadata = metadata
 
         # subtract evoked response from each epoch
         if induced:
@@ -161,6 +167,7 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
                                         n_per_seg=256)
                 
             spec_data = spectrum.get_data()
+            spectra_all.append(spectrum)
             spectrum_path = Path('D:/expecon_ms/data/eeg/sensor/psd/')
 
             # save the spectra to disk
@@ -168,14 +175,9 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
             
         else:
             
-            # calculate prestimulus power per trial
-            epochs.crop(tmin=tmin, tmax=tmax)
-
             # first create conditions and equalize trial numbers
             epochs_high = epochs[((epochs.metadata.cue == 0.75))]
             epochs_low = epochs[((epochs.metadata.cue == 0.25))]
-
-            mne.epochs.equalize_epoch_counts([epochs_high, epochs_low])
 
             hit = epochs[(epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1)]
             miss = epochs[(epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0)]
@@ -187,17 +189,14 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
 
             df_all.append(epochs.metadata)
 
-            # Filter the first 6 trials from each 'blocks' and 'subblock' group
-            first_trials = epochs.metadata[epochs.metadata['trial_count'] < 6]
-
-            epochs_high = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.trial_count < 6))]
-            epochs_low = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.trial_count < 6))]
+            epochs_high = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 0))]
+            epochs_low = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.isyes == 0))]
 
             mne.epochs.equalize_epoch_counts([epochs_high, epochs_low])
 
             tfr_path = Path('D:/expecon_ms/data/eeg/sensor/tfr')
 
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high-tfr.h5'):
+            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_catchtrials-tfr.h5'):
                 print('TFR already exists')
             else:
                 tfr_high, _ = mne.time_frequency.tfr_multitaper(epochs_high, 
@@ -210,8 +209,8 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
                                                                n_cycles=cycles,
                                                                n_jobs=-1)
 
-                tfr_high.save(f'{tfr_path}{Path("/")}{subj}_high-tfr.h5')
-                tfr_low.save(f'{tfr_path}{Path("/")}{subj}_low-tfr.h5')
+                tfr_high.save(f'{tfr_path}{Path("/")}{subj}_high_catchtrials-tfr.h5')
+                tfr_low.save(f'{tfr_path}{Path("/")}{subj}_low_catchtrials-tfr.h5')
             
             if os.path.exists(f'{tfr_path}{Path("/")}{subj}_hit-tfr.h5'):
                 print('TFR already exists')
@@ -228,7 +227,7 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
                 tfr_hit.save(f'{tfr_path}{Path("/")}{subj}_hit-tfr.h5')
                 tfr_miss.save(f'{tfr_path}{Path("/")}{subj}_miss-tfr.h5')
             
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_6trialsaftercue-tfr.h5'):
+            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_prevno_6trialsaftercue-tfr.h5'):
                 print('TFR already exists')
             else:
                 tfr_high, _ = mne.time_frequency.tfr_multitaper(epochs_high, 
@@ -241,24 +240,36 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
                                                                   n_cycles=cycles,
                                                                   n_jobs=-1)
                 
-                tfr_high.save(f'{tfr_path}{Path("/")}{subj}_high_6trialsaftercue-tfr.h5')
-                tfr_low.save(f'{tfr_path}{Path("/")}{subj}_low_6trialsaftercue-tfr.h5')
+                tfr_high.save(f'{tfr_path}{Path("/")}{subj}_high_prevno_6trialsaftercue-tfr.h5')
+                tfr_low.save(f'{tfr_path}{Path("/")}{subj}_low_prevno_6trialsaftercue-tfr.h5')
+
+            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_epochs-tfr.h5'):
+                print('TFR already exists')
+            else:
+
+                tfr_allepochs = mne.time_frequency.tfr_multitaper(epochs, freqs=freqs,
+                                                            n_cycles=cycles, return_itc=False,
+                                                            n_jobs=-1, average=False)
                 
-    df = pd.concat(df_all)
+                tfr_allepochs.save(f'{tfr_path}{Path("/")}{subj}_epochs-tfr.h5')
+                
+    #df = pd.concat(df_all)
 
-    df.to_csv(f'{Path("D:/expecon_ms/data/behav/behav_df")}{Path("/")}df_after_tfr_analysis.csv')
+    #df.to_csv(f'{Path("D:/expecon_ms/data/behav/behav_df")}{Path("/")}df_after_tfr_analysis.csv')
 
-    return 'Done with tfr computation', freqs, df
+    return 'Done with tfr computation', freqs
 
 
-def visualize_contrasts(cond_a='high_6trialsaftercue', cond_b='low_6trialsaftercue':
+def visualize_contrasts(cond_a='hit', cond_b='miss'):
 
     '''plot the grand average of the difference between conditions
     after loading the contrast data using pickle
     Parameters
     ----------
-    cond : str
+    cond_a : str
         which condition tfr to load 
+    cond_b : str
+        which condition tfr to load
     Returns
     -------
     diff: mne.time_frequency.AverageTFR
@@ -298,10 +309,17 @@ def visualize_contrasts(cond_a='high_6trialsaftercue', cond_b='low_6trialsafterc
 
     return diff, gra_a, gra_b, tfr_a_all, tfr_b_all
 
-def plot_figure4(channel_names=['C4']):
+def plot_figure4(channel_names=['C4'], fmin=7, fmax=35):
 
-    '''plot figure 4
+    '''plot figure 4: tfr contrasts (first row for different time windows)
+    and significant clusters (second row)
     Parameters
+    channel_names : list of char 
+        channels to analyze
+    fmin : int
+        minimum frequency to plot
+    fmax : int
+        maximum frequency to plot
     ----------
     channel_names : list of char (channel names)
     Returns
@@ -310,29 +328,31 @@ def plot_figure4(channel_names=['C4']):
     '''
 
     # Create a 2x3 grid of plots (2 rows, 3 columns)
-    fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(18, 9))
+    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(16, 10))
 
     # which time windows to plot
-    time_windows = [(-1, -0.5), (-0.4, 0.1), (-0.1, 0.4)]
+    time_windows = [(-1, -0.4), (-0.4, 0.5)]
+    # for mirrored data
+    #time_windows = [(-0.4, 0)]
 
     # which axes to plot the time windows
-    axes_first_row = [(0,0), (0,1), (0,2)]
-    axes_second_row = [(1,0), (1,1), (1,2)]
+    axes_first_row = [(0,0), (0,1)]
+    axes_second_row = [(1,0), (1,1)]
 
     # now populate first row with tfr contrasts
     for t, a in zip(time_windows, axes_first_row):
 
-        tfr_fig = diff.copy().crop(tmin=t[0], tmax=t[1]).plot(picks=channel_names[0], combine='mean',
-                                                    cmap=reversed_cmap, axes=axs[a[0], a[1]], show=False)[0]
+        tfr_fig = diff.copy().crop(tmin=t[0], tmax=t[1]).plot(picks=channel_names[0], combine='mean', vmin=-1, 
+                                                    vmax =1, cmap = 'viridis', axes=axs[a[0], a[1]], show=False)[0]
 
     # now plot cluster permutation output in the second row
     # pick channel
     ch_index = tfr_a.ch_names.index(channel_names[0])
 
-    for t, a in zip(times, axes_second_row):
+    for t, a in zip(time_windows, axes_second_row):
 
         # contrast data
-        X = np.array([h.copy().crop(tmin=t[0],tmax=t[1]).data - l.copy().crop(tmin=t[0],tmax=t[1]).data for h, l in zip(tfr_a_all, tfr_b_all)])
+        X = np.array([h.copy().crop(tmin=t[0], tmax=t[1]).data - l.copy().crop(tmin=t[0], tmax=t[1]).data for h, l in zip(tfr_a_all, tfr_b_all)])
 
         # pick channel
         X = X[:, ch_index, :, :]
@@ -345,14 +365,33 @@ def plot_figure4(channel_names=['C4']):
                                 n_jobs=-1,
                                 n_permutations=10000,
                                 tail=0)
+
+        if len(cluster_p) > 0:
+
+            print(f'The minimum p-value is {min(cluster_p)}')
+
+            good_cluster_inds = np.where(cluster_p < 0.05)
+            
+            if len(good_cluster_inds[0]) > 0:
+
+                # Find the index of the overall minimum value
+                min_index = np.unravel_index(np.argmin(T_obs), T_obs.shape)
+
+                freqs = np.arange(fmin, fmax, 1)
+                times = tfr_a_all[0].copy().crop(t[0], t[1]).times
+
+                #print(f'Frequencies: {str(freqs[np.unique(clusters[good_cluster_inds[0]][0])])}')
+                #print(f'Timepoints: {str(times[np.unique(clusters[good_cluster_inds[0]][1])])}')
+
         # run function to plot significant cluster in time and frequency space
         plot_cluster_test_output(tobs = T_obs, cluster_p_values = cluster_p, clusters=clusters, fmin=7, fmax=35,
                                 data_cond=tfr_a_all, tmin=t[0], tmax=t[1], ax0=a[0], ax1=a[1])
 
     # finally save figure
-    plt.savefig(f'{savedir_figure4}{Path("/")}fig4_tfr.svg', dpi=300, format='svg')
+    plt.savefig(f'{savedir_figure4}{Path("/")}fig4_{cond_a}_{cond_b}_tfr_C4.svg', dpi=300, format='svg')
+    plt.savefig(f'{savedir_figure4}{Path("/")}fig4_{cond_a}_{cond_b}_tfr_C4.png', dpi=300, format='png')
 
- def run_3D_cluster_test():
+def run_3D_cluster_test():
 
     # definde adjaceny matrix for cluster permutation test
     ch_adjacency = mne.channels.find_ch_adjacency(tfr_a_all[0].info,
@@ -423,7 +462,7 @@ def plot_cluster_test_output(tobs=None, cluster_p_values=None, clusters=None, fm
 
     fig2 = axs[ax0, ax1].imshow(
         T_obs_plot,
-        cmap=plt.cm.RdBu_r,
+        cmap=plt.cm.bwr,
         extent=[times[0], times[-1], freqs[0], freqs[-1]],
         aspect="auto",
         origin="lower",
@@ -441,18 +480,20 @@ def correlate_cluster_with_behav():
 
     # correlate cluster with criterion change
 
-    fmin=min(np.unique(clusters[1][0]))
-    fmax=max(np.unique(clusters[1][0]))
-    tmin=min(np.unique(clusters[1][1]))
-    tmax=max(np.unique(clusters[1][1]))
+    fmin=min(np.unique(clusters[0][0]))
+    fmax=max(np.unique(clusters[0][0]))
+    tmin=min(np.unique(clusters[0][1]))
+    tmax=max(np.unique(clusters[0][1]))
 
     #cluster before cue:
     X1 = X[:,fmin:fmax, tmin:tmax]
     X1 = X[:, min_index[0], min_index[1]]
-    
+
+    X1 = X[:,10:12,50:95]
+   
     X1 = np.mean(X1, axis=(1,2))
 
-    X1 = X1*10**11
+    X1 = X1*10**10
 
     # load signal detection dataframe
     out = figure1.prepare_for_plotting()
@@ -464,13 +505,14 @@ def correlate_cluster_with_behav():
     d_diff = np.array(sdt.dprime[sdt.cue == 0.75]) - np.array(sdt.dprime[sdt.cue == 0.25])
 
     # load random effects from glmmer model
-    re = pd.read_csv("D:\expecon_ms\data\\behav\mixed_models\\brms\\brms_betaweights.csv")
+    #re = pd.read_csv(f'{Path("D:/expecon_ms/data/behav/mixed_models/brms/brms_betaweights.csv")}')
+    re = pd.read_csv(f'{Path("D:/expecon_ms/data/behav/mixed_models/brms/regweights_6trials.csv")}')
 
-    np.corrcoef(re.cue, X1)
+    np.corrcoef(re.criterion, X1)
 
-    scipy.stats.pearsonr(re.cue, X1)
+    scipy.stats.pearsonr(re.criterion, X1)
 
-    sns.regplot(re.cue, X1)
+    sns.regplot(re.criterion, X1)
     
     # contrast data
     contrast_data = np.array([h.data-l.data for h, l in zip(power_a_all, power_b_all)])
@@ -711,28 +753,38 @@ def run_cluster_correlation_2D(cond='lowhigh', channel_names=['CP4', 'CP6', 'C4'
 
 ########################################################## Helper functions
 
-def zero_pad_data(data):
+def zero_pad_or_mirror_data(data, zero_pad=False):
     '''
-    :param data: data array with the structure channelsxtime
-    :return: array with zeros padded to both sides of the array with length = data.shape[2]
+    :param data: data array with the structure epochsxchannelsxtime
+    :return: array with mirrored data on both ends = data.shape[2]
     '''
 
-    zero_pad = np.zeros(data.shape[2])
+    if zero_pad:
+        padded_list=[]
+        
+        zero_pad = np.zeros(data.shape[2])
+        # loop over epochs
+        for epoch in range(data.shape[0]):
+            ch_list = []
+            # loop over channels
+            for ch in range(data.shape[1]):
+                # zero padded data at beginning and end
+                ch_list.append(np.concatenate([zero_pad, data[epoch][ch], zero_pad]))
+            padded_list.append([value for value in ch_list])
+    else:
+        padded_list=[]
 
-    padded_list=[]
-
-    for epoch in range(data.shape[0]):
-        ch_list = []
-        for ch in range(data.shape[1]):
-            ch_list.append(np.concatenate([zero_pad,data[epoch][ch],zero_pad]))
-        padded_list.append([value for value in ch_list])
+        # loop over epochs
+        for epoch in range(data.shape[0]):
+            ch_list = []
+            # loop over channels
+            for ch in range(data.shape[1]):
+                # mirror data at beginning and end
+                ch_list.append(np.concatenate([data[epoch][ch][::-1], data[epoch][ch], data[epoch][ch][::-1]]))
+            padded_list.append([value for value in ch_list])
 
     return np.squeeze(np.array(padded_list))
 
-        # randomly sample from low power trials to match number of trials
-        # in high power condition (equalize epoch counts mne not supported
-        # for tfrepochs object (yet))
-        # run 100 times and average over TFR average object
 
 def permutate_trials(n_permutations=500, power_a=None, power_b=None):
 
@@ -779,12 +831,30 @@ def extract_band_power():
     df = [s.metadata for s in spectra]
     df = pd.concat(df)
 
+    df_new = []
+
+    # Assign a sequential count for each row within each 'blocks' and 'subblock' group
+    for idx, id in enumerate(IDlist):
+        df_sub = df[df.ID == idx+7]
+        df_sub['trial_count'] = df_sub.groupby(['block', 'subblock']).cumcount()
+        df_new.append(df_sub)
+
+    df_new = pd.concat(df_new)
+
+    # add trial count to metadata
+    spectra_new = []
+
+    for i, spectrum in enumerate(spectra):
+        df_sub = df_new[df_new['ID'] == i+7]
+        spectrum.metadata = df_sub
+        spectra_new.append(spectrum)
+
     # save freqs
     freqs = spectra[0].freqs
 
     # contrast conditions
-    spectra_high = [spectrum[spectrum.metadata.cue == 0.75] for spectrum in spectra]
-    spectra_low = [spectrum[spectrum.metadata.cue == 0.25] for spectrum in spectra]
+    spectra_high = [spectrum[((spectrum.metadata.cue == 0.75) & (spectrum.metadata.trial_count < 6))] for spectrum in spectra_new]
+    spectra_low = [spectrum[((spectrum.metadata.cue == 0.25) & (spectrum.metadata.trial_count < 6))] for spectrum in spectra_new]
 
     # prepare for fooof (channel = C4 = index 24)
     ch_index = spectra[0].ch_names.index('C4')
@@ -838,8 +908,8 @@ def extract_band_power():
                 dpi=300)
     
     # average over frequency bands and log 10 transform
-    alpha_pow = [np.log10(np.mean(s.get_data()[:,:,1:4], axis=2)) for s in spectra]
-    beta_pow = [np.log10(s.get_data()[:,:,14]) for s in spectra]
+    alpha_pow = [np.log10(np.mean(s.get_data()[:,:,0:4], axis=2)) for s in spectra]
+    beta_pow = [np.log10(s.get_data()[:,:,4:]) for s in spectra]
   
     # extract band power from the power spectrum in channel C4
     alpha_pow = [p[:,ch_index] for p in alpha_pow]
@@ -859,7 +929,7 @@ def extract_band_power():
     beta_gr = df.groupby(['ID', 'cue'])['beta_pow'].mean()
     alpha_gr = df.groupby(['ID', 'cue'])['alpha_pow'].mean()
 
-    power_gr = {'beta': beta_gr}
+    power_gr = {'beta': beta_gr, 'alpha': alpha_gr}
 
     for keys, values in power_gr.items():
         # Extract values for low and high expectation conditions
@@ -881,7 +951,7 @@ def extract_band_power():
         plt.xlabel('Condition')
         plt.ylabel(f'{keys} Power')
 
-        plt.savefig('D:\\expecon_ms\\figs\\manuscript_figures\\Figure6_PSD\\boxplot_beta_diff.svg', dpi=300, format='svg')
+        # plt.savefig('D:\\expecon_ms\\figs\\manuscript_figures\\Figure6_PSD\\boxplot_beta_diff.svg', dpi=300, format='svg')
         # Display the plot
         plt.show()
 
@@ -899,6 +969,8 @@ def extract_band_power():
     # load random effects from glmmer model
     re = pd.read_csv("D:\expecon_ms\data\\behav\mixed_models\\brms\\brms_betaweights.csv")
     
+    low_expectation = beta_gr.loc[:, 0.25]
+    high_expectation = beta_gr.loc[:, 0.75]
     diff = high_expectation - low_expectation
 
     np.corrcoef(diff, re['cue_prev'])

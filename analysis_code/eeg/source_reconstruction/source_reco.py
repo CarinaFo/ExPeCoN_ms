@@ -5,18 +5,20 @@
 
 
 # Author: Carina Forster
-# last update: 28.02.2023
+# last update: 14.07.2023
 
+import os
 # load packages
 import os.path as op
-import os
-import numpy as np
+
+# plotting
+import matplotlib.pyplot as plt
 import mne
+import numpy as np
+import pandas as pd
 import scipy
 # freesurfer
 from mne.datasets import fetch_fsaverage
-# plotting
-import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # load source space files
@@ -36,8 +38,8 @@ src = mne.read_source_spaces(src_fname)
 fwd = mne.read_forward_solution(fwd_dir)
 
 save_dir_cluster_output = r"D:\expecon_ms\figs\eeg\sensor\cluster_permutation_output"
-savedir_epochs = 'D:/expecon/data/eeg/epochs_after_ica_cleaning'
-
+dir_cleanepochs = "D:\\expecon_ms\\data\\eeg\\prepro_ica\\clean_epochs_iclabel"
+behavpath = 'D:\\expecon_ms\\data\\behav\\behav_df\\'
 
 IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020', '021',
           '022', '023', '024', '025', '026', '027', '028', '029', '030', '031', '032', '033', '034','035', '036',
@@ -52,49 +54,48 @@ def run_source_reco(dics=1):
     each participant: shape: verticesxtimepoints
     """
 
-    trials_removed, all_trials = [], []
-
     for idx, subj in enumerate(IDlist):
 
         # print participant ID
         print('Analyzing ' + subj)
-        # skip those participants
-        if subj == '040' or subj == '045':
-            continue
 
-        # load cleaned epochs
-        #os.chdir("D:\expecon_ms\data\eeg\prepro_ica\clean_epochs")
+        epochs = mne.read_epochs(f'{dir_cleanepochs}\P{subj}_epochs_after_ic-label-epo.fif')
 
-        #epochs = mne.read_epochs('P' + subj + '_epochs_after_ica-epo.fif')
-        epochs = mne.read_epochs(savedir_epochs + '\P' + subj + '_after_ica-epo.fif')
+        ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
+        blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
 
-        # Remove 6 blocks with hitrates < 0.2 or > 0.8
+        # Check if the participant ID is in the list of IDs to delete
+        if pd.unique(epochs.metadata.ID) in ids_to_delete:
 
-        if subj == '010':
-            epochs = epochs[epochs.metadata.block != 6]
-        if subj == '012':
-            epochs = epochs[epochs.metadata.block != 6]
-        if subj == '026':
-            epochs = epochs[epochs.metadata.block != 4]
-        if subj == '030':
-            epochs = epochs[epochs.metadata.block != 3]
-        if subj == '032':
-            epochs = epochs[epochs.metadata.block != 2]
-            epochs = epochs[epochs.metadata.block != 3]
-        if subj == '039':
-            epochs = epochs[epochs.metadata.block != 3]
-        
+            # Get the corresponding blocks to delete for the current participant
+            participant_blocks_to_delete = [block for id_, block in
+                                            zip(ids_to_delete, blocks_to_delete)
+                                            if id_ == pd.unique(epochs.metadata.ID)]
+            
+            # Drop the rows with the specified blocks from the dataframe
+            epochs = epochs[~epochs.metadata.block.isin(participant_blocks_to_delete)]
+            
         # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
-        before_rt_removal = len(epochs.metadata)
-        epochs = epochs[epochs.metadata.respt1 > 0.1]
+        epochs = epochs[epochs.metadata.respt1 >= 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
-        # some weird trigger stuff going on?
-        epochs = epochs[epochs.metadata.trial != 1]
 
-        #save n trials per participant
-        all_trials.append(len(epochs.metadata))
+        # load behavioral data
+        data = pd.read_csv(f'{behavpath}//prepro_behav_data.csv')
 
-        trials_removed.append(before_rt_removal - len(epochs.metadata))
+        subj_data = data[data.ID == idx+7]
+
+        # get drop log from epochs
+        drop_log = epochs.drop_log
+
+        search_string = 'IGNORED'
+
+        indices = [index for index, tpl in enumerate(drop_log) if tpl and search_string not in tpl]
+
+        # drop bad epochs (too late recordings)
+        if indices:
+            epochs.metadata = subj_data.reset_index().drop(indices)
+        else:
+            epochs.metadata = subj_data
 
         #high vs. low condition
         epochs_high = epochs[epochs.metadata.cue == 0.75]
@@ -105,21 +106,21 @@ def run_source_reco(dics=1):
         #epochs_low = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0))]
         
         #average and crop in prestimulus window
-        evokeds_high = epochs_high.average().crop(-0.5,0)
-        evokeds_low = epochs_low.average().crop(-0.5,0)
+        evokeds_high = epochs_high.average()
+        evokeds_low = epochs_low.average()
 
         if dics == 1:
                 
             # We are interested in the beta band. Define a range of frequencies, using a
             # log scale, from 12 to 30 Hz.
 
-            freqs = np.logspace(np.log10(7), np.log10(13), 5)
+            freqs = np.logspace(np.log10(12), np.log10(30), 8)
 
             # Computing the cross-spectral density matrix for the beta frequency band, for
             # different time intervals.
-            csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=-0.5, tmax=0)
-            csd_a = mne.time_frequency.csd_morlet(epochs_high, freqs, tmin=-0.5, tmax=0)
-            csd_b = mne.time_frequency.csd_morlet(epochs_low, freqs, tmin=-0.5, tmax=0)
+            csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=-0.4, tmax=0)
+            csd_a = mne.time_frequency.csd_morlet(epochs_high, freqs, tmin=-0.4, tmax=0)
+            csd_b = mne.time_frequency.csd_morlet(epochs_low, freqs, tmin=-0.4, tmax=0)
             #csd_baseline = mne.time_frequency.csd_morlet(epochs, freqs, tmin=-1, tmax=-0.5)
 
             info = epochs.info
@@ -144,8 +145,8 @@ def run_source_reco(dics=1):
 
             os.chdir("D:\expecon_ms\data\eeg\source\high_low_pre_beamformer")
 
-            source_power_a.save('high_alpha_olddata_' + subj)
-            source_power_b.save('low_alpha_olddata_' + subj)
+            source_power_a.save('\high_beta_' + subj)
+            source_power_b.save('\low_beta_' + subj)
 
         else:
 

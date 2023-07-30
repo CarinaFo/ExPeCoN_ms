@@ -46,33 +46,13 @@ library(lmerTest) # pvalues for lmer models
 # set working directory
 
 # load brain behavior dataframe that contains single trial power in spec. frequency bands in sensor space
+setwd("D:/expecon_ms")
 
-power = read.csv('D:\\expecon\\data\\behav_brain\\power_per_trial_alpha_beta_sensor_laplace.csv')
-# TODO SIMON COMMENT: "I would suggest to use relative paths, assuming you start from the root of the repo."
+# Identify the relative path from your current working directory to the file
+relative_path <- file.path("data", "behav", "behav_df", "brain_behav.csv")
 
-# add variables for later analysis before data cleaning
-
-#include previous trial variables (lag variables)
-
-# previous choice
-
-power$lag1r = shift(power$sayyes, n=1) 
-
-# previous stimulus 
-
-power$lag1 = shift(power$isyes, n=1)
-
-# add accuracy variable
-
-power$correct = power$isyes == power$sayyes
-
-# previous trial accuracy
-
-power$correct1 = shift(power$correct, n=1) 
-
-# previous trial confidence
-
-power$lag1c = shift(power$conf, n=1)
+# Use the relative path to read the CSV file
+power <- read.csv(relative_path)
 
 # add prediction error per trial
 
@@ -80,18 +60,8 @@ power$PE_abs = abs(power$isyes - power$cue)
 
 # convert power values, log transform and standardize (see Stephani et. al, 2021)
 
-power$beta_scale_log <- scale(log10(power$beta), center=T, scale=T)
-power$alpha_scale_log <- scale(log10(power$alpha), center=T, scale=T)
-
-# remove no response trials (max rt=2.5) 
-# and trials that are faster than 200 ms for first order response 
-
-power <- power %>%
-  filter(power$respt1 < 2.5 & power$respt1 > 0.2 & power$respt2 < 2.5)
-
-# save rt cleaned data
-
-#write.csv(cue_power, "data_betapower_exclRT.csv")
+power$beta_scale_log <- scale(log10(power$beta_150to0), center=T, scale=T)
+power$alpha_scale_log <- scale(log10(power$alpha_150to0), center=T, scale=T)
 
 ## detrend data within participants (see Stephani et al., 2021)
 
@@ -138,6 +108,12 @@ if (check == 1){
 }
 
 # remove unnecessary variables 
+power <- power_copy[, !(names(power_copy) %in% c("alpha_trial", "beta_trial", "alpha_scale_log", 
+                                                 "beta_scale_log", "index", "alpha_150to0",
+                                                 "beta_150to0", "sayyes_y", "X", "Unnamed..0.1",
+                                                 "Unnamed..0"))]
 
-write.csv(power_copy, 'D:\\expecon\\data\\behav_brain\\behav_brain_expecon_sensor_laplace.csv')
-# TODO SIMON COMMENT: "Same as above."
+# Identify the relative path from your current working directory to the file
+relative_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
+
+write.csv(power, relative_path)

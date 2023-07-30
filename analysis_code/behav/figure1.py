@@ -149,10 +149,10 @@ def exclude_data():
     """
 
     # Set up data path
-    behavpath = Path('D:/expecon_ms/data/behav/behav_df/')
+    behavpath = Path('D:/expecon_ms/data/behav/behav_df')
 
     # Load data
-    data = pd.read_csv(f'{behavpath}behav_data_exclrts.csv')
+    data = pd.read_csv(f'{behavpath}{Path("/")}behav_data_exclrts.csv')
 
     # Calculate hit rates by participant and cue condition
     signal = data[data.isyes == 1]
