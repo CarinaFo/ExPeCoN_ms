@@ -41,6 +41,9 @@ par(family = "Arial", cex = 1.2)
 
 ####################################################################################################
 
+# expecon 1
+setwd("D:/expecon_ms")
+
 # set working directory and load clean, behavioral dataframe
 behav_path <- file.path("data", "behav", "behav_df", "prepro_behav_data.csv")
 
@@ -54,6 +57,20 @@ brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpow
 brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
 
 behav = read.csv(brain_behav_path)
+
+# expecon 2 behavioral data
+
+setwd("D:/expeco_2")
+
+brain_behav_path <- file.path("prepro_behav_data.csv")
+
+behav = read.csv(brain_behav_path)
+
+# ID to exclude
+ID_to_exclude <- 13
+
+# Excluding the ID from the dataframe
+behav <- behav[behav$ID != ID_to_exclude, ]
 
 ###############manual SDT calculation#####################################################
 
@@ -242,7 +259,7 @@ sjPlot::plot_model(beta_prevchoice, type='pred')
 
 # fit sdt model
 
-cue_model = glmer(sayyes ~ isyes+beta+isyes*beta + (isyes+beta+isyes*beta|ID), data=behav, 
+cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
                   family=binomial(link='probit'),
                   control=glmerControl(optimizer="bobyqa",
                   optCtrl=list(maxfun=2e5)),
@@ -296,12 +313,15 @@ summary(cue_prev_model)
 # Plot model
 
 est = sjPlot::plot_model(cue_prev_model, type='est', title='detection response ~',
-                         axis.lim=c(0.8,8)) +
+                         sort.est = TRUE, transform='plogis', show.values =TRUE, 
+                         value.offset = 0.3, colors='Accent') +
   theme(plot.background = element_blank(),
-        text = element_text(family = "Arial", size = 14)) +
-  ylab("Odds Ratio")
+        text = element_text(family = "Arial", size = 12)) +
+  ylab("Probabilities")
 
 est
+
+sjPlot::plot_model(cue_prev_int_model, type='int', mdrt.values = "meansd")
 
 # Save the plot as an SVG file
 ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_model_est.svg", plot = est, device = "svg")
@@ -310,8 +330,8 @@ ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_model_est.sv
 
 # including interaction between cue and previous choice
 
-cue_prev_int_model = glmer(sayyes ~ isyes + alpha + prevsayyes + alpha*prevsayyes + alpha*isyes +
-                            (isyes + alpha + prevsayyes + alpha*prevsayyes + alpha*isyes|ID), data=behav, 
+cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevsayyes + cue*prevsayyes + cue*isyes +
+                            (isyes + cue + prevsayyes + cue*prevsayyes + cue*isyes|ID), data=behav, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                            optCtrl=list(maxfun=2e5)),
@@ -341,7 +361,7 @@ est
 
 int = sjPlot::plot_model(cue_prev_int_model, type='int', mdrt.values = "meansd")
 
-int = int[[2]]+
+int = int[[1]]+
   theme(plot.background = element_blank(),
         text = element_text(family = "Arial", size = 12)) +
   ylab('detection response') +
