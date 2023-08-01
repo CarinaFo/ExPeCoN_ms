@@ -15,8 +15,10 @@ from matplotlib.font_manager import FontProperties as fm
 plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['font.size'] = 14
 
+savepath_fig1_expecon1 = Path('D:/expecon_ms/figs/manuscript_figures/Figure1')
+savepath_fig1_expecon2 = Path('D:/expeco_2/figures')
 
-def prepro_behavioral_data():
+def prepro_behavioral_data(expecon=2):
  
     """ This function preprocesses the behavioral data.
     We remove trials with no response or super fast responses
@@ -25,21 +27,34 @@ def prepro_behavioral_data():
     data: pandas dataframe containing the preprocessed behavioral data
     """
 
-    behavpath = Path('D:/expecon_ms/data/behav/behav_df/')
+    if expecon == 1:
 
-    # Load the behavioral data from the specified path
-    data = []
-    for root, dirs, files in os.walk(behavpath):
-        for name in files:
-            if 'behav_cleaned_for_eeg.csv' in name:
-                data = pd.read_csv(os.path.join(root, name))
+        # analyze expecon 1 behavioral data
+        behavpath = Path('D:/expecon_ms/data/behav/behav_df')
+        # Load the behavioral data from the specified path
+        data = pd.read_csv(f'{behavpath}{Path("/")}behav_cleaned_for_eeg.csv')
 
-    # Clean up the dataframe by dropping unnecessary columns
-    columns_to_drop = ["Unnamed: 0.2", 'Unnamed: 0.1', 'Unnamed: 0']
-    data = data.drop(columns_to_drop, axis=1)
+        # Clean up the dataframe by dropping unnecessary columns
+        columns_to_drop = ["Unnamed: 0.2", 'Unnamed: 0.1', 'Unnamed: 0']
+        data = data.drop(columns_to_drop, axis=1)
 
-    # Change the block number for participant 7's block 3
-    data.loc[(144*2):(144*3), 'block'] = 4
+        # Change the block number for participant 7's block 3
+        data.loc[(144*2):(144*3), 'block'] = 4
+
+    else:
+        # analyze expecon 2 behavioral data
+        behavpath = Path('D:/expeco_2')
+        data = pd.read_csv(f'{behavpath}{Path("/")}behav_expecon2.csv')
+
+        # rename columns
+        data = data.rename(columns={'stim_type': 'isyes'}) # stimulus (1 = signal)
+        data = data.rename(columns={'resp1': 'sayyes'}) # detection response (1 = Yes)
+        data = data.rename(columns={'resp2': 'conf'}) # confidence (binary)
+        data = data.rename(columns={'resp1_t': 'respt1'}) # confidence (binary)
+
+        data[['sayyes', 'isyes', 'cue', 'conf', 'respt1', 'resp2_t']] = \
+            data[['sayyes', 'isyes', 'cue', 'conf',
+                   'respt1', 'resp2_t']].apply(pd.to_numeric, errors='coerce')
 
     # add a column that indicates correct responses & congruency
     data['correct'] = data.sayyes == data.isyes
@@ -78,7 +93,7 @@ def prepro_behavioral_data():
     data = data.drop(data[data.respt1 < 0.1].index)
 
     # save the preprocessing data
-    data.to_csv(f'{behavpath}behav_data_exclrts.csv')
+    data.to_csv(f'{behavpath}{Path("/")}behav_data_exclrts.csv')
 
 
 def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition_col):
@@ -137,7 +152,7 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
     return results_df
 
 
-def exclude_data():
+def exclude_data(expecon=2):
     """
     Excludes participants and trials from the data based on the exclusion criteria.
     Arguments:
@@ -148,8 +163,12 @@ def exclude_data():
 
     """
 
-    # Set up data path
-    behavpath = Path('D:/expecon_ms/data/behav/behav_df')
+    if expecon == 1:
+        # Set up data path
+        behavpath = Path('D:/expecon_ms/data/behav/behav_df')
+    else: 
+        # analyze expecon 2 behavioral data
+        behavpath = Path('D:/expeco_2')
 
     # Load data
     data = pd.read_csv(f'{behavpath}{Path("/")}behav_data_exclrts.csv')
@@ -168,6 +187,7 @@ def exclude_data():
 
     # Filter the grouped object based on hit rate conditions
     filtered_groups = hitrate_per_block[(hitrate_per_block > 0.9) | (hitrate_per_block < 0.2)]
+    print('Participants with hit rates > 0.9 or < 0.2: ', len(filtered_groups))
 
     # Extract the ID and block information from the filtered groups
     remove_hitrates = filtered_groups.reset_index()
@@ -176,8 +196,9 @@ def exclude_data():
     noise = data[data.isyes == 0]
     farate_per_block = noise.groupby(['ID', 'block']).mean()['sayyes']
 
-    # Filter the grouped object based on hit rate conditions
+    # Filter the grouped object based on fa rate conditions
     filtered_groups = farate_per_block[farate_per_block > 0.4]
+    print('Participants with false alarm rates > 0.4: ', len(filtered_groups))
 
     # Extract the ID and block information from the filtered groups
     remove_farates = filtered_groups.reset_index()
@@ -185,7 +206,8 @@ def exclude_data():
     # Filter the grouped objects based on the conditions
     #filtered_groups = hitrate_per_block[hitrate_per_block < farate_per_block]  # Hit rate < False alarm rate
     filtered_groups = hitrate_per_block[hitrate_per_block - farate_per_block < 0.05]  # Difference < 0.1
-
+    print('Participants with hit rates < false alarm rates: ', len(filtered_groups))
+          
     # Extract the ID and block information from the filtered groups
     hitvsfarate = filtered_groups.reset_index()
 
@@ -204,9 +226,9 @@ def exclude_data():
     # Remove the '_merge' column
     data = filtered_df.drop('_merge', axis=1)
 
-    data.to_csv(f'{behavpath}prepro_behav_data.csv')
+    data.to_csv(f'{behavpath}{Path("/")}prepro_behav_data.csv')
     
-    return data
+    return data, expecon
 
 
 def prepare_for_plotting(exclude_high_fa=False):
@@ -220,7 +242,7 @@ def prepare_for_plotting(exclude_high_fa=False):
     data -- Pandas dataframe containing the data
     """
 
-    data = exclude_data()
+    data, expecon = exclude_data()
 
     # calculate hit rates, false alarm rates, d-prime, and criterion per participant and cue condition
     # and per condition
@@ -232,8 +254,11 @@ def prepare_for_plotting(exclude_high_fa=False):
     print(f"Index of participants with high farates: {faratehigh_indices}")
 
     if exclude_high_fa is True:
-        # exclude participants with high farates
-        indices = [f+7 for f in faratehigh_indices]  # add 7 to the indices to get the correct participant number
+        if expecon == 1:
+            # exclude participants with high farates
+            indices = [f+7 for f in faratehigh_indices]  # add 7 to the indices to get the correct participant number
+        else:
+            indices = [f+1 for f in faratehigh_indices]  # add 1 to the indices to get the correct participant number
         data = data[~data['ID'].isin(indices[0])]
 
     # calculate hit rates, false alarm rates, d-prime, and criterion per participant and cue condition
@@ -403,7 +428,7 @@ def diff_from_optimal_criterion():
     print(std_high)
 
 
-def plot_figure1_grid(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figures/Figure1/')):
+def plot_figure1_grid(savepath_fig1=savepath_fig1_expecon2):
 
     """Plot the figure 1 grid and the behavioral data
 
@@ -628,11 +653,11 @@ def plot_figure1_grid(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figures/
             plots.set_xlabel('')
 
     if exclude_high_fa is True:
-        fig.savefig(f'{savepath_fig1}figure1_exclhighfa.svg', dpi=300,
+        fig.savefig(f'{savepath_fig1}{Path("/")}figure1_exclhighfa.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     else:
-        fig.savefig(f'{savepath_fig1}figure1.svg', dpi=300,
+        fig.savefig(f'{savepath_fig1}{Path("/")}figure1.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
@@ -653,8 +678,8 @@ def calc_stats():
         ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(x1=df_sdt[cond][df_sdt.cue == 0.25].reset_index(drop=True), 
                                                             x2=df_sdt[cond][df_sdt.cue == 0.75].reset_index(drop=True))
 
-        ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(conf[0].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0]
-                                                                    ,conf[1].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0])
+    ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(conf[0].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0]
+                                                                ,conf[1].reset_index(drop=True).drop('ID', axis=1).iloc[:, 0])
 
 def effect_wilcoxon(x1, x2):
     """
@@ -733,7 +758,7 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     return ci_lower, ci_upper
 
 
-def supplementary_plots(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figures/Figure1/'),
+def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
                         exclude_high_fa=False):
 
     # set colors for both conditions
@@ -780,11 +805,11 @@ def supplementary_plots(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figure
     plt.ylabel('accuracy', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}acc_cue_exclhighfa.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}acc_cue_exclhighfa.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(f'{savepath_fig1}acc_cue.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}acc_cue.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
@@ -821,11 +846,11 @@ def supplementary_plots(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figure
     plt.ylabel('confidence', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}conf_cue_exclhighfa.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}conf_cue_exclhighfa.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(f'{savepath_fig1}conf_cue.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}conf_cue.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
@@ -864,11 +889,11 @@ def supplementary_plots(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figure
     plt.ylabel('Confidence', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}conf_con_yes_exclhighfa.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_yes_exclhighfa.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(f'{savepath_fig1}conf_con_yes.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_yes.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
@@ -904,11 +929,11 @@ def supplementary_plots(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figure
     plt.ylabel('Mean confidence', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}conf_con_no_exclhighfa.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_no_exclhighfa.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(f'{savepath_fig1}conf_con_no.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_no.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
@@ -944,11 +969,11 @@ def supplementary_plots(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figure
     plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}rt_con_exclhighfa.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}rt_con_exclhighfa.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(f'{savepath_fig1}rt_con.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}rt_con.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
@@ -984,11 +1009,11 @@ def supplementary_plots(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figure
     plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}rt_con_incorrect_exclhighfa.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}rt_con_incorrect_exclhighfa.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(f'{savepath_fig1}rt_con_incorrect.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}rt_con_incorrect.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
@@ -1024,11 +1049,11 @@ def supplementary_plots(savepath_fig1=Path('D:/expecon_ms/figs/manuscript_figure
     plt.ylabel('c 0.75', fontname="Arial", fontsize=14)
 
     if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}dprime_c_exclhighfa.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}dprime_c_exclhighfa.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     else:
-        plt.savefig(f'{savepath_fig1}dprime_c.svg', dpi=300,
+        plt.savefig(f'{savepath_fig1}{Path("/")}dprime_c.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
  
