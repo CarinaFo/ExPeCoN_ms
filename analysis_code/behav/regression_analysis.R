@@ -33,6 +33,7 @@ library(sjPlot)
 library(ggplot2)
 library(htmlTable)
 library(emmeans)
+library(gridExtra) # for subplots
 
 # Set the font family and size
 
@@ -41,13 +42,18 @@ par(family = "Arial", cex = 1.2)
 ####################################################################################################
 
 # set working directory and load clean, behavioral dataframe
+behav_path <- file.path("data", "behav", "behav_df", "prepro_behav_data.csv")
 
-behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\prepro_behav_data.csv")
+behav = read.csv(behav_path)
 
-# only the first 6 trials of each miniblock
-behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\df_after_tfr_analysis.csv")
+# brain behav path
+# cluster before stimulation cue onset from contrast previous choice
+brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower_precue.csv")
 
-behav <- behav[behav$trial_count < 6, ]
+# cluster close to stimulation onset from contrast high - low stim. probability
+brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
+
+behav = read.csv(brain_behav_path)
 
 ###############manual SDT calculation#####################################################
 
@@ -158,6 +164,32 @@ sdt_perblock <- sdt %>%
     crit = -0.5*(zhr + zfa)
   )
 
+
+# Group by 'cue' and 'ID' and calculate the mean beta power for each group
+result <- behav %>%
+  group_by(cue, ID) %>%
+  summarize(mean_beta_power = mean(beta, na.rm = TRUE))
+
+# Pivot the data to have 'cue' as columns and 'beta' as values
+df_wide <- pivot_wider(result, id_cols = ID, names_from = cue, values_from = mean_beta_power)
+
+# Calculate the difference in beta power between the two conditions
+df_diff <- df_wide %>%
+  mutate(beta_difference = `0.25` - `0.75`)
+
+# Filter the dataframe for each cue condition and calculate the mean criterion for each cue and participant
+criterion_diff <- sdt_persub %>%
+  filter(cue %in% c(0.75, 0.25)) %>%
+  group_by(cue, ID) %>%
+  summarize(mean_criterion = mean(crit))
+
+# Calculate the difference between the criterion for the two cue conditions per participant
+criterion_diff <- criterion_diff %>%
+  pivot_wider(names_from = cue, values_from = mean_criterion) %>%
+  mutate(criterion_difference = `0.25` - `0.75`)
+
+cor.test(criterion_diff$criterion_difference, df_diff$beta_difference)
+
 ################################ linear mixed modelling ###########################################
 
 # make factors:
@@ -198,9 +230,19 @@ if (length(significant_lags) > 0) {
 
 # No significant autocorrelation between trials
 
+# does the cue condition predict beta power?
+
+beta_cue = lmer(beta ~ cue + (cue|ID), data=behav) # yes
+beta_prevchoice = lmer(beta ~ prevsayyes + (prevsayyes|ID), data=behav)
+
+# plot the difference
+sjPlot::plot_model(beta_cue, type='pred')
+# plot the difference
+sjPlot::plot_model(beta_prevchoice, type='pred')
+
 # fit sdt model
 
-cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
+cue_model = glmer(sayyes ~ isyes+beta+isyes*beta + (isyes+beta+isyes*beta|ID), data=behav, 
                   family=binomial(link='probit'),
                   control=glmerControl(optimizer="bobyqa",
                   optCtrl=list(maxfun=2e5)),
@@ -211,7 +253,7 @@ emmeans::emmeans(cue_model, 'cue')
 check_collinearity(cue_model)
 check_convergence(cue_model)
 
-saveRDS(cue_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_model.rda")
+saveRDS(cue_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_model_betapow.rda")
 
 cue_model <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_model.rda")
 
@@ -268,47 +310,48 @@ ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_model_est.sv
 
 # including interaction between cue and previous choice
 
-cue_prev_int_model = glmer(sayyes ~ isyes + prevsayyes + cue + prevsayyes*cue + isyes*cue +
-                            (isyes + prevsayyes + cue + prevsayyes*cue + isyes*cue|ID), data=behav, 
+cue_prev_int_model = glmer(sayyes ~ isyes + alpha + prevsayyes + alpha*prevsayyes + alpha*isyes +
+                            (isyes + alpha + prevsayyes + alpha*prevsayyes + alpha*isyes|ID), data=behav, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                            optCtrl=list(maxfun=2e5)),
 )
 
-emmeans::emmeans(cue_prev_int_model, pairwise ~ cue * prevsayyes)
+summary(cue_prev_int_model)
+
+emmeans::emmeans(cue_prev_int_model, pairwise ~ prevsayyes*beta)
 
 # Print the post hoc comparisons with adjusted p-values
 print(interaction_comparisons, adjust = "holm")
 check_collinearity(cue_prev_int_model)
 check_convergence(cue_prev_int_model)
 
-saveRDS(cue_prev_int_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model.rda")
+saveRDS(cue_prev_int_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\alpha_prev_int_model.rda")
 
-cue_prev_int_model <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model.rda")
-
-summary(cue_prev_int_model)
+cue_prev_int_model <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model.rda")
 
 est = sjPlot::plot_model(cue_prev_int_model, type='est', title='detection response ~',
-                         axis.lim=c(0.8,8)) +
+                         sort.est = TRUE, transform='plogis', show.values =TRUE, 
+                         value.offset = 0.3, colors='Accent') +
   theme(plot.background = element_blank(),
-        text = element_text(family = "Arial", size = 14)) +
-  ylab("Odds Ratio")
+        text = element_text(family = "Arial", size = 12)) +
+  ylab("Probabilities")
 
 est
 
-int = sjPlot::plot_model(cue_prev_int_model, type='int', title='Predicted probability of responding yes')
+int = sjPlot::plot_model(cue_prev_int_model, type='int', mdrt.values = "meansd")
 
-int = int[[1]]+
+int = int[[2]]+
   theme(plot.background = element_blank(),
-        text = element_text(family = "Arial", size = 14)) +
+        text = element_text(family = "Arial", size = 12)) +
   ylab('detection response') +
   xlab('stimulus')
 
 int
 
 # Save the plot as an SVG file
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_model.svg", plot = int, device = "svg")
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_est_model.svg", plot = est, device = "svg")
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure5\\beta_prev_int_int_signal_model.svg", plot = int, device = "svg")
+ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure5\\beta_prev_int_est_model.svg", plot = est, device = "svg")
 
 # Model comparision
 
@@ -340,44 +383,44 @@ htmlTable(table1, file = output_file)
 signal = filter(behav, isyes==1)
 noise = filter(behav, isyes==0)
 
-cue_prev_int_model_signal = glmer(sayyes ~ prevsayyes + cue + prevsayyes*cue +
-                             (prevsayyes + cue + prevsayyes*cue|ID), data=signal, 
+cue_prev_int_model_signal = glmer(sayyes ~ prevsayyes + beta + prevsayyes*beta +
+                             (prevsayyes + beta + prevsayyes*beta|ID), data=signal, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
 )
 
-emmeans::emmeans(cue_prev_int_model_signal, pairwise ~ cue * prevsayyes)
+summary(cue_prev_int_model_signal)
 
+emmeans::emmeans(cue_prev_int_model_signal, pairwise ~ cue * prevsayyes)
 
 check_collinearity(cue_prev_int_model_signal)
 check_convergence(cue_prev_int_model_signal)
 
-saveRDS(cue_prev_int_model_signal, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_signal.rda")
-cue_prev_int_model_signal <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_signal.rda")
-
-summary(cue_prev_int_model_signal)
+saveRDS(cue_prev_int_model_signal, "D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model_signal.rda")
+cue_prev_int_model_signal <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model_signal.rda")
 
 # noise model
 
-cue_prev_int_model_noise = glmer(sayyes ~ prevsayyes + cue + prevsayyes*cue +
-                                    (prevsayyes + cue + prevsayyes*cue|ID), data=noise, 
+cue_prev_int_model_noise = glmer(sayyes ~ prevsayyes + beta + prevsayyes*beta +
+                                    (prevsayyes + beta + prevsayyes*beta|ID), data=noise, 
                                   family=binomial(link='probit'),
                                   control=glmerControl(optimizer="bobyqa",
                                                        optCtrl=list(maxfun=2e5)),
 )
+
+summary(cue_prev_int_model_noise)
 
 emmeans::emmeans(cue_prev_int_model_noise, ~ cue * prevsayyes)
 
 check_collinearity(cue_prev_int_model_noise)
 check_convergence(cue_prev_int_model_noise)
 
-saveRDS(cue_prev_int_model_noise, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_noise.rda")
-cue_prev_int_model_noise <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_noise.rda")
+saveRDS(cue_prev_int_model_noise, "D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model_noise.rda")
+cue_prev_int_model_noise <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model_noise.rda")
 
-summary(cue_prev_int_model_noise)
 
-int = sjPlot::plot_model(cue_prev_int_model_noise, type='int', title='Predicted probability of responding yes')+
+int = sjPlot::plot_model(cue_prev_int_model_noise, type='int',  mdrt.values = "meansd")+
   theme(plot.background = element_blank(),
         text = element_text(family = "Arial", size = 14)) +
   ylab('detection response') +
@@ -401,8 +444,8 @@ summary(acc_conf_model)
 conf = filter(behav, prevconf==1)
 unconf = filter(behav, prevconf==0)
 
-cue_prev_int_model_conf = glmer(sayyes ~ isyes + prevsayyes + cue + isyes*cue+prevsayyes*cue +
-                             (isyes + prevsayyes + cue + isyes*cue + prevsayyes*cue|ID), data=conf, 
+cue_prev_int_model_conf = glmer(sayyes ~ isyes + prevsayyes + beta + isyes*beta+prevsayyes*beta +
+                             (isyes + prevsayyes + beta + isyes*beta + prevsayyes*beta|ID), data=conf, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
@@ -445,3 +488,9 @@ int
 # Save the plot as an SVG file
 ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_conf_model.svg", plot = int, device = "svg")
 ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_unconf_model.svg", plot = int, device = "svg")
+
+
+# Figure 5
+
+combined_plot <- grid.arrange(plot_output1, plot_output2, ..., ncol = 3)
+

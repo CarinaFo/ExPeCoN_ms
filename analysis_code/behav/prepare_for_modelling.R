@@ -58,10 +58,20 @@ power <- read.csv(relative_path)
 
 power$PE_abs = abs(power$isyes - power$cue)
 
-# convert power values, log transform and standardize (see Stephani et. al, 2021)
+# https://philippmasur.de/2018/05/23/how-to-center-in-multilevel-models/
 
-power$beta_scale_log <- scale(log10(power$beta_150to0), center=T, scale=T)
-power$alpha_scale_log <- scale(log10(power$alpha_150to0), center=T, scale=T)
+# Log transform and standardize the 'beta' variable within each participant (grouped by 'ID')
+# cluster centering
+#power <- power %>%
+#  group_by(ID) %>%
+#  mutate(
+#    alpha_scale_log = scale(log10(alpha_150to0)),
+#    beta_scale_log = scale(log10(beta_150to0))
+ # )
+
+# grand mean centering (we decided for this approach, see Stephani et al., 2021)
+power$beta_scale_log <- scale(log10(power$beta_900to700))
+power$alpha_scale_log <- scale(log10(power$alpha_900to700))
 
 ## detrend data within participants (see Stephani et al., 2021)
 
@@ -114,6 +124,6 @@ power <- power_copy[, !(names(power_copy) %in% c("alpha_trial", "beta_trial", "a
                                                  "Unnamed..0"))]
 
 # Identify the relative path from your current working directory to the file
-relative_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
+relative_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower_precue.csv")
 
 write.csv(power, relative_path)

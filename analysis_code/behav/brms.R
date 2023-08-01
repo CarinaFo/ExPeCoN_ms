@@ -26,13 +26,16 @@ par(family = "Arial", cex = 1.2)
 ####################################################################################################
 
 # set working directory and load clean, behavioral dataframe
+behav_path <- file.path("data", "behav", "behav_df", "prepro_behav_data.csv")
 
-behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\prepro_behav_data.csv")
+behav = read.csv(behav_path)
 
-# only the first 6 trials of each miniblock
-behav = read.csv("D:\\expecon_ms\\data\\behav\\behav_df\\df_after_tfr_analysis.csv")
+# brain behav path
+brain_behav_path <- file.path("data", "behav", "behav_df", "behav_brain_cleanpower.csv")
 
-behav <- behav[behav$trial_count < 6, ]
+behav = read.csv(brain_behav_path)
+
+####################################################################################################
 
 # make factors:
 
@@ -90,12 +93,12 @@ cue_prev_model = readRDS(file = "cue_prev_model_brms.rds")
 
 summary(cue_prev_model)
 
-cue_prev_int_model = brm(sayyes ~ prevsayyes+isyes+cue+isyes*cue+cue*prevsayyes +
-                           (prevsayyes+isyes+cue+isyes*cue+cue*prevsayyes|ID),
+cue_prev_int_model = brm(sayyes ~ prevsayyes+isyes+beta+isyes*beta+beta*prevsayyes +
+                           (prevsayyes+isyes+beta+isyes*beta+beta*prevsayyes|ID),
                      data=behav, family=bernoulli(link='probit'), 
                      cores = getOption("mc.cores", 12))
 
-saveRDS(object = cue_prev_int_model, file = "cue_prev_int_model_brms_firstsixtrialsonly.rds")
+saveRDS(object = cue_prev_int_model, file = "cue_prev_int_model_brms_beta.rds")
 
 cue_prev_int_model = readRDS(file = "cue_prev_int_model_brms.rds")
 
