@@ -40,7 +40,8 @@ freq_list = np.arange(7, 35, 1)
 freq_bands = {'alpha': (7, 13), 'beta': (15, 25)}
 
 
-def save_band_power_per_trial(time_intervals={'150to0': (-0.15, 0)}, channel_name=['C4']):
+def save_band_power_per_trial(time_intervals={'900to700': (-0.9, -0.7), '300to100': (-0.3, -0.1),
+                                              '150to0': (-0.15, 0)}, channel_name=['C4']):
 
     """This function saves the power per trial per frequency band in a csv file. 
     The power is calculated for the time interval specified and averaged over 
@@ -55,7 +56,7 @@ def save_band_power_per_trial(time_intervals={'150to0': (-0.15, 0)}, channel_nam
     # save single subject dataframes in a list
     brain_behav = []
 
-    for subj in enumerate(IDlist):
+    for subj in IDlist:
 
         # load single trial power
         power = mne.time_frequency.read_tfrs(f'{tfr_dir}{Path("/")}{subj}_epochs-tfr.h5')[0]
@@ -74,8 +75,10 @@ def save_band_power_per_trial(time_intervals={'150to0': (-0.15, 0)}, channel_nam
             # now we average over the frequency band and time interval 
             # and add the column to the 
             # behavioral data frame
-            behav_data[f'alpha_{keys}'] = np.mean(power_crop.data[:, 0:7], axis=1)  # 7-14 Hz
-            behav_data[f'beta_{keys}'] = np.mean(power_crop.data[:, 8:19], axis=1) # 15-25 Hz
+            behav_data[f'alpha_{keys}'] = np.mean(power_crop.data[:, 0:7], 
+                                                  axis=1)  # 7-13 Hz
+            behav_data[f'beta_{keys}'] = np.mean(power_crop.data[:, 8:19], 
+                                                 axis=1) # 15-25 Hz
 
         # save the data in a list
         brain_behav.append(behav_data)
