@@ -40,6 +40,7 @@ library(tidyr) # spread function
 library(data.table) # for shift function
 library(lme4)
 library(lmerTest) # pvalues for lmer models
+#library(purr)
 
 ####################################################################################################
 
@@ -69,39 +70,43 @@ power$PE_abs = abs(power$isyes - power$cue)
 #    beta_scale_log = scale(log10(beta_150to0))
  # )
 
+# Columns to process
+columns_to_process <- c("alpha_900to700", "beta_900to700", "alpha_300to100", "beta_300to100", "alpha_150to0", "beta_150to0")
+
 # grand mean centering (we decided for this approach, see Stephani et al., 2021)
-power$beta_scale_log <- scale(log10(power$beta_900to700))
-power$alpha_scale_log <- scale(log10(power$alpha_900to700))
-
-## detrend data within participants (see Stephani et al., 2021)
-
-# copy dataset
-
-power_copy <- power
-power_copy$alpha <- NA
-power_copy$beta <- NA
-
-# take residuals from regression on trial_ix (calculate trend including intercept
-# but do not subtract participant-specific intercepts)
-
-for (s in c( unique(power$ID) )){
-  dat_tmp2 <- power[power$ID==s,]
-  
-  power_copy$alpha_trial[power$ID==s] <- power$alpha_scale_log[power$ID==s] - 
-    lm(alpha_scale_log ~ trial, data=dat_tmp2)$coefficients[2]*dat_tmp2$trial
-  power_copy$beta_trial[power$ID==s] <- power$beta_scale_log[power$ID==s] - 
-    lm(beta_scale_log~ trial, data=dat_tmp2)$coefficients[2]*dat_tmp2$trial
+standardize_and_log <- function(x) {
+  scale(log10(x))
 }
 
-for (s in c( unique(power$ID) )){
-  
-  dat_tmp2 <- power_copy[power_copy$ID==s,]
-  
-  power_copy$alpha[power$ID==s] <- power_copy$alpha_trial[power_copy$ID==s] - 
-    lm(alpha_trial ~ block, data=dat_tmp2)$coefficients[2]*dat_tmp2$block
-  power_copy$beta[power$ID==s] <- power_copy$beta_trial[power_copy$ID==s] - 
-    lm(beta_trial ~ block, data=dat_tmp2)$coefficients[2]*dat_tmp2$block
+# detrend data within participants (see Stephani et al., 2021)
+detrend <- function(x) {
+  model <- lmer(x ~ trial + block + (1|ID), REML=T, data=power)
+  residuals <- residuals(model)
+  return(residuals)
 }
+
+# standardize and log transform
+power <- power %>%
+  mutate(across(all_of(columns_to_process), standardize_and_log))
+
+# Remove attributes from the scaled columns
+power[, columns_to_process] <- lapply(power[, columns_to_process], unclass)
+
+# Convert the specified columns to numeric
+power[c('block', 'trial')] <- lapply(power[c('block', 'trial')], as.numeric)
+
+# Function to detrend a column using linear mixed models
+detrend_lmm <- function(column, trial, block, ID) {
+  model <- lmer(column ~ trial + block + (1 | ID))
+  residuals <- resid(model)
+  return(residuals)
+}
+
+# Loop over the columns and apply detrending
+for (col in columns_to_process) {
+  power[[paste0(col, "_detrended")]] <- detrend_lmm(power[[col]], power$trial, power$block, power$ID)
+}
+
 
 # check whether trend removal has worked (remove trend for trials within block and trend over blocks)
 
@@ -109,21 +114,19 @@ check = 1
 
 if (check == 1){
   
-  summary(lmer(alpha ~ trial + (1|ID), data=power_copy, REML=T))
-  summary(lmer(alpha ~ block + (1|ID), data=power_copy, REML=T))
+  summary(lmer(alpha_900to700_detrended ~ trial + (1|ID), data=power, REML=T))
+  summary(lmer(alpha_900to700_detrended ~ block + (1|ID), data=power, REML=T))
   
-  summary(lmer(beta ~ trial + (1|ID), data=power_copy, REML=T))
-  summary(lmer(beta ~ block + (1|ID), data=power_copy, REML=T))
+  summary(lmer(beta_900to700_detrended ~ trial + (1|ID), data=power, REML=T))
+  summary(lmer(beta_900to700_detrended ~ block + (1|ID), data=power, REML=T))
   
 }
 
 # remove unnecessary variables 
-power <- power_copy[, !(names(power_copy) %in% c("alpha_trial", "beta_trial", "alpha_scale_log", 
-                                                 "beta_scale_log", "index", "alpha_150to0",
-                                                 "beta_150to0", "sayyes_y", "X", "Unnamed..0.1",
-                                                 "Unnamed..0"))]
+power <- power[, !(names(power_copy) %in% c("index", "sayyes_y", "X", "Unnamed..0.1",
+                                                 "Unnamed..0", "sayyes_y"))]
 
 # Identify the relative path from your current working directory to the file
-relative_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower_precue.csv")
+relative_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
 
 write.csv(power, relative_path)
