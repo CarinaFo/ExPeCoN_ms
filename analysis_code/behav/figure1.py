@@ -662,10 +662,16 @@ def plot_figure1_grid(savepath_fig1=savepath_fig1_expecon2):
         fig.savefig(f'{savepath_fig1}{Path("/")}figure1_exclhighfa.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
+        fig.savefig(f'{savepath_fig1}{Path("/")}figure1_exclhighfa.png', dpi=300,
+                    bbox_inches='tight',
+                    format='png')
     else:
         fig.savefig(f'{savepath_fig1}{Path("/")}figure1.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
+        fig.savefig(f'{savepath_fig1}{Path("/")}figure1.png', dpi=300,
+                    bbox_inches='tight',
+                    format='png')
     plt.show()
 
 
