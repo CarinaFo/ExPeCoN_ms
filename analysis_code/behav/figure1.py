@@ -46,6 +46,12 @@ def prepro_behavioral_data(expecon=2):
         behavpath = Path('D:/expeco_2')
         data = pd.read_csv(f'{behavpath}{Path("/")}behav_expecon2.csv')
 
+        # ID to exclude(missing stimulation in block 1 and 2)
+        ID_to_exclude = 13
+
+        # Excluding the ID from the DataFrame
+        data = data[data['ID'] != ID_to_exclude]
+
         # rename columns
         data = data.rename(columns={'stim_type': 'isyes'}) # stimulus (1 = signal)
         data = data.rename(columns={'resp1': 'sayyes'}) # detection response (1 = Yes)
