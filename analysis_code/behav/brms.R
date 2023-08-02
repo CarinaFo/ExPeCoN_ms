@@ -24,6 +24,8 @@ options(mc.cores = parallel::detectCores())
 par(family = "Arial", cex = 1.2)
 
 ####################################################################################################
+main_dir = file.path("D:", "expecon_ms")
+setwd(main_dir)
 
 # set working directory and load clean, behavioral dataframe
 behav_path <- file.path("data", "behav", "behav_df", "prepro_behav_data.csv")
@@ -31,10 +33,9 @@ behav_path <- file.path("data", "behav", "behav_df", "prepro_behav_data.csv")
 behav = read.csv(behav_path)
 
 # brain behav path
-brain_behav_path <- file.path("data", "behav", "behav_df", "behav_brain_cleanpower.csv")
+brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
 
 behav = read.csv(brain_behav_path)
-
 ####################################################################################################
 
 # make factors:
@@ -50,15 +51,17 @@ behav$correct = as.factor(behav$correct)
 # Remove the first row (assures equal amount of data for all models)
 behav <- behav[-1, ]
 
-setwd("D:\\expecon_ms\\data\\behav\\mixed_models\\brms\\")
-
+wd_path <- file.path("data", "behav", "mixed_models", "brms")
+setwd(wd_path)
 ##################################### prev choice  models ##########################################
 
 cue_model = brm(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
                 family=bernoulli(link='probit'), 
                 cores = getOption("mc.cores", 12))
 
-# posterior predictive
+summary(cue_model)
+
+# posterior predictive checks
 pp_check(cue_model)
 
 # extract variables
@@ -71,36 +74,64 @@ marginal_effects_model <- marginal_effects(cue_model)
 me = plot(marginal_effects_model)
 me_int = me$`isyes:cue`
 
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\sdt_int_cue_brms_model.svg", 
-       plot = me_int, device = "svg")
+# save figure
+fig_save_path = file.path("figs", "manuscript_figures", "Figure1", "sdt_int_cue_brms_model.svg")
+ggsave(fig_save_path, plot = me_int, device = "svg")
 
 # save and read RDS model
 saveRDS(object = cue_model, file = "cue_model_brms_firstsixtrialsonly.rds")
-summary(cue_model)
-
 cue_model = readRDS("cue_model_brms.rds")
+
+####################add previous choice############################################################
 
 cue_prev_model = brm(sayyes ~ prevsayyes+isyes+cue+isyes*cue + (prevsayyes+isyes+cue+isyes*cue|ID),
                      data=behav, family=bernoulli(link='probit'), 
                      cores = getOption("mc.cores", 12))
 
+summary(cue_prev_model)
+
 # posterior predictive
 pp_check(cue_prev_model)
 
+# save and read model
 saveRDS(object = cue_prev_model, file = "cue_prev_model_brms_firstsixtrialsonly.rds")
-
 cue_prev_model = readRDS(file = "cue_prev_model_brms.rds")
 
-summary(cue_prev_model)
+
+############################interaction model######################################################
 
 cue_prev_int_model = brm(sayyes ~ prevsayyes+isyes+beta+isyes*beta+beta*prevsayyes +
                            (prevsayyes+isyes+beta+isyes*beta+beta*prevsayyes|ID),
                      data=behav, family=bernoulli(link='probit'), 
                      cores = getOption("mc.cores", 12))
 
-saveRDS(object = cue_prev_int_model, file = "cue_prev_int_model_brms_beta.rds")
+summary(cue_prev_int_model)
 
+saveRDS(object = cue_prev_int_model, file = "cue_prev_int_model_brms.rds")
 cue_prev_int_model = readRDS(file = "cue_prev_int_model_brms.rds")
+
+# including prestimulus  power
+
+# replacing the cue predictor with prestimulus beta power
+cue_prev_int_model_cue150to100 = brm(sayyes ~ isyes + beta_150to0 + prevsayyes + 
+                                       beta_150to0*prevsayyes
+                                       + beta_150to0*isyes +
+                                         (isyes + beta_150to0 + prevsayyes + 
+                                            beta_150to0*prevsayyes
+                                          + beta_150to0*isyes|ID), data=behav, 
+                                          family=bernoulli(link='probit'), 
+                                          cores = getOption("mc.cores", 12)
+)
+
+# replacing previous choice with prestimulus beta power
+cue_prev_int_model_prev300to100 = brm(sayyes ~ isyes + cue + beta_300to0 + cue*beta_300to0
+                                       + cue*isyes +
+                                         (isyes + cue + beta_300to0 + cue*beta_300to0
+                                          + cue*isyes|ID), data=behav, 
+                                          data=behav, family=bernoulli(link='probit'), 
+                                          cores = getOption("mc.cores", 12)
+)
+
 
 # Obtain fixed effects estimates
 fixed_effects <- fixef(cue_prev_int_model)
@@ -112,17 +143,6 @@ new_data <- data.frame(cue = behav$cue,
 # Predict the response variable using the fixed effects estimates and new data
 predicted_values <- predict(cue_prev_int_model, newdata = new_data, type = "response")
 
-# Create new variables representing the mediated pathway
-mediator <- your_data$mediator_variable
-outcome <- your_data$response_var
-
-# Fit the mediation models
-med_model <- lm(mediator ~ predictor1 + predictor2, data = your_data)
-out_model <- lm(outcome ~ mediator + predictor1 + predictor2, data = your_data)
-
-# Run the mediation analysis
-mediation_result <- mediate(med_model, out_model, treat = "mediator", mediator = "outcome")
-
 # extract variables
 get_variables(cue_prev_int_model)
 
@@ -133,8 +153,8 @@ marginal_effects_model <- marginal_effects(cue_prev_int_model)
 me = plot(marginal_effects_model)
 me_int = me$`prevsayyes:cue`
 
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\int_cue_brms_model.svg", 
-       plot = me_int, device = "svg")
+# save figure
+ggsave(fig_save_path, plot = me_int, device = "svg")
 
 # model comparision
 
@@ -150,9 +170,8 @@ waic_comp = loo(cue_model, cue_prev_model, cue_prev_int_model, 'waic')
 
 # save model output as table to html file
 table1 = sjPlot::tab_model(cue_model, cue_prev_model, cue_prev_int_model)
-output_file <- "D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\table1_supplm.html"
-htmlTable(table1, file = output_file)
-
+output_file_path <- file.path("figs", "manuscript_figures", "Tables", "table1_supplm.html")
+htmlTable(table1, file =  output_file_path)
 #########################################signal vs. noise##########################################
 # Signal vs. noise 
 

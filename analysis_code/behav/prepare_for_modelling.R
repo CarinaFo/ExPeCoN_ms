@@ -78,13 +78,6 @@ standardize_and_log <- function(x) {
   scale(log10(x))
 }
 
-# detrend data within participants (see Stephani et al., 2021)
-detrend <- function(x) {
-  model <- lmer(x ~ trial + block + (1|ID), REML=T, data=power)
-  residuals <- residuals(model)
-  return(residuals)
-}
-
 # standardize and log transform
 power <- power %>%
   mutate(across(all_of(columns_to_process), standardize_and_log))
@@ -95,18 +88,31 @@ power[, columns_to_process] <- lapply(power[, columns_to_process], unclass)
 # Convert the specified columns to numeric
 power[c('block', 'trial')] <- lapply(power[c('block', 'trial')], as.numeric)
 
-# Function to detrend a column using linear mixed models
-detrend_lmm <- function(column, trial, block, ID) {
-  model <- lmer(column ~ trial + block + (1 | ID))
-  residuals <- resid(model)
-  return(residuals)
+detrend_within_participants <- function(df, column) {
+  for (s in unique(df$ID)) {
+    dat_tmp2 <- df[df$ID == s,]
+    
+    trend_col <- paste0(column)
+    df[[trend_col]][df$ID == s] <- df[[trend_col]][df$ID == s] -
+      lm(as.formula(paste0(trend_col, " ~ trial")), data = dat_tmp2)$coefficients[2] * dat_tmp2$trial
+  }
+  
+  for (s in unique(df$ID)) {
+    dat_tmp2 <- df[df$ID == s,]
+    
+    trial_col <- paste0(column)
+    df[[trial_col]][df$ID == s] <- df[[trial_col]][df$ID == s] -
+      lm(as.formula(paste0(trial_col, " ~ block")), data = dat_tmp2)$coefficients[2] * dat_tmp2$block
+  }
+  
+  return(df)
 }
+
 
 # Loop over the columns and apply detrending
 for (col in columns_to_process) {
-  power[[paste0(col, "_detrended")]] <- detrend_lmm(power[[col]], power$trial, power$block, power$ID)
+  power <- detrend_within_participants(power, col)
 }
-
 
 # check whether trend removal has worked (remove trend for trials within block and trend over blocks)
 
@@ -114,16 +120,16 @@ check = 1
 
 if (check == 1){
   
-  summary(lmer(alpha_900to700_detrended ~ trial + (1|ID), data=power, REML=T))
-  summary(lmer(alpha_900to700_detrended ~ block + (1|ID), data=power, REML=T))
+  summary(lmer(alpha_900to700 ~ trial + (1|ID), data=power, REML=T))
+  summary(lmer(alpha_900to700 ~ block + (1|ID), data=power, REML=T))
   
-  summary(lmer(beta_900to700_detrended ~ trial + (1|ID), data=power, REML=T))
-  summary(lmer(beta_900to700_detrended ~ block + (1|ID), data=power, REML=T))
+  summary(lmer(beta_900to700 ~ trial + (1|ID), data=power, REML=T))
+  summary(lmer(beta_900to700 ~ block + (1|ID), data=power, REML=T))
   
 }
 
 # remove unnecessary variables 
-power <- power[, !(names(power_copy) %in% c("index", "sayyes_y", "X", "Unnamed..0.1",
+power <- power[, !(names(power) %in% c("index", "sayyes_y", "X", "Unnamed..0.1",
                                                  "Unnamed..0", "sayyes_y"))]
 
 # Identify the relative path from your current working directory to the file

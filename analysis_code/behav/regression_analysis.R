@@ -34,6 +34,10 @@ library(ggplot2)
 library(htmlTable)
 library(emmeans)
 library(gridExtra) # for subplots
+library(performance)
+
+# don't forget to give credit to the amazing authors of those packages
+#citation("emmeans")
 
 # Set the font family and size
 
@@ -49,22 +53,13 @@ behav_path <- file.path("data", "behav", "behav_df", "prepro_behav_data.csv")
 
 behav = read.csv(behav_path)
 
-# brain behav path
-# cluster before stimulation cue onset from contrast previous choice
-brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower_precue.csv")
-
-# cluster close to stimulation onset from contrast high - low stim. probability
-brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
-
-behav = read.csv(brain_behav_path)
-
 # expecon 2 behavioral data
 
 setwd("D:/expeco_2")
 
-brain_behav_path <- file.path("prepro_behav_data.csv")
+behav_path <- file.path("prepro_behav_data.csv")
 
-behav = read.csv(brain_behav_path)
+behav = read.csv(behav_path)
 
 # ID to exclude
 ID_to_exclude <- 13
@@ -72,7 +67,13 @@ ID_to_exclude <- 13
 # Excluding the ID from the dataframe
 behav <- behav[behav$ID != ID_to_exclude, ]
 
-###############manual SDT calculation#####################################################
+####################################brain behav#####################################################
+
+brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
+
+behav = read.csv(brain_behav_path)
+
+###############manual SDT calculation###############################################################
 
 # without cue
 
@@ -185,7 +186,7 @@ sdt_perblock <- sdt %>%
 # Group by 'cue' and 'ID' and calculate the mean beta power for each group
 result <- behav %>%
   group_by(cue, ID) %>%
-  summarize(mean_beta_power = mean(beta, na.rm = TRUE))
+  summarize(mean_beta_power = mean(beta_150to0, na.rm = TRUE))
 
 # Pivot the data to have 'cue' as columns and 'beta' as values
 df_wide <- pivot_wider(result, id_cols = ID, names_from = cue, values_from = mean_beta_power)
@@ -249,14 +250,18 @@ if (length(significant_lags) > 0) {
 
 # does the cue condition predict beta power?
 
-beta_cue = lmer(beta ~ cue + (cue|ID), data=behav) # yes
-beta_prevchoice = lmer(beta ~ prevsayyes + (prevsayyes|ID), data=behav)
+beta_cue = lmer(beta_150to0 ~ cue + (cue|ID), data=behav) # yes
+summary(beta_cue)
+beta_prevchoice = lmer(alpha_900to700 ~ prevsayyes + (prevsayyes|ID), data=behav)
+summary(beta_prevchoice)
 
 # plot the difference
 sjPlot::plot_model(beta_cue, type='pred')
 # plot the difference
 sjPlot::plot_model(beta_prevchoice, type='pred')
 
+
+################################GLMMs##############################################################
 # fit sdt model
 
 cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
@@ -265,35 +270,23 @@ cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=
                   optCtrl=list(maxfun=2e5)),
                   )
 
-emmeans::emmeans(cue_model, 'cue')
-
+# check model performance
 check_collinearity(cue_model)
 check_convergence(cue_model)
 
-saveRDS(cue_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_model_betapow.rda")
-
-cue_model <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_model.rda")
-
 summary(cue_model)
 
-est = sjPlot::plot_model(cue_model, type='est', title='detection response ~',
-                          axis.lim=c(0.8,8)) +
-  theme(plot.background = element_blank(),
-        text = element_text(family = "Arial", size = 14)) +
-        ylab("Odds Ratio")
+# Post hoc tests for interactions (estimated marginal means)
+emm_model <- emmeans(cue_model, "isyes", by = "cue")
+con = contrast(emm_model) # fdr corrected for 2 tests
+con
 
-est
+# save and load model from and to disk
+cue_model_path = file.path("data", "behav", "mixed_models", "cue_model.rda")
+saveRDS(cue_model, cue_model_path)
+cue_model <- readRDS(cue_model_path)
 
-int = sjPlot::plot_model(cue_model, type='int', title='Predicted probability of responding yes')+
-      theme(plot.background = element_blank(),
-            text = element_text(family = "Arial", size = 14)) +
-      ylab('detection response') +
-      xlab('stimulus')
-int
-
-# Save the plot as an SVG file
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\est_cue_model.svg", plot = est, device = "svg")
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\int_cue_model.svg", plot = int, device = "svg")
+########################### add previous choice predictor###########################################
 
 cue_prev_model = glmer(sayyes ~ isyes + cue + prevsayyes + isyes*cue +
                            + (isyes + cue + prevsayyes + isyes*cue|ID), data=behav, 
@@ -302,78 +295,59 @@ cue_prev_model = glmer(sayyes ~ isyes + cue + prevsayyes + isyes*cue +
                                                 optCtrl=list(maxfun=2e5)),
 )
 
+summary(cue_prev_model)
+
 check_collinearity(cue_prev_model)
 check_convergence(cue_prev_model)
 
-saveRDS(cue_prev_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_model.rda")
-cue_prev_model <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_model.rda")
+# save and load model from and to disk
+cue_prev_model_path = file.path("data", "behav", "mixed_models", "cue_prev_model.rda")
+saveRDS(cue_prev_model, cue_prev_model_path)
+cue_prev_model <- readRDS(cue_prev_model_path)
 
-summary(cue_prev_model)
-
-# Plot model
-
-est = sjPlot::plot_model(cue_prev_model, type='est', title='detection response ~',
-                         sort.est = TRUE, transform='plogis', show.values =TRUE, 
-                         value.offset = 0.3, colors='Accent') +
-  theme(plot.background = element_blank(),
-        text = element_text(family = "Arial", size = 12)) +
-  ylab("Probabilities")
-
-est
-
-sjPlot::plot_model(cue_prev_int_model, type='int', mdrt.values = "meansd")
-
-# Save the plot as an SVG file
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_model_est.svg", plot = est, device = "svg")
 
 # cue is still a significant predictor but less strong effect
 
-# including interaction between cue and previous choice
+################ including interaction between cue and previous choice#############################
 
-cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevsayyes + cue*prevsayyes + cue*isyes +
-                            (isyes + cue + prevsayyes + cue*prevsayyes + cue*isyes|ID), data=behav, 
-                           family=binomial(link='probit'),
-                           control=glmerControl(optimizer="bobyqa",
-                           optCtrl=list(maxfun=2e5)),
+cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevsayyes + cue*prevsayyes
+                                        + cue*isyes +
+                                        (isyes + cue + prevsayyes + cue*prevsayyes
+                                       + cue*isyes|ID), data=behav, 
+                                      family=binomial(link='probit'),
+                                      control=glmerControl(optimizer="bobyqa",
+                                      optCtrl=list(maxfun=2e5)),
 )
 
 summary(cue_prev_int_model)
 
-emmeans::emmeans(cue_prev_int_model, pairwise ~ prevsayyes*beta)
-
-# Print the post hoc comparisons with adjusted p-values
-print(interaction_comparisons, adjust = "holm")
 check_collinearity(cue_prev_int_model)
 check_convergence(cue_prev_int_model)
 
-saveRDS(cue_prev_int_model, "D:\\expecon_ms\\data\\behav\\mixed_models\\alpha_prev_int_model.rda")
+# Post hoc tests for behavior interaction
+emm_model <- emmeans(cue_prev_int_model, "prevsayyes", by = "cue")
+con <- contrast(emm_model)
+con
 
-cue_prev_int_model <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model.rda")
+# Post hoc tests for power
+emm_model <- emmeans(cue_prev_int_model_cue150to100, "beta_150to0", by = "prevsayyes", 
+                     at = list(beta_150to0 = c(-1.16, 0.91)))
+con <- contrast(emm_model)
+con
 
-est = sjPlot::plot_model(cue_prev_int_model, type='est', title='detection response ~',
-                         sort.est = TRUE, transform='plogis', show.values =TRUE, 
-                         value.offset = 0.3, colors='Accent') +
-  theme(plot.background = element_blank(),
-        text = element_text(family = "Arial", size = 12)) +
-  ylab("Probabilities")
+emm_model <- emmeans(cue_prev_int_model_prev300to100, "beta_300to100", by = "cue", 
+                     at = list(beta_300to100 = c(-1.16, 0.91)))
+con <- contrast(emm_model)
+con
 
-est
+# save and load model from and to disk
+cue_prev_int_model_path = file.path("data", "behav", "mixed_models", "cue_prev_int_model.rda")
 
-int = sjPlot::plot_model(cue_prev_int_model, type='int', mdrt.values = "meansd")
+saveRDS(cue_prev_int_model, cue_prev_int_model_path)
 
-int = int[[1]]+
-  theme(plot.background = element_blank(),
-        text = element_text(family = "Arial", size = 12)) +
-  ylab('detection response') +
-  xlab('stimulus')
+cue_prev_int_model <- readRDS(cue_prev_int_model_path)
 
-int
-
-# Save the plot as an SVG file
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure5\\beta_prev_int_int_signal_model.svg", plot = int, device = "svg")
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure5\\beta_prev_int_est_model.svg", plot = est, device = "svg")
-
-# Model comparision
+############################################### Model comparision##################################
 
 # Likelihood ratio tests
 anova(cue_model, cue_prev_model)
@@ -395,16 +369,41 @@ print(diff_bic_2)
 # save table to html
 table1 = sjPlot::tab_model(cue_model, cue_prev_model, cue_prev_int_model, 
                            show.aic=TRUE, show.loglik=TRUE)
-output_file <- "D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\table1.html"
-htmlTable(table1, file = output_file)
+
+output_file_path <- file.path("figs", "manuscript_figures", "Tables", "table1.html")
+htmlTable(table1, file = output_file_path)
+
+################################Plot estimates and interactions#####################################
+
+est = plot_model(cue_prev_int_model, type='est', 
+                         title='detection response ~',
+                         sort.est = TRUE, transform='plogis', show.values =TRUE, 
+                         value.offset = 0.3, colors='Accent') +
+                         theme(plot.background = element_blank(),
+                         text = element_text(family = "Arial", size = 12)) +
+                          ylab("Probabilities")
+
+est
+
+# mean plus minus one sd for continious variables
+plot_model(cue_prev_int_model, type='int', mdrt.values = "meansd") 
+
+# change order of variables after model fitting
+plot_model(cue_prev_int_model, type = "pred", 
+           terms = c("cue", "beta_300to100 [-1.16, -0.12, 0.91]"))
+
+save_path = file.path("figs", "manuscript_figures", "Figure5")
+# Save the plot as an SVG file
+ggsave(save_path, plot = int, device = "svg")
+ggsave(save_path, plot = est, device = "svg")
 
 ###########################separate models for signal and noise trials#############################
 
 signal = filter(behav, isyes==1)
 noise = filter(behav, isyes==0)
 
-cue_prev_int_model_signal = glmer(sayyes ~ prevsayyes + beta + prevsayyes*beta +
-                             (prevsayyes + beta + prevsayyes*beta|ID), data=signal, 
+cue_prev_int_model_signal = glmer(sayyes ~ beta300to100 + cue + beta300to100*beta +
+                             (beta300to100 + beta + beta300to100*beta|ID), data=signal, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
@@ -412,13 +411,17 @@ cue_prev_int_model_signal = glmer(sayyes ~ prevsayyes + beta + prevsayyes*beta +
 
 summary(cue_prev_int_model_signal)
 
-emmeans::emmeans(cue_prev_int_model_signal, pairwise ~ cue * prevsayyes)
-
 check_collinearity(cue_prev_int_model_signal)
 check_convergence(cue_prev_int_model_signal)
 
-saveRDS(cue_prev_int_model_signal, "D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model_signal.rda")
-cue_prev_int_model_signal <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model_signal.rda")
+
+# save and load model from and to disk
+cue_prev_int_model_signal_path = file.path("data", "behav", "mixed_models",
+                                           "cue_prev_int_model_signal.rda")
+
+saveRDS(cue_prev_int_model_signal, cue_prev_int_model_signal_path)
+
+cue_prev_int_model_signal <- readRDS(cue_prev_int_model_signal_path)
 
 # noise model
 
@@ -436,21 +439,13 @@ emmeans::emmeans(cue_prev_int_model_noise, ~ cue * prevsayyes)
 check_collinearity(cue_prev_int_model_noise)
 check_convergence(cue_prev_int_model_noise)
 
-saveRDS(cue_prev_int_model_noise, "D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model_noise.rda")
-cue_prev_int_model_noise <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\beta_prev_int_model_noise.rda")
+# save and load model from and to disk
+cue_prev_int_model_noise_path = file.path("data", "behav", "mixed_models",
+                                           "cue_prev_int_model_noise.rda")
 
+saveRDS(cue_prev_int_model_noise, cue_prev_int_model_noise_path)
 
-int = sjPlot::plot_model(cue_prev_int_model_noise, type='int',  mdrt.values = "meansd")+
-  theme(plot.background = element_blank(),
-        text = element_text(family = "Arial", size = 14)) +
-  ylab('detection response') +
-  xlab('previous choice')
-
-int
-
-# Save the plot as an SVG file
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_signal_model.svg", plot = int, device = "svg")
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_noise_model.svg", plot = int, device = "svg")
+cue_prev_int_model_noise <- readRDS(cue_prev_int_model_noise_path)
 
 ##################separate model for confident/unconfident previous response#######
 
@@ -489,28 +484,18 @@ check_convergence(cue_prev_int_model_unconf)
 
 summary(cue_prev_int_model_unconf)
 
-saveRDS(cue_prev_int_model_conf, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_conf.rda")
-saveRDS(cue_prev_int_model_unconf, "D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_unconf.rda")
+# save and load model from and to disk
+cue_prev_int_model_conf_path = file.path("data", "behav", "mixed_models",
+                                           "cue_prev_int_model_conf.rda")
 
-cue_prev_int_model_conf <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_conf.rda")
-cue_prev_int_model_unconf <- readRDS("D:\\expecon_ms\\data\\behav\\mixed_models\\cue_prev_int_model_unconf.rda")
+saveRDS(cue_prev_int_model_conf, cue_prev_int_model_conf_path)
 
-int = sjPlot::plot_model(cue_prev_int_model_unconf, type='int', title='Predicted probability of responding yes')
+cue_prev_int_model_conf <- readRDS(cue_prev_int_model_conf_path)
 
-int = int[[2]]+
-  theme(plot.background = element_blank(),
-        text = element_text(family = "Arial", size = 14)) +
-  ylab('detection response') +
-  xlab('previous choice')
+# save and load model from and to disk
+cue_prev_int_model_unconf_path = file.path("data", "behav", "mixed_models",
+                                         "cue_prev_int_model_unconf.rda")
 
-int
+saveRDS(cue_prev_int_model_unconf, cue_prev_int_model_unconf_path)
 
-# Save the plot as an SVG file
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_conf_model.svg", plot = int, device = "svg")
-ggsave("D:\\expecon_ms\\figs\\manuscript_figures\\Figure2\\cue_prev_int_int_unconf_model.svg", plot = int, device = "svg")
-
-
-# Figure 5
-
-combined_plot <- grid.arrange(plot_output1, plot_output2, ..., ncol = 3)
-
+cue_prev_int_model_unconf <- readRDS(cue_prev_int_model_unconf_path)
