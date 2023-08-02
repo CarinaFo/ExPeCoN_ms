@@ -107,10 +107,10 @@ cue_prev_int_model = brm(sayyes ~ prevsayyes+isyes+beta+isyes*beta+beta*prevsayy
 
 summary(cue_prev_int_model)
 
-saveRDS(object = cue_prev_int_model, file = "cue_prev_int_model_brms.rds")
+saveRDS(object = cue_prev_int_model_cue150to100, file = "cue_prev_int_model_cue150to0_brms.rds")
 cue_prev_int_model = readRDS(file = "cue_prev_int_model_brms.rds")
 
-# including prestimulus  power
+########################### including prestimulus  power############################################
 
 # replacing the cue predictor with prestimulus beta power
 cue_prev_int_model_cue150to100 = brm(sayyes ~ isyes + beta_150to0 + prevsayyes + 
@@ -124,11 +124,11 @@ cue_prev_int_model_cue150to100 = brm(sayyes ~ isyes + beta_150to0 + prevsayyes +
 )
 
 # replacing previous choice with prestimulus beta power
-cue_prev_int_model_prev300to100 = brm(sayyes ~ isyes + cue + beta_300to0 + cue*beta_300to0
+cue_prev_int_model_prev300to100 = brm(sayyes ~ isyes + cue + beta_300to100 + cue*beta_300to100
                                        + cue*isyes +
-                                         (isyes + cue + beta_300to0 + cue*beta_300to0
+                                         (isyes + cue + beta_300to100 + cue*beta_300to100
                                           + cue*isyes|ID), data=behav, 
-                                          data=behav, family=bernoulli(link='probit'), 
+                                          family=bernoulli(link='probit'), 
                                           cores = getOption("mc.cores", 12)
 )
 
