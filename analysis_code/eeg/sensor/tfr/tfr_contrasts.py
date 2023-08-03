@@ -189,14 +189,14 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
 
             df_all.append(epochs.metadata)
 
-            epochs_high = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.isyes == 0))]
-            epochs_low = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.isyes == 0))]
+            epochs_high = epochs[(epochs.metadata.isyes == 1)]
+            epochs_low = epochs[(epochs.metadata.isyes == 0)]
 
             mne.epochs.equalize_epoch_counts([epochs_high, epochs_low])
 
             tfr_path = Path('D:/expecon_ms/data/eeg/sensor/tfr')
 
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_catchtrials-tfr.h5'):
+            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_signal-tfr.h5'):
                 print('TFR already exists')
             else:
                 tfr_high, _ = mne.time_frequency.tfr_multitaper(epochs_high, 
@@ -209,8 +209,8 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
                                                                n_cycles=cycles,
                                                                n_jobs=-1)
 
-                tfr_high.save(f'{tfr_path}{Path("/")}{subj}_high_catchtrials-tfr.h5')
-                tfr_low.save(f'{tfr_path}{Path("/")}{subj}_low_catchtrials-tfr.h5')
+                tfr_high.save(f'{tfr_path}{Path("/")}{subj}_signal-tfr.h5')
+                tfr_low.save(f'{tfr_path}{Path("/")}{subj}_noise-tfr.h5')
             
             if os.path.exists(f'{tfr_path}{Path("/")}{subj}_hit-tfr.h5'):
                 print('TFR already exists')
@@ -260,7 +260,7 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
     return 'Done with tfr computation', freqs
 
 
-def visualize_contrasts(cond_a='hit', cond_b='miss'):
+def visualize_contrasts(cond_a='signal', cond_b='noise'):
 
     '''plot the grand average of the difference between conditions
     after loading the contrast data using pickle
