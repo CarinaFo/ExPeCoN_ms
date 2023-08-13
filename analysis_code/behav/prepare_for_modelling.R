@@ -40,24 +40,45 @@ library(tidyr) # spread function
 library(data.table) # for shift function
 library(lme4)
 library(lmerTest) # pvalues for lmer models
-#library(purr)
+
+# which study do you want to analyze?
+
+expecon <- 2
+
+# check wether the removal of the trend worked?
+
+check_trend_removal = 1
 
 ####################################################################################################
 
 # set working directory
+# Example 3: if-else if loop
 
-# load brain behavior dataframe that contains single trial power in spec. frequency bands in sensor space
-setwd("D:/expecon_ms")
-
-# Identify the relative path from your current working directory to the file
-relative_path <- file.path("data", "behav", "behav_df", "brain_behav.csv")
-
-# Use the relative path to read the CSV file
-power <- read.csv(relative_path)
-
-# add prediction error per trial
-
-power$PE_abs = abs(power$isyes - power$cue)
+if (expecon == 1) {
+  
+  # load brain behavior dataframe that contains single trial power in spec. frequency bands in sensor space
+  setwd("D:/expecon_ms")
+  # Identify the relative path from your current working directory to the file
+  relative_path <- file.path("data", "behav", "behav_df", "brain_behav.csv")
+  # Use the relative path to read the CSV file
+  power <- read.csv(relative_path)
+  # add prediction error per trial
+  power$PE_abs = abs(power$isyes - power$cue)
+  # Columns to process
+  columns_to_process <- c("alpha_900to700", "beta_900to700", "alpha_300to100", "beta_300to100", "alpha_150to0", "beta_150to0")
+  
+} else {
+  
+  setwd("D:/expeco_2")
+  # Identify the relative path from your current working directory to the file
+  relative_path <- file.path("behav", "brain_behav.csv")
+  # Use the relative path to read the CSV file
+  power <- read.csv(relative_path)
+  # add prediction error per trial
+  power$PE_abs = abs(power$stim_type - power$cue)
+  # expecon 2
+  columns_to_process <- c("alpha_600to400", "beta_600to400", "alpha_900to800", "beta_900to800")
+}
 
 # https://philippmasur.de/2018/05/23/how-to-center-in-multilevel-models/
 
@@ -69,9 +90,6 @@ power$PE_abs = abs(power$isyes - power$cue)
 #    alpha_scale_log = scale(log10(alpha_150to0)),
 #    beta_scale_log = scale(log10(beta_150to0))
  # )
-
-# Columns to process
-columns_to_process <- c("alpha_900to700", "beta_900to700", "alpha_300to100", "beta_300to100", "alpha_150to0", "beta_150to0")
 
 # grand mean centering (we decided for this approach, see Stephani et al., 2021)
 standardize_and_log <- function(x) {
@@ -116,23 +134,20 @@ for (col in columns_to_process) {
 
 # check whether trend removal has worked (remove trend for trials within block and trend over blocks)
 
-check = 1
-
-if (check == 1){
-  
+if (expecon == 1 && check_trend_removal == 1) {
   summary(lmer(alpha_900to700 ~ trial + (1|ID), data=power, REML=T))
-  summary(lmer(alpha_900to700 ~ block + (1|ID), data=power, REML=T))
-  
-  summary(lmer(beta_900to700 ~ trial + (1|ID), data=power, REML=T))
-  summary(lmer(beta_900to700 ~ block + (1|ID), data=power, REML=T))
-  
+} else if (expecon == 2 && check_trend_removal == 1) {
+  summary(lmer(alpha_600to400 ~ block + (1|ID), data=power, REML=T))
 }
 
-# remove unnecessary variables 
-power <- power[, !(names(power) %in% c("index", "sayyes_y", "X", "Unnamed..0.1",
-                                                 "Unnamed..0", "sayyes_y"))]
 
-# Identify the relative path from your current working directory to the file
-relative_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
+if (expecon == 1) {
+  # remove unnecessary variables 
+  power <- power[, !(names(power) %in% c("index", "sayyes_y", "X", "Unnamed..0.1",
+                                         "Unnamed..0", "sayyes_y"))]
+  relative_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
+} else {
+  relative_path <- file.path("behav", "brain_behav_cleanpower.csv")
+}
 
 write.csv(power, relative_path)
