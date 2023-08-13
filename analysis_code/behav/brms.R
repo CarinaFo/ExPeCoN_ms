@@ -132,6 +132,8 @@ cue_prev_int_model_prev300to100 = brm(sayyes ~ isyes + cue + beta_300to100 + cue
                                           cores = getOption("mc.cores", 12)
 )
 
+saveRDS(object = cue_prev_int_model_prev300to100, file = "cue_prev_int_model_prev300to100_brms.rds")
+cue_prev_int_model_prev300to100 = readRDS(file = "cue_prev_int_model_prev300to100.rds")
 
 # Obtain fixed effects estimates
 fixed_effects <- fixef(cue_prev_int_model)
