@@ -138,12 +138,8 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
                                         (subset[response_col] == False)].shape[0]
             
             # log linear correction (Hautus, 1995)
-            if condition == 0.75:
-                hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
-                false_alarm_rate = (false_alarms + 0.5) / (false_alarms + correct_rejections + 1)
-            else:
-                hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
-                false_alarm_rate = (false_alarms + 0.5) / (false_alarms + correct_rejections + 1)
+            hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
+            false_alarm_rate = (false_alarms + 0.5) / (false_alarms + correct_rejections + 1)
 
             d_prime = stats.norm.ppf(hit_rate) - stats.norm.ppf(false_alarm_rate)
             criterion = -0.5 * (stats.norm.ppf(hit_rate) + stats.norm.ppf(false_alarm_rate))
