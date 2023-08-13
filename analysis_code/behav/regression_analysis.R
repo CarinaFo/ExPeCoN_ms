@@ -24,8 +24,9 @@
 
 # Email: forster@mpg.cbs.de
 
-library(lme4) # mixed models 
-library(lmerTest) # no p values without this package for linear mixed mdoels
+library(lme4) # mixed models
+library(mediation)
+#library(lmerTest) # no p values without this package for linear mixed mdoels
 library(dplyr)# pandas style
 library(tidyr)
 library(data.table) # for shift function
@@ -71,7 +72,19 @@ behav <- behav[behav$ID != ID_to_exclude, ]
 
 brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
 
+# expecon 2
+
+brain_behav_path <- file.path("behav", "brain_behav_cleanpower.csv")
+
 behav = read.csv(brain_behav_path)
+
+# Rename columns for expecon2
+colnames(behav)[colnames(behav) == "stim_type"] <- "isyes"
+colnames(behav)[colnames(behav) == "resp1"] <- "sayyes"
+# Adding the previous response column to 'behav' data frame
+behav <- behav %>%
+  mutate(previous_response = lag(sayyes))
+behav$previous_response = as.factor(behav$previous_response)
 
 ###############manual SDT calculation###############################################################
 
@@ -250,7 +263,7 @@ if (length(significant_lags) > 0) {
 
 # does the cue condition predict beta power?
 
-beta_cue = lmer(beta_150to0 ~ cue + (cue|ID), data=behav) # yes
+beta_cue = lmer(alpha_600to400 ~ cue + (cue|ID), data=behav) # yes
 summary(beta_cue)
 beta_prevchoice = lmer(alpha_900to700 ~ prevsayyes + (prevsayyes|ID), data=behav)
 summary(beta_prevchoice)
@@ -386,11 +399,11 @@ est = plot_model(cue_prev_int_model, type='est',
 est
 
 # mean plus minus one sd for continious variables
-plot_model(cue_prev_int_model, type='int', mdrt.values = "meansd") 
+plot_model(cue_model, type='int', mdrt.values = "meansd") 
 
 # change order of variables after model fitting
-plot_model(cue_prev_int_model, type = "pred", 
-           terms = c("cue", "beta_300to100 [-1.16, -0.12, 0.91]"))
+plot_model(cue_model, type = "pred", 
+           terms = c("isyes", "beta_600to400 [-1.16, -0.12, 0.91]"))
 
 save_path = file.path("figs", "manuscript_figures", "Figure5")
 # Save the plot as an SVG file
@@ -499,3 +512,26 @@ cue_prev_int_model_unconf_path = file.path("data", "behav", "mixed_models",
 saveRDS(cue_prev_int_model_unconf, cue_prev_int_model_unconf_path)
 
 cue_prev_int_model_unconf <- readRDS(cue_prev_int_model_unconf_path)
+
+
+###########################Brain behavior mediation ################################################################################################
+
+# make sure lme4test is not loaded, this prevents the mediation model to work properly
+
+
+fit.mediator <- glmer(beta_150to0 ~ cue + prevsayyes + isyes + cue*isyes + cue*prevsayyes + (cue + prevsayyes + isyes + cue*isyes + cue*prevsayyes | ID),
+                        data = behav)
+
+
+fit.dv <- glmer(sayyes ~ beta_150to0 + cue + prevsayyes + isyes + cue*isyes + cue*prevsayyes + (beta_150to0 + cue + prevsayyes + isyes + cue*isyes + cue*prevsayyes| ID),
+                         data = behav, family=binomial(link='probit'), 
+                          control=glmerControl(optimizer="bobyqa",
+                                      optCtrl=list(maxfun=2e5)))
+
+results_prev <- mediate(fit.mediator, fit.dv, treat='cue', mediator='beta_150to0', covariates= list('prevsayyes'))
+
+summary(results)
+
+beta_cue_res = lmer(beta_150to0 ~ cue + (cue|ID), data=behav)
+beta_prevchoice_res = lmer(beta_150to0 ~ prevsayyes + (prevsayyes|ID), data=behav)
+beta_cue_prev = lmer(beta_150to0 ~ prevsayyes + cue + (prevsayyes+cue|ID), data=behav)
