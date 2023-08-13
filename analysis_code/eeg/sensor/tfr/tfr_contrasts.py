@@ -52,8 +52,8 @@ IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '047', '048', '049']
 
 
-def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
-                induced=False, zero_pad=0, psd=0):
+def compute_tfr(tmin=-0.5, tmax=0, fmax=35, fmin=7, laplace=0,
+                induced=False, mirror_data=1, psd=0):
 
     '''calculate prestimulus time-frequency representations per trial
       (induced power) using multitaper method.
@@ -68,7 +68,7 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
         fmax: float
         laplace: boolean, info: apply current source density transform
         induced : boolean, info: subtract evoked response from each epoch
-        zero_pad : boolean, info: zero pad the data on both sides to avoid leakage and edge artifacts
+        mirror_data : boolean, info: mirror the data on both sides to avoid edge artifacts
         psd : boolean, info: calculate power spectral density
         Returns
         -------
@@ -141,7 +141,7 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
         epochs.crop(tmin=tmin, tmax=tmax)
 
         # avoid leakage and edge artifacts by zero padding the data
-        if zero_pad:
+        if mirror_data:
             
             metadata = epochs.metadata
             # zero pad the data on both sides to avoid leakage and edge artifacts
@@ -152,7 +152,7 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
             # put back into epochs structure
             epochs = mne.EpochsArray(data, epochs.info, tmin=tmin * 2)
 
-            # add metadta back
+            # add metadata back
             epochs.metadata = metadata
 
         # subtract evoked response from each epoch
@@ -174,93 +174,43 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
             np.save(f'{spectrum_path}{Path("/")}{subj}_psd.npy', spec_data)
             
         else:
-            
-            # first create conditions and equalize trial numbers
-            epochs_high = epochs[((epochs.metadata.cue == 0.75))]
-            epochs_low = epochs[((epochs.metadata.cue == 0.25))]
-
-            hit = epochs[(epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1)]
-            miss = epochs[(epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0)]
-
-            mne.epochs.equalize_epoch_counts([hit, miss])
-
+    
             # Assign a sequential count for each row within each 'blocks' and 'subblock' group
             epochs.metadata['trial_count'] = epochs.metadata.groupby(['block', 'subblock']).cumcount()
 
             df_all.append(epochs.metadata)
-
-            epochs_high = epochs[(epochs.metadata.isyes == 1)]
-            epochs_low = epochs[(epochs.metadata.isyes == 0)]
-
-            mne.epochs.equalize_epoch_counts([epochs_high, epochs_low])
-
+ 
             tfr_path = Path('D:/expecon_ms/data/eeg/sensor/tfr')
 
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_signal-tfr.h5'):
+            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.prevsayyes == 1))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.prevsayyes == 0))]
+
+            mne.epochs.equalize_epoch_counts([epochs_a, epochs_b]) # minimize timing differences
+
+            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_no_mirror-tfr.h5'):
                 print('TFR already exists')
             else:
-                tfr_high, _ = mne.time_frequency.tfr_multitaper(epochs_high, 
-                                                                freqs=freqs,
-                                                                n_cycles=cycles,
-                                                                n_jobs=-1)
-                    
-                tfr_low, _ = mne.time_frequency.tfr_multitaper(epochs_low, 
-                                                               freqs=freqs,
-                                                               n_cycles=cycles,
-                                                               n_jobs=-1)
-
-                tfr_high.save(f'{tfr_path}{Path("/")}{subj}_signal-tfr.h5')
-                tfr_low.save(f'{tfr_path}{Path("/")}{subj}_noise-tfr.h5')
-            
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_hit-tfr.h5'):
-                print('TFR already exists')
-            else:
-                tfr_hit,_ = mne.time_frequency.tfr_multitaper(hit, freqs=freqs,
-                                                              n_cycles=cycles,
-                                                              n_jobs=-1)
+                tfr_a = mne.time_frequency.tfr_multitaper(epochs_a, 
+                                                          freqs=freqs,
+                                                          n_cycles=cycles,
+                                                          return_itc=False,
+                                                          n_jobs=-1, 
+                                                          average=True)
                 
-                tfr_miss,_ = mne.time_frequency.tfr_multitaper(miss, 
-                                                               freqs=freqs,
-                                                               n_cycles=cycles,
-                                                               n_jobs=-1)
+                tfr_b = mne.time_frequency.tfr_multitaper(epochs_b, 
+                                                          freqs=freqs,
+                                                          n_cycles=cycles,
+                                                          return_itc=False,
+                                                          n_jobs=-1, 
+                                                          average=True)
                 
-                tfr_hit.save(f'{tfr_path}{Path("/")}{subj}_hit-tfr.h5')
-                tfr_miss.save(f'{tfr_path}{Path("/")}{subj}_miss-tfr.h5')
-            
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_prevno_6trialsaftercue-tfr.h5'):
-                print('TFR already exists')
-            else:
-                tfr_high, _ = mne.time_frequency.tfr_multitaper(epochs_high, 
-                                                                   freqs=freqs,
-                                                                   n_cycles=cycles,
-                                                                   n_jobs=-1)
-                
-                tfr_low, _ = mne.time_frequency.tfr_multitaper(epochs_low,
-                                                                  freqs=freqs,
-                                                                  n_cycles=cycles,
-                                                                  n_jobs=-1)
-                
-                tfr_high.save(f'{tfr_path}{Path("/")}{subj}_high_prevno_6trialsaftercue-tfr.h5')
-                tfr_low.save(f'{tfr_path}{Path("/")}{subj}_low_prevno_6trialsaftercue-tfr.h5')
-
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_epochs-tfr.h5'):
-                print('TFR already exists')
-            else:
-
-                tfr_allepochs = mne.time_frequency.tfr_multitaper(epochs, freqs=freqs,
-                                                            n_cycles=cycles, return_itc=False,
-                                                            n_jobs=-1, average=False)
-                
-                tfr_allepochs.save(f'{tfr_path}{Path("/")}{subj}_epochs-tfr.h5')
-                
-    #df = pd.concat(df_all)
-
-    #df.to_csv(f'{Path("D:/expecon_ms/data/behav/behav_df")}{Path("/")}df_after_tfr_analysis.csv')
+                tfr_a.save(f'{tfr_path}{Path("/")}{subj}_high_yes_mirror-tfr.h5', overwrite=True)
+                tfr_b.save(f'{tfr_path}{Path("/")}{subj}_high_no_mirror-tfr.h5', overwrite=True)
 
     return 'Done with tfr computation', freqs
 
 
-def visualize_contrasts(cond_a='signal', cond_b='noise'):
+def visualize_contrasts(cond_a='high_yes', cond_b='high_no'):
 
     '''plot the grand average of the difference between conditions
     after loading the contrast data using pickle
@@ -293,12 +243,11 @@ def visualize_contrasts(cond_a='signal', cond_b='noise'):
         tfr_path = Path('D:/expecon_ms/data/eeg/sensor/tfr')
 
         tfr_a = mne.time_frequency.read_tfrs(f'{tfr_path}{Path("/")}{subj}_{cond_a}-tfr.h5', condition=0)
-
         tfr_b = mne.time_frequency.read_tfrs(f'{tfr_path}{Path("/")}{subj}_{cond_b}-tfr.h5', condition=0)
 
         tfr_a_all.append(tfr_a)
         tfr_b_all.append(tfr_b)
-    
+
     # average over participants
     gra_a = mne.grand_average(tfr_a_all)
     gra_b = mne.grand_average(tfr_b_all)
@@ -306,6 +255,12 @@ def visualize_contrasts(cond_a='signal', cond_b='noise'):
     # difference between conditions (2nd level)
     diff = gra_a - gra_b
     diff.data = diff.data*10**11
+
+    # now contrast conditions: high vs low
+    #tfr_a_all = np.array([a[a.metadata.cue == 0.75].get_data() for a in tfr_all])
+    #tfr_b_all = np.array([b[b.metadata.cue == 0.25].get_data() for b in tfr_all])
+
+    #tfr_a, tfr_b = equalize_epochs(tfr_a_all, tfr_b_all)
 
     return diff, gra_a, gra_b, tfr_a_all, tfr_b_all
 
@@ -333,7 +288,7 @@ def plot_figure4(channel_names=['C4'], fmin=7, fmax=35):
     # which time windows to plot
     time_windows = [(-1, -0.4), (-0.4, 0.5)]
     # for mirrored data
-    #time_windows = [(-0.4, 0)]
+    #time_windows = [(-1, 0)]
 
     # which axes to plot the time windows
     axes_first_row = [(0,0), (0,1)]
@@ -428,12 +383,12 @@ def run_3D_cluster_test():
     freqs = np.arange(fmin, fmax, 1)
 
     # significant frequencies
-    freqs[np.unique(clusters[0][0])]
+    freqs[np.unique(clusters[162][1])]
 
     # significant timepoints
     times = tfr_a_all[0].copy().crop(tmin, tmax).times
 
-    times[np.unique(clusters[0][1])]
+    times[np.unique(clusters[162][0])]
 
 def plot_cluster_test_output(tobs=None, cluster_p_values=None, clusters=None, fmin=7, fmax=35,
                              data_cond=None, tmin=0, tmax=0.5, ax0=0, ax1=0):
@@ -976,3 +931,43 @@ def extract_band_power():
     np.corrcoef(diff, re['cue_prev'])
 
     scipy.stats.pearsonr(diff, re['cue'])
+
+
+def equalize_epochs(array1, array2):
+    """
+    Equalizes the number of epochs between two arrays along the first dimension.
+
+    Args:
+        array1 (numpy.ndarray): First input array with shape (epochs1, channels, time, frequency).
+        array2 (numpy.ndarray): Second input array with shape (epochs2, channels, time, frequency).
+
+    Returns:
+        numpy.ndarray, numpy.ndarray: Two arrays with equalized number of epochs.
+    """
+    # Calculate the number of epochs in each array
+    num_epochs_array1 = array1.shape[0]
+    num_epochs_array2 = array2.shape[0]
+
+    # Determine which array has more epochs
+    if num_epochs_array1 > num_epochs_array2:
+        array_with_more_epochs = array1
+        array_with_fewer_epochs = array2
+    else:
+        array_with_more_epochs = array2
+        array_with_fewer_epochs = array1
+
+    # Calculate the difference in the number of epochs
+    num_epochs_diff = abs(num_epochs_array1 - num_epochs_array2)
+
+    # Randomly select indices (epochs) from the array with more epochs to match the number of epochs in the other array
+    selected_indices = np.random.choice(num_epochs_array_with_more_epochs, size=num_epochs_array_with_fewer_epochs, replace=False)
+
+    # Use the selected indices to create a new array with the same number of epochs as the other array
+    new_array_with_more_epochs = array_with_more_epochs[selected_indices, :, :, :]
+
+    # Return the arrays with equalized number of epochs
+    if array_with_more_epochs is array1:
+        return new_array_with_more_epochs, array_with_fewer_epochs
+    else:
+        return array_with_fewer_epochs, new_array_with_more_epochs
+
