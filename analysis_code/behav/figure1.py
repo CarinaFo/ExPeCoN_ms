@@ -18,7 +18,7 @@ plt.rcParams['font.size'] = 14
 savepath_fig1_expecon1 = Path('D:/expecon_ms/figs/manuscript_figures/Figure1')
 savepath_fig1_expecon2 = Path('D:/expeco_2/figures')
 
-def prepro_behavioral_data(expecon=2):
+def prepro_behavioral_data(expecon=1):
  
     """ This function preprocesses the behavioral data.
     We remove trials with no response or super fast responses
@@ -84,12 +84,14 @@ def prepro_behavioral_data(expecon=2):
     data['conf_resp'] = conf_resp
 
     # add lagged variables
-    data['prevsayyes'] = data['sayyes'].shift(1)
-    data['prevcue'] = data['cue'].shift(1)
-    data['previsyes'] = data['isyes'].shift(1)
-    data['prevcorrect'] = data['correct'].shift(1)
-    data['prevconf'] = data['conf'].shift(1)
-    data['prevconf_resp'] = data['conf_resp'].shift(1)
+    data['prevresp']  = data.groupby(['ID', 'block'])['sayyes'].shift(1)
+    data['prevconf'] = data.groupby(['ID', 'block'])['conf'].shift(1)
+    data['prevconf_resp'] = data.groupby(['ID', 'block'])['conf_resp'].shift(1)
+    data['prevcorrect'] = data.groupby(['ID', 'block'])['correct'].shift(1)
+    data['prevcue'] = data.groupby(['ID', 'block'])['cue'].shift(1)
+    data['prevrespt1'] = data.groupby(['ID', 'block'])['respt1'].shift(1)
+    data['prevrespt2'] = data.groupby(['ID', 'block'])['respt2'].shift(1)
+    data['previsyes'] = data.groupby(['ID', 'block'])['isyes'].shift(1)
 
     excl_noresp = len(data[data.respt1 == 2.5])
     excl_fastresp = len(data[data.respt1 < 0.1])
@@ -154,7 +156,7 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
     return results_df
 
 
-def exclude_data(expecon=2):
+def exclude_data(expecon=1):
     """
     Excludes participants and trials from the data based on the exclusion criteria.
     Arguments:
@@ -231,6 +233,47 @@ def exclude_data(expecon=2):
     data.to_csv(f'{behavpath}{Path("/")}prepro_behav_data.csv')
     
     return data, expecon
+
+def plot_mean_response_and_confidence(blue = '#0571b0', red = '#ca0020'):
+
+    data, expecon = exclude_data()
+
+    # Calculate mean response per ID and cue
+    mean_resp_id_cue = data.groupby(['cue', 'ID'])['sayyes'].mean().reset_index()
+
+    # Calculate mean confidence per ID and response
+    mean_conf_id_resp = data.groupby(['sayyes', 'ID'])['conf'].mean().reset_index()
+
+    # Create boxplots
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x='cue', y='sayyes', data=mean_resp_id_cue, palette=[blue, red])
+    sns.stripplot(x='cue', y='sayyes', data=mean_resp_id_cue, color='black', size=4, jitter=True)
+    plt.xlabel('Cue')
+    plt.ylabel('Mean of Say Yes')
+    plt.savefig(f'{savepath_fig1_expecon1}{Path("/")}choice_cue.svg')
+    plt.savefig(f'{savepath_fig1_expecon1}{Path("/")}choice_cue.png')
+    plt.show()
+
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x='sayyes', y='conf', data=mean_conf_id_resp)
+    sns.stripplot(x='sayyes', y='conf', data=mean_conf_id_resp, color='black', size=4, jitter=True)
+    plt.xlabel('detection response')
+    plt.ylabel('Mean confidence')
+    plt.xticks(ticks=[0, 1], labels=['No', 'Yes'])  # Set custom tick labels
+    plt.savefig(f'{savepath_fig1_expecon1}{Path("/")}choice_conf.svg')
+    plt.savefig(f'{savepath_fig1_expecon1}{Path("/")}choice_conf.png')
+    plt.show()
+
+    # Perform the Wilcoxon signed-rank test
+    wilcoxon_statistic, p_value = stats.wilcoxon(mean_resp_id_cue[mean_resp_id_cue.cue == 0.25].sayyes, mean_resp_id_cue[mean_resp_id_cue.cue == 0.75].sayyes)
+
+    print(f"Wilcoxon statistic: {wilcoxon_statistic}")
+    print(f"p-value: {p_value}")
+
+    # Perform the Wilcoxon signed-rank test
+    wilcoxon_statistic, p_value = stats.wilcoxon(mean_conf_id_resp[mean_conf_id_resp.sayyes == 1].conf, mean_conf_id_resp[mean_conf_id_resp.sayyes == 0].conf)
+    print(f"Wilcoxon statistic: {wilcoxon_statistic}")
+    print(f"p-value: {p_value}")
 
 
 def prepare_for_plotting(exclude_high_fa=False):
