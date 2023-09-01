@@ -16,9 +16,9 @@ plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['font.size'] = 14
 
 savepath_fig1_expecon1 = Path('D:/expecon_ms/figs/manuscript_figures/Figure1')
-savepath_fig1_expecon2 = Path('D:/expeco_2/figures')
+savepath_fig1_expecon2 = Path('D:/expecon_2/figures')
 
-def prepro_behavioral_data(expecon=1):
+def prepro_behavioral_data(expecon=2):
  
     """ This function preprocesses the behavioral data.
     We remove trials with no response or super fast responses
@@ -43,7 +43,7 @@ def prepro_behavioral_data(expecon=1):
 
     else:
         # analyze expecon 2 behavioral data
-        behavpath = Path('D:/expeco_2')
+        behavpath = Path('D:/expecon_2/behav')
         data = pd.read_csv(f'{behavpath}{Path("/")}behav_expecon2.csv')
 
         # ID to exclude(missing stimulation in block 1 and 2)
@@ -53,10 +53,11 @@ def prepro_behavioral_data(expecon=1):
         data = data[data['ID'] != ID_to_exclude]
 
         # rename columns
-        data = data.rename(columns={'stim_type': 'isyes'}) # stimulus (1 = signal)
-        data = data.rename(columns={'resp1': 'sayyes'}) # detection response (1 = Yes)
-        data = data.rename(columns={'resp2': 'conf'}) # confidence (binary)
-        data = data.rename(columns={'resp1_t': 'respt1'}) # confidence (binary)
+        data = data.rename(columns={'stim_type': 'isyes'})  # stimulus (1 = signal)
+        data = data.rename(columns={'resp1': 'sayyes'})  # detection response (1 = Yes)
+        data = data.rename(columns={'resp2': 'conf'})  # confidence (binary)
+        data = data.rename(columns={'resp1_t': 'respt1'})  # detection rt
+        data = data.rename(columns={'resp2_t': 'respt2'})  # confidence rt
 
         data[['sayyes', 'isyes', 'cue', 'conf', 'respt1', 'resp2_t']] = \
             data[['sayyes', 'isyes', 'cue', 'conf',
@@ -156,7 +157,7 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
     return results_df
 
 
-def exclude_data(expecon=1):
+def exclude_data(expecon=2):
     """
     Excludes participants and trials from the data based on the exclusion criteria.
     Arguments:
@@ -172,7 +173,7 @@ def exclude_data(expecon=1):
         behavpath = Path('D:/expecon_ms/data/behav/behav_df')
     else: 
         # analyze expecon 2 behavioral data
-        behavpath = Path('D:/expeco_2')
+        behavpath = Path('D:/expecon_2/behav')
 
     # Load data
     data = pd.read_csv(f'{behavpath}{Path("/")}behav_data_exclrts.csv')
@@ -191,7 +192,7 @@ def exclude_data(expecon=1):
 
     # Filter the grouped object based on hit rate conditions
     filtered_groups = hitrate_per_block[(hitrate_per_block > 0.9) | (hitrate_per_block < 0.2)]
-    print('Participants with hit rates > 0.9 or < 0.2: ', len(filtered_groups))
+    print('Blocks with hit rates > 0.9 or < 0.2: ', len(filtered_groups))
 
     # Extract the ID and block information from the filtered groups
     remove_hitrates = filtered_groups.reset_index()
@@ -202,7 +203,7 @@ def exclude_data(expecon=1):
 
     # Filter the grouped object based on fa rate conditions
     filtered_groups = farate_per_block[farate_per_block > 0.4]
-    print('Participants with false alarm rates > 0.4: ', len(filtered_groups))
+    print('Blocks with false alarm rates > 0.4: ', len(filtered_groups))
 
     # Extract the ID and block information from the filtered groups
     remove_farates = filtered_groups.reset_index()
@@ -210,7 +211,7 @@ def exclude_data(expecon=1):
     # Filter the grouped objects based on the conditions
     #filtered_groups = hitrate_per_block[hitrate_per_block < farate_per_block]  # Hit rate < False alarm rate
     filtered_groups = hitrate_per_block[hitrate_per_block - farate_per_block < 0.05]  # Difference < 0.1
-    print('Participants with hit rates < false alarm rates: ', len(filtered_groups))
+    print('Blocks with hit rates < false alarm rates: ', len(filtered_groups))
           
     # Extract the ID and block information from the filtered groups
     hitvsfarate = filtered_groups.reset_index()
@@ -234,7 +235,8 @@ def exclude_data(expecon=1):
     
     return data, expecon
 
-def plot_mean_response_and_confidence(blue = '#0571b0', red = '#ca0020'):
+def plot_mean_response_and_confidence(blue = '#0571b0', red = '#ca0020',
+                                      savepath=savepath_fig1_expecon2):
 
     data, expecon = exclude_data()
 
@@ -260,13 +262,12 @@ def plot_mean_response_and_confidence(blue = '#0571b0', red = '#ca0020'):
     plt.xlabel('detection response')
     plt.ylabel('Mean confidence')
     plt.xticks(ticks=[0, 1], labels=['No', 'Yes'])  # Set custom tick labels
-    plt.savefig(f'{savepath_fig1_expecon1}{Path("/")}choice_conf.svg')
-    plt.savefig(f'{savepath_fig1_expecon1}{Path("/")}choice_conf.png')
+    plt.savefig(f'{savepath}{Path("/")}choice_conf.svg')
+    plt.savefig(f'{savepath}{Path("/")}choice_conf.png')
     plt.show()
 
     # Perform the Wilcoxon signed-rank test
     wilcoxon_statistic, p_value = stats.wilcoxon(mean_resp_id_cue[mean_resp_id_cue.cue == 0.25].sayyes, mean_resp_id_cue[mean_resp_id_cue.cue == 0.75].sayyes)
-
     print(f"Wilcoxon statistic: {wilcoxon_statistic}")
     print(f"p-value: {p_value}")
 
@@ -603,7 +604,7 @@ def plot_figure1_grid(savepath_fig1=savepath_fig1_expecon2):
         patch.set_color(color)
 
     dprime_ax .set_ylabel('dprime', fontname="Arial", fontsize=14)
-    dprime_ax.text(1.4, 3, 'ns', verticalalignment='center', fontname='Arial',
+    dprime_ax.text(1.4, 3, 'n.s.', verticalalignment='center', fontname='Arial',
                    fontsize='13')
     dprime_ax.set_ylim(0, 3.0)
     dprime_ax.set_yticks([0, 1.5, 3.0])
@@ -718,7 +719,7 @@ def calc_stats():
 
     """ Calculate statistics and effect sizes for the behavioral data."""
 
-    conditions,_ = prepare_for_plotting(exclude_high_fa=True)
+    conditions,_ = prepare_for_plotting(exclude_high_fa=False)
 
     # only for dprime, crit, hitrate, farate and confidence congruency
     df_sdt = conditions[0]
