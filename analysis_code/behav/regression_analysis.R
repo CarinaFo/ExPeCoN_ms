@@ -26,7 +26,7 @@
 
 library(lme4) # mixed models
 library(mediation)
-#library(lmerTest) # no p values without this package for linear mixed mdoels
+library(lmerTest) # no p values without this package for linear mixed mdoels
 library(dplyr)# pandas style
 library(tidyr)
 library(data.table) # for shift function
@@ -56,7 +56,7 @@ behav = read.csv(behav_path)
 
 # expecon 2 behavioral data
 
-setwd("D:/expeco_2")
+setwd("D:/expeco_2/behav")
 
 behav_path <- file.path("prepro_behav_data.csv")
 
@@ -228,17 +228,22 @@ cor.test(criterion_diff$criterion_difference, df_diff$beta_difference)
 behav$ID = as.factor(behav$ID)
 behav$isyes = as.factor(behav$isyes)
 behav$cue = as.factor(behav$cue)
-behav$prevsayyes = as.factor(behav$prevsayyes)
+behav$prevresp = as.factor(behav$prevresp)
 behav$previsyes = as.factor(behav$previsyes)
 behav$prevconf = as.factor(behav$prevconf)
 behav$correct = as.factor(behav$correct)
 
-# Remove the first row (assures equal amount of data for all models)
-behav <- behav[-1, ]
+# Remove NaN trials (first trial for each)
+behav <- na.omit(behav) 
 
 # test for autocorrelation between trials?
 high = filter(behav, cue==0.75)
 low = filter(behav, cue==0.25)
+
+high$ID = as.factor(high$ID)
+high$cue = as.factor(high$cue)
+high$isyes = as.factor(high$isyes)
+high$prevsayyes = as.factor(high$prevsayyes)
 
 auto_model = glmer(isyes ~ previsyes*cue+(previsyes*cue|ID), data=behav, 
                   family=binomial(link='probit'),
@@ -301,14 +306,14 @@ cue_model <- readRDS(cue_model_path)
 
 ########################### add previous choice predictor###########################################
 
-cue_prev_model = glmer(sayyes ~ isyes + cue + prevsayyes + isyes*cue +
-                           + (isyes + cue + prevsayyes + isyes*cue|ID), data=behav, 
+cue_prev_model = glmer(sayyes ~ isyes + cue + prevresp + isyes*cue +
+                           + (isyes + cue + prevresp + isyes*cue|ID), data=behav, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
 )
 
-summary(cue_prev_model)
+summary(beta_prev_model)
 
 check_collinearity(cue_prev_model)
 check_convergence(cue_prev_model)
@@ -318,14 +323,46 @@ cue_prev_model_path = file.path("data", "behav", "mixed_models", "cue_prev_model
 saveRDS(cue_prev_model, cue_prev_model_path)
 cue_prev_model <- readRDS(cue_prev_model_path)
 
+ranef <- ranef(cue_prev_model)
+cue_ran = ranef$ID[,3]
+prev_choice_ran = ranef$ID[,4]
+
+# alternator: correlation between cue beta weight and prev choice beta weight
+cor.test(cue_ran[prev_choice_ran<0], prev_choice_ran[prev_choice_ran<0])
+
+# repeater
+cor.test(cue_ran[prev_choice_ran>0], prev_choice_ran[prev_choice_ran>0])
+
+plot_data = data.frame(beta_probcue = cue_ran[prev_choice_ran>0], 
+                       beta_previouschoice = prev_choice_ran[prev_choice_ran>0])
+
+ggplot(plot_data, aes(beta_probcue, beta_previouschoice)) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) +  # Add a linear trend line
+  labs(x = "probability condition beta weight", y = "previous choice beta weight")
 
 # cue is still a significant predictor but less strong effect
 
+########################### include confidence ###################################################
+
+cue_prev_conf_model = glmer(sayyes ~ isyes + cue + prevsayyes + conf + isyes*cue +
+                         + (isyes + cue + prevsayyes + conf + isyes*cue|ID), data=behav, 
+                       family=binomial(link='probit'),
+                       control=glmerControl(optimizer="bobyqa",
+                                            optCtrl=list(maxfun=2e5)),
+)
+
+summary(cue_prev_conf_model)
+# save and load model from and to disk
+cue_prev_conf_model_path = file.path("data", "behav", "mixed_models", "cue_prev_conf_model.rda")
+saveRDS(cue_prev_conf_model, cue_prev_conf_model_path)
+cue_prev_conf_model <- readRDS(cue_prev_conf_model_path)
+
 ################ including interaction between cue and previous choice#############################
 
-cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevsayyes + cue*prevsayyes
+cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevresp + cue*prevresp
                                         + cue*isyes +
-                                        (isyes + cue + prevsayyes + cue*prevsayyes
+                                        (isyes + cue + prevresp + cue*prevresp
                                        + cue*isyes|ID), data=behav, 
                                       family=binomial(link='probit'),
                                       control=glmerControl(optimizer="bobyqa",
@@ -388,7 +425,7 @@ htmlTable(table1, file = output_file_path)
 
 ################################Plot estimates and interactions#####################################
 
-est = plot_model(cue_prev_int_model, type='est', 
+est = plot_model(cue_prev_model, type='est', 
                          title='detection response ~',
                          sort.est = TRUE, transform='plogis', show.values =TRUE, 
                          value.offset = 0.3, colors='Accent') +
@@ -398,8 +435,13 @@ est = plot_model(cue_prev_int_model, type='est',
 
 est
 
+save_path = file.path("figs", "manuscript_figures", "Figure1")
+# Save the plot as an SVG file
+ggsave(save_path, plot = int, device = "svg")
+ggsave(save_path, plot = est, device = "svg")
+
 # mean plus minus one sd for continious variables
-plot_model(cue_model, type='int', mdrt.values = "meansd") 
+int = plot_model(cue_prev_model, type='int', mdrt.values = "meansd") 
 
 # change order of variables after model fitting
 plot_model(cue_model, type = "pred", 
@@ -426,7 +468,6 @@ summary(cue_prev_int_model_signal)
 
 check_collinearity(cue_prev_int_model_signal)
 check_convergence(cue_prev_int_model_signal)
-
 
 # save and load model from and to disk
 cue_prev_int_model_signal_path = file.path("data", "behav", "mixed_models",
@@ -519,19 +560,55 @@ cue_prev_int_model_unconf <- readRDS(cue_prev_int_model_unconf_path)
 # make sure lme4test is not loaded, this prevents the mediation model to work properly
 
 
-fit.mediator <- glmer(beta_150to0 ~ cue + prevsayyes + isyes + cue*isyes + cue*prevsayyes + (cue + prevsayyes + isyes + cue*isyes + cue*prevsayyes | ID),
+fit.mediator <- glmer(beta_150to0 ~ cue + prevsayyes + isyes + cue*isyes + (cue + prevsayyes + isyes + cue*isyes | ID),
                         data = behav)
 
 
-fit.dv <- glmer(sayyes ~ beta_150to0 + cue + prevsayyes + isyes + cue*isyes + cue*prevsayyes + (beta_150to0 + cue + prevsayyes + isyes + cue*isyes + cue*prevsayyes| ID),
+fit.dv <- glmer(sayyes ~ beta_150to0 + cue + prevsayyes + isyes + cue*isyes +  (beta_150to0 + cue + prevsayyes + isyes + cue*isyes| ID),
                          data = behav, family=binomial(link='probit'), 
                           control=glmerControl(optimizer="bobyqa",
                                       optCtrl=list(maxfun=2e5)))
 
-results_prev <- mediate(fit.mediator, fit.dv, treat='cue', mediator='beta_150to0', covariates= list('prevsayyes'))
+results_prev <- mediate(fit.mediator, fit.dv, treat='cue', mediator='beta_150to0')
 
 summary(results)
 
 beta_cue_res = lmer(beta_150to0 ~ cue + (cue|ID), data=behav)
 beta_prevchoice_res = lmer(beta_150to0 ~ prevsayyes + (prevsayyes|ID), data=behav)
 beta_cue_prev = lmer(beta_150to0 ~ prevsayyes + cue + (prevsayyes+cue|ID), data=behav)
+
+#
+alpha_precue <- lmer(alpha_900to700 ~ prevsayyes + prevconf + previsyes + (prevsayyes+prevconf+previsyes|ID), data=behav)
+alpha_postcue <- lmer(alpha_300to100 ~ prevsayyes + isyes + (prevsayyes+isyes|ID), data=behav)
+
+beta_prestim <- lmer(beta_150to0 ~ cue + isyes + cue*isyes + (cue + isyes + cue*isyes|ID),
+                     data=behav)
+
+cue_prev_model_neur = glmer(sayyes ~ isyes + beta_150to0 + alpha_900to700 + isyes*beta_150to0 +
+                         + (isyes + beta_150to0 + alpha_900to700 + isyes*beta_150to0|ID), data=behav, 
+                       family=binomial(link='probit'),
+                       control=glmerControl(optimizer="bobyqa",
+                                            optCtrl=list(maxfun=2e5)),
+)
+
+est = plot_model(beta_prestim, type='est', 
+                 title='prestimulus beta power ~',
+                 sort.est = TRUE, show.values =TRUE, 
+                 value.offset = 0.3, colors='Accent') +
+  theme(plot.background = element_blank(),
+        text = element_text(family = "Arial", size = 12)) +
+  ylab("beta estimates")
+
+est
+
+# mean plus minus one sd for continious variables
+plot_model(alpha_precue, type='pred', mdrt.values = "meansd") 
+
+# change order of variables after model fitting
+plot_model(cue_model, type = "pred", 
+           terms = c("isyes", "beta_600to400 [-1.16, -0.12, 0.91]"))
+
+save_path = file.path("figs", "manuscript_figures", "Figure5")
+# Save the plot as an SVG file
+ggsave(save_path, plot = int, device = "svg")
+ggsave(save_path, plot = est, device = "svg")
