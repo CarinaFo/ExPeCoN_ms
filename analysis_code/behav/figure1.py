@@ -15,10 +15,11 @@ from matplotlib.font_manager import FontProperties as fm
 plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['font.size'] = 14
 
-savepath_fig1_expecon1 = Path('D:/expecon_ms/figs/manuscript_figures/Figure1')
+savepath_fig1_expecon1 = Path('D:/expecon_ms/figs/manuscript_figures/figure1_expecon1_paradigm_behav')
+savepath_fig3 = Path('D:/expecon_ms/figs/manuscript_figures/figure3_glmermodels')
 savepath_fig1_expecon2 = Path('D:/expecon_2/figures')
 
-def prepro_behavioral_data(expecon=2):
+def prepro_behavioral_data(expecon=1):
  
     """ This function preprocesses the behavioral data.
     We remove trials with no response or super fast responses
@@ -157,7 +158,7 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
     return results_df
 
 
-def exclude_data(expecon=2):
+def exclude_data(expecon=1):
     """
     Excludes participants and trials from the data based on the exclusion criteria.
     Arguments:
@@ -236,7 +237,7 @@ def exclude_data(expecon=2):
     return data, expecon
 
 def plot_mean_response_and_confidence(blue = '#0571b0', red = '#ca0020',
-                                      savepath=savepath_fig1_expecon2):
+                                      savepath=savepath_fig3):
 
     data, expecon = exclude_data()
 
@@ -252,8 +253,8 @@ def plot_mean_response_and_confidence(blue = '#0571b0', red = '#ca0020',
     sns.stripplot(x='cue', y='sayyes', data=mean_resp_id_cue, color='black', size=4, jitter=True)
     plt.xlabel('Cue')
     plt.ylabel('Mean of Say Yes')
-    plt.savefig(f'{savepath_fig1_expecon1}{Path("/")}choice_cue.svg')
-    plt.savefig(f'{savepath_fig1_expecon1}{Path("/")}choice_cue.png')
+    plt.savefig(f'{savepath}{Path("/")}choice_cue.svg')
+    plt.savefig(f'{savepath}{Path("/")}choice_cue.png')
     plt.show()
 
     plt.figure(figsize=(10, 6))
@@ -489,7 +490,7 @@ def plot_figure1_grid(savepath_fig1=savepath_fig1_expecon2):
     """
 
     # load data
-    conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=True)
+    conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=False)
 
     # unpack data
     df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, \
