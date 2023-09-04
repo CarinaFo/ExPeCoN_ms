@@ -56,7 +56,7 @@ behav = read.csv(behav_path)
 
 # expecon 2 behavioral data
 
-setwd("D:/expeco_2/behav")
+setwd("D:/expecon_2/behav")
 
 behav_path <- file.path("prepro_behav_data.csv")
 
@@ -232,6 +232,7 @@ behav$prevresp = as.factor(behav$prevresp)
 behav$previsyes = as.factor(behav$previsyes)
 behav$prevconf = as.factor(behav$prevconf)
 behav$correct = as.factor(behav$correct)
+behav$prevcue = as.factor(behav$prevcue)
 
 # Remove NaN trials (first trial for each)
 behav <- na.omit(behav) 
@@ -282,7 +283,7 @@ sjPlot::plot_model(beta_prevchoice, type='pred')
 ################################GLMMs##############################################################
 # fit sdt model
 
-cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
+cue_model2 = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue+isyes*cue|ID), data=behav, 
                   family=binomial(link='probit'),
                   control=glmerControl(optimizer="bobyqa",
                   optCtrl=list(maxfun=2e5)),
@@ -313,7 +314,7 @@ cue_prev_model = glmer(sayyes ~ isyes + cue + prevresp + isyes*cue +
                                                 optCtrl=list(maxfun=2e5)),
 )
 
-summary(beta_prev_model)
+summary(cue_prev_model)
 
 check_collinearity(cue_prev_model)
 check_convergence(cue_prev_model)
@@ -321,7 +322,7 @@ check_convergence(cue_prev_model)
 # save and load model from and to disk
 cue_prev_model_path = file.path("data", "behav", "mixed_models", "cue_prev_model.rda")
 saveRDS(cue_prev_model, cue_prev_model_path)
-cue_prev_model <- readRDS(cue_prev_model_path)
+cue_prev_model2 <- readRDS(cue_prev_model_path)
 
 ranef <- ranef(cue_prev_model)
 cue_ran = ranef$ID[,3]
@@ -345,8 +346,8 @@ ggplot(plot_data, aes(beta_probcue, beta_previouschoice)) +
 
 ########################### include confidence ###################################################
 
-cue_prev_conf_model = glmer(sayyes ~ isyes + cue + prevsayyes + conf + isyes*cue +
-                         + (isyes + cue + prevsayyes + conf + isyes*cue|ID), data=behav, 
+cue_prev_prevcue_model = glmer(sayyes ~ isyes + cue + prevresp + prevcue + isyes*cue +
+                         + (isyes + cue + prevresp + prevcue + isyes*cue|ID), data=behav, 
                        family=binomial(link='probit'),
                        control=glmerControl(optimizer="bobyqa",
                                             optCtrl=list(maxfun=2e5)),
@@ -360,9 +361,9 @@ cue_prev_conf_model <- readRDS(cue_prev_conf_model_path)
 
 ################ including interaction between cue and previous choice#############################
 
-cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevresp + cue*prevresp
+cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevresp + prevcue + prevresp*cue
                                         + cue*isyes +
-                                        (isyes + cue + prevresp + cue*prevresp
+                                        (isyes + cue + prevresp + prevcue + prevresp*cue
                                        + cue*isyes|ID), data=behav, 
                                       family=binomial(link='probit'),
                                       control=glmerControl(optimizer="bobyqa",
@@ -375,7 +376,7 @@ check_collinearity(cue_prev_int_model)
 check_convergence(cue_prev_int_model)
 
 # Post hoc tests for behavior interaction
-emm_model <- emmeans(cue_prev_int_model, "prevsayyes", by = "cue")
+emm_model <- emmeans(cue_prev_int_model, "prevresp", by = "cue")
 con <- contrast(emm_model)
 con
 
@@ -395,7 +396,7 @@ cue_prev_int_model_path = file.path("data", "behav", "mixed_models", "cue_prev_i
 
 saveRDS(cue_prev_int_model, cue_prev_int_model_path)
 
-cue_prev_int_model <- readRDS(cue_prev_int_model_path)
+cue_prev_int_model2 <- readRDS(cue_prev_int_model_path)
 
 ############################################### Model comparision##################################
 
@@ -425,40 +426,71 @@ htmlTable(table1, file = output_file_path)
 
 ################################Plot estimates and interactions#####################################
 
-est = plot_model(cue_prev_model, type='est', 
-                         title='detection response ~',
-                         sort.est = TRUE, transform='plogis', show.values =TRUE, 
-                         value.offset = 0.3, colors='Accent') +
-                         theme(plot.background = element_blank(),
-                         text = element_text(family = "Arial", size = 12)) +
-                          ylab("Probabilities")
+theme_set(theme_sjplot())
+save_path = file.path("figs", "manuscript_figures", "figure3_glmermodels")
+setwd(save_path)
 
-est
+est_cue1 = plot_model(cue_model, type='est', 
+                      title='yes response ~',
+                      sort.est = TRUE, transform='plogis', show.values =TRUE, 
+                      value.offset = 0.3, colors='black')
 
-save_path = file.path("figs", "manuscript_figures", "Figure1")
-# Save the plot as an SVG file
-ggsave(save_path, plot = int, device = "svg")
-ggsave(save_path, plot = est, device = "svg")
+est_cue2 = plot_model(cue_model2, type='est', 
+                      title='yes response ~',
+                      sort.est = TRUE, transform='plogis', show.values =TRUE, 
+                      value.offset = 0.3, colors='black')
+
+est_cue_prev1 = plot_model(cue_prev_model, type='est',
+                           sort.est = TRUE, transform='plogis', show.values =TRUE, 
+                           value.offset = 0.3, colors='black')
+
+est_cue_prev2 = plot_model(cue_prev_model2, type='est', 
+                           sort.est = TRUE, transform='plogis', show.values =TRUE, 
+                           value.offset = 0.3, colors='black')
+
+
+est_cue_prev_int1 = plot_model(cue_prev_int_model, type='est',
+                               sort.est = TRUE, transform='plogis', show.values =TRUE, 
+                               value.offset = 0.3, colors='black')+
+ylab("Probabilities")
+
+
+est_cue_prev_int2 = plot_model(cue_prev_int_model2, type='est', 
+                               sort.est = TRUE, transform='plogis', show.values =TRUE, 
+                               value.offset = 0.3, colors='black') +
+  ylab("Probabilities")
+
+# arange plots in a grid
+g = arrangeGrob(est_cue1, est_cue2, est_cue_prev1, est_cue_prev2, est_cue_prev_int1,
+             est_cue_prev_int2, nrow = 3)
+
+# save figure
+ggsave('model_estimates.svg', dpi = 300, height = 8, width = 10, plot=g)
 
 # mean plus minus one sd for continious variables
-int = plot_model(cue_prev_model, type='int', mdrt.values = "meansd") 
+
+intg = arrangeGrob(cue_signal_int1, cue_signal_int2, cue_signal_prev_int1,
+             cue_signal_prev_int2, nrow=2)
+
+ggsave('model_interactions.svg', dpi = 300, height = 8, width = 10, plot=intg)
+
+cue_signal_int1 = plot_model(cue_model, type='int', mdrt.values = "meansd")
+cue_signal_int2 = plot_model(cue_model2, type='int', mdrt.values = "meansd") 
+
+cue_signal_prev_int1 = plot_model(cue_prev_int_model, type='pred',
+                                  terms = c("prevresp", "cue"))
+cue_signal_prev_int2 = plot_model(cue_prev_int_model2, type='pred', terms = c("prevresp", "cue"))
 
 # change order of variables after model fitting
 plot_model(cue_model, type = "pred", 
            terms = c("isyes", "beta_600to400 [-1.16, -0.12, 0.91]"))
-
-save_path = file.path("figs", "manuscript_figures", "Figure5")
-# Save the plot as an SVG file
-ggsave(save_path, plot = int, device = "svg")
-ggsave(save_path, plot = est, device = "svg")
-
 ###########################separate models for signal and noise trials#############################
 
 signal = filter(behav, isyes==1)
 noise = filter(behav, isyes==0)
 
-cue_prev_int_model_signal = glmer(sayyes ~ beta300to100 + cue + beta300to100*beta +
-                             (beta300to100 + beta + beta300to100*beta|ID), data=signal, 
+cue_prev_int_model_signal = glmer(sayyes ~ prevresp + cue + prevresp*cue +
+                             (prevresp + cue + prevresp*cue|ID), data=signal, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
@@ -479,8 +511,8 @@ cue_prev_int_model_signal <- readRDS(cue_prev_int_model_signal_path)
 
 # noise model
 
-cue_prev_int_model_noise = glmer(sayyes ~ prevsayyes + beta + prevsayyes*beta +
-                                    (prevsayyes + beta + prevsayyes*beta|ID), data=noise, 
+cue_prev_int_model_noise = glmer(sayyes ~ prevresp + cue + prevresp*cue +
+                                    (prevresp + cue + prevresp*cue |ID), data=noise, 
                                   family=binomial(link='probit'),
                                   control=glmerControl(optimizer="bobyqa",
                                                        optCtrl=list(maxfun=2e5)),
@@ -513,8 +545,8 @@ summary(acc_conf_model)
 conf = filter(behav, prevconf==1)
 unconf = filter(behav, prevconf==0)
 
-cue_prev_int_model_conf = glmer(sayyes ~ isyes + prevsayyes + beta + isyes*beta+prevsayyes*beta +
-                             (isyes + prevsayyes + beta + isyes*beta + prevsayyes*beta|ID), data=conf, 
+cue_prev_int_model_conf = glmer(sayyes ~ isyes + prevresp + cue + isyes*cue+prevresp*cue +
+                             (isyes + prevresp + cue + isyes*cue+prevresp*cue|ID), data=conf, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
@@ -525,8 +557,16 @@ check_convergence(cue_prev_int_model_conf)
 
 summary(cue_prev_int_model_conf)
 
-cue_prev_int_model_unconf = glmer(sayyes ~ isyes + prevsayyes + cue + isyes*cue+prevsayyes*cue +
-                             (isyes + prevsayyes + cue + isyes*cue + prevsayyes*cue|ID), 
+# save and load model from and to disk
+cue_prev_int_model_conf_path = file.path("data", "behav", "mixed_models",
+                                         "cue_prev_int_model_conf.rda")
+
+saveRDS(cue_prev_int_model_conf, cue_prev_int_model_conf_path)
+
+cue_prev_int_model_conf <- readRDS(cue_prev_int_model_conf_path)
+
+cue_prev_int_model_unconf = glmer(sayyes ~ isyes + prevresp + cue + isyes*cue+prevresp*cue +
+                             (isyes + prevresp + cue + isyes*cue + prevresp*cue|ID), 
                              data=unconf, 
                              family=binomial(link='probit'),
                              control=glmerControl(optimizer="bobyqa",
@@ -539,14 +579,7 @@ check_convergence(cue_prev_int_model_unconf)
 summary(cue_prev_int_model_unconf)
 
 # save and load model from and to disk
-cue_prev_int_model_conf_path = file.path("data", "behav", "mixed_models",
-                                           "cue_prev_int_model_conf.rda")
 
-saveRDS(cue_prev_int_model_conf, cue_prev_int_model_conf_path)
-
-cue_prev_int_model_conf <- readRDS(cue_prev_int_model_conf_path)
-
-# save and load model from and to disk
 cue_prev_int_model_unconf_path = file.path("data", "behav", "mixed_models",
                                          "cue_prev_int_model_unconf.rda")
 
