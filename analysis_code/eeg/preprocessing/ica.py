@@ -6,17 +6,14 @@
 # Author: Carina Forster
 # email: forster@cbs.mpg.de
 
-import os
 import pickle
+import subprocess
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import mne
-import numpy as np
 import pandas as pd
-from autoreject import Ransac
 from mne_icalabel import label_components
-import subprocess
 
 # show plots interactively  
 # %matplotlib qt
@@ -107,7 +104,7 @@ def label_icacorr():
     """
     In order to detect blink and cardiac artifacts, we use the mne function detect_artifacts.
     The cleaned data will be saved as a -epo.fif file.
-    Update: added rereferencing after ICA.
+    - rereferencing to common average after ICA.
     """
     
     ch_name_blinks = "VEOG"
@@ -125,24 +122,25 @@ def label_icacorr():
         # load ica solution
         ica_sol = load_pickle(f'{save_dir_ica_sol}{Path("/")}icas_{subj}.pkl')
 
+        # correlate components with ECG and EOG
         eog_inds, _ = ica_sol.find_bads_eog(epochs, ch_name=ch_name_blinks)
         ecg_inds, _ = ica_sol.find_bads_ecg(epochs, ch_name=ch_name_ecg, 
                                             method='correlation')
 
+        # combine the sources to exclude
         inds_to_exclude = eog_inds + ecg_inds
 
         # plot ICs applied to raw data, with ECG matches highlighted
         ica_sol.plot_sources(epochs, show_scrollbars=False, block=False, 
                              show=False, picks=list(range(21)))
-
-        os.chdir(save_dir_ica_comps)
-        plt.savefig(f'{Path("/")}ica_sources_{subj}')
+        # save figures
+        plt.savefig(f'{save_dir_ica_comps}{Path("/")}ica_sources_{subj}')
 
         ica_sol.plot_components(inst=epochs, show=False, picks=list(range(21)))
-        plt.savefig(f'{Path("/")}ica_comps_{subj}')
+        plt.savefig(f'{save_dir_ica_comps}{Path("/")}ica_comps_{subj}')
 
         ica_sol.plot_components(inst=epochs, show=False, picks=inds_to_exclude)
-        plt.savefig(f'{Path("/")}ica_del_{subj}')
+        plt.savefig(f'{save_dir_ica_comps}{Path("/")}ica_del_{subj}')
 
         ica_sol.exclude = inds_to_exclude
 
@@ -152,12 +150,13 @@ def label_icacorr():
         filt_path = (f'{epochs_for_data_analysis}{Path("/")}P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
         
         epochs_filt = mne.read_epochs(filt_path, preload=True)
-        
+        #apply ica solution (reject components that are not brain related)
         ica_sol.apply(epochs_filt)
 
         # rereference to average
         epochs_filt.set_eeg_reference('average', ch_type="eeg")
 
+        # save the cleaned epochs
         epochs_filt.save(f'{save_dir_ica}{Path("/")}clean_epochs_corr{Path("/")}P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif')
 
         print(f'Saved ica cleaned epochs for participant {subj}.')
@@ -221,17 +220,18 @@ def label_iclabel():
         # Remove the non-brain components from the clean epochs
         ica_sol.apply(epochs_filt)
 
-        # Rereference to average
+        # rereference to average
         epochs_filt.set_eeg_reference('average', ch_type="eeg")
 
+        # save the cleaned epochs
         epochs_filt.save(f'{save_dir_ica}{Path("/")}clean_epochs_iclabel{Path("/")}P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif')
-
         print(f'Saved ICA cleaned epochs for participant {subj}')
 
     # save a dataframe with info on how many components were removed
     pd.DataFrame(icalist).to_csv(f'{save_dir_ica}{Path("/")}clean_epochs_iclabel{Path("/")}ica_components_0.1Hzfilter.csv')
 
     return "Done with removing ICA components"
+
 
 # Helper functions
 def save_data(data, id):
