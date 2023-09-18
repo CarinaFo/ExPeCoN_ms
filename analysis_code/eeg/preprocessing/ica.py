@@ -1,10 +1,10 @@
-#function to run ICA on epoched data and save the ica solution
-#function that selects ICA components based on template matching or ica labels and rejects them
+# function to run ICA on epoched data and save the ica solution
+# function that selects ICA components based on template matching or 
+# ica label and rejects them
 
-# please report bugs
-# Author: Carina Forster, forsteca@cbs.mpg.de
 
-# last update: 15.02.2023
+# Author: Carina Forster
+# email: forster@cbs.mpg.de
 
 import os
 import pickle
@@ -16,14 +16,21 @@ import numpy as np
 import pandas as pd
 from autoreject import Ransac
 from mne_icalabel import label_components
+import subprocess
 
 # show plots interactively  
 # %matplotlib qt
 
-# directory where to find the cleaned, epoched data
-epochs_dir_ica = Path('D:/expecon_ms/data/eeg/prepro_stim/downsample_after_epoching')
+# Specify the file path for which you want the last commit date
+file_path = "D:\expecon_ms\\analysis_code\\eeg\\preprocessing\\ica.py"
 
-clean_epochs_dir = Path('D:/expecon_ms/data/eeg/prepro_stim/filter_0.1Hz')
+last_commit_date = subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", file_path]).decode("utf-8").strip()
+print("Last Commit Date for", file_path, ":", last_commit_date)
+
+# directory where to find the cleaned, epoched data
+epochs_for_data_analysis = Path('D:/expecon_ms/data/eeg/prepro_stim/filter_0.1Hz')
+
+epochs_for_ica_dir = Path('D:/expecon_ms/data/eeg/prepro_stim/filter_1Hz')
 
 # directory where to save the ica cleaned epochs
 save_dir_ica = Path('D:/expecon_ms/data/eeg/prepro_ica')
@@ -36,31 +43,29 @@ save_dir_ica_comps = Path('D:/expecon_ms/data/eeg/prepro_ica/ica_comps')
 # raw EEG data
 raw_dir = Path('D:/expecon_ms/data/eeg/raw_concatenated')
 
+# participant IDs
 IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
-            '017', '018', '019', '020', '021', '022', '023', '024', '025', '026',
-            '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
-            '037', '038', '039', '040', '041', '042', '043', '044', '045', '046',
-            '047', '048', '049']
+          '017', '018', '019', '020', '021', '022', '023', '024', '025', '026',
+          '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
+          '037', '038', '039', '040', '041', '042', '043', '044', '045', '046',
+          '047', '048', '049']
 
 
 def run_ica(infomax=1, save_psd=0):
 
     """
     Run ICA on epoched data and save the ICA solution.
-
     Args:
         infomax (int): Flag indicating whether to use the infomax method (default: 1).
         save_psd (int): Flag indicating whether to save the power spectral density (PSD) plot (default: 0).
-
     Returns:
         None
-
     """
 
     for subj in IDlist:
 
-        # Read the epochs data for the current participant
-        epochs = mne.read_epochs(f'{clean_epochs_dir}{Path("/P")}{subj}_epochs_stim-epo.fif')
+        # Read the epochs data for the current participant (1Hz filtered data for ICA)
+        epochs = mne.read_epochs(f'{epochs_for_ica_dir}{Path("/P")}{subj}_epochs_stim-epo.fif')
 
         # Pick EEG channels for ICA
         picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
@@ -81,7 +86,7 @@ def run_ica(infomax=1, save_psd=0):
             ica = mne.preprocessing.ICA(method='fastica').fit(
                 epochs, picks=picks)
 
-        save_data(data=ica, id=subj)  # Save the ICA solution for the participant
+        save_data(data=ica, id=subj)  # save ica solution
 
     return "Done with ICA"
 
@@ -112,7 +117,7 @@ def label_icacorr():
 
     for subj in IDlist:
 
-        file_path = (f'{epochs_dir_ica}{Path("/")}P{subj}_epochs_stim-epo.fif')
+        file_path = (f'{epochs_for_ica_dir}{Path("/")}P{subj}_epochs_stim-epo.fif')
         
         # load epochs
         epochs = mne.read_epochs(file_path, preload=True)
@@ -131,20 +136,20 @@ def label_icacorr():
                              show=False, picks=list(range(21)))
 
         os.chdir(save_dir_ica_comps)
-        plt.savefig(f'{Path("/")}ica_sources_01Hzfilter_{subj}')
+        plt.savefig(f'{Path("/")}ica_sources_{subj}')
 
         ica_sol.plot_components(inst=epochs, show=False, picks=list(range(21)))
-        plt.savefig(f'{Path("/")}ica_comps_01Hzfilter_{subj}')
+        plt.savefig(f'{Path("/")}ica_comps_{subj}')
 
         ica_sol.plot_components(inst=epochs, show=False, picks=inds_to_exclude)
-        plt.savefig(f'{Path("/")}ica_del_01Hzfilter_{subj}')
+        plt.savefig(f'{Path("/")}ica_del_{subj}')
 
         ica_sol.exclude = inds_to_exclude
 
         comps_removed.append(len(inds_to_exclude))
 
         # now load the highpass filtered data
-        filt_path = (f'{clean_epochs_dir}{Path("/")}P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
+        filt_path = (f'{epochs_for_data_analysis}{Path("/")}P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
         
         epochs_filt = mne.read_epochs(filt_path, preload=True)
         
@@ -179,7 +184,7 @@ def label_iclabel():
 
     for subj in IDlist:
         
-        file_path = (f'{epochs_dir_ica}{Path("/")}P{subj}_epochs_stim-epo.fif')
+        file_path = (f'{epochs_for_ica_dir}{Path("/")}P{subj}_epochs_stim-epo.fif')
 
         # Load the clean epochs (1 Hz filtered)
         epochs_ica = mne.read_epochs(file_path)
@@ -206,7 +211,7 @@ def label_iclabel():
         icalist.append(len(exclude_idx))
 
         # now load the highpass filtered data
-        filt_path = (f'{clean_epochs_dir}{Path("/")}P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
+        filt_path = (f'{epochs_for_data_analysis}{Path("/")}P{subj}_epochs_stim_0.1Hzfilter-epo.fif')
         
         epochs_filt = mne.read_epochs(filt_path, preload=True)
         
@@ -228,14 +233,13 @@ def label_iclabel():
 
     return "Done with removing ICA components"
 
+# Helper functions
 def save_data(data, id):
     """
     Save data to a pickle file.
-
     Args:
         data: The data to be saved.
         id: The identifier to be included in the filename.
-
     Returns:
         None
     """
@@ -247,10 +251,8 @@ def save_data(data, id):
 def load_pickle(file_path):
     """
     Load data from a pickle file.
-
     Args:
         file_path: The path to the pickle file.
-
     Returns:
         The loaded data.
     """
