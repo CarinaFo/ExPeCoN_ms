@@ -1,5 +1,13 @@
-import math
-import os
+# This script contains functions to analyze and plot the behavioral data for the EXPECON study
+# the expecon study investigates stimulus probabilities and the influence on perception and confidence
+# in a near-threshold somatosensory detection task in two datasets:
+# dataset 1: mini-block design, 144 trials in 5 blocks, 43 participants, stimulus probability cues before mini-blocks of 12 trials
+# dataset 2: trial-by-trial design, 120 trials in 5 blocks, 40 participants, stimulus probability cues before each trial
+
+# Author: Carina Forster
+# email: forster@cbs.mpg.de
+
+import subprocess
 from pathlib import Path
 
 import matplotlib.gridspec as gridspec
@@ -9,21 +17,30 @@ import pandas as pd
 import scipy.stats as stats
 import seaborn as sns
 import statsmodels.api as sm
-from matplotlib.font_manager import FontProperties as fm
+
+# Specify the file path for which you want the last commit date
+file_path = "D:\expecon_ms\\analysis_code\\behav\\figure1.py"
+
+last_commit_date = subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", file_path]).decode("utf-8").strip()
+print("Last Commit Date for", file_path, ":", last_commit_date)
 
 # Set Arial as the default font
 plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['font.size'] = 14
 
+# set save paths
 savepath_fig1_expecon1 = Path('D:/expecon_ms/figs/manuscript_figures/figure1_expecon1_paradigm_behav')
-savepath_fig3 = Path('D:/expecon_ms/figs/manuscript_figures/figure3_glmermodels')
 savepath_fig1_expecon2 = Path('D:/expecon_2/figures')
+savepath_fig3 = Path('D:/expecon_ms/figs/manuscript_figures/figure3_glmermodels')
+
 
 def prepro_behavioral_data(expecon=1):
  
     """ This function preprocesses the behavioral data.
-    We remove trials with no response or super fast responses
-    and add aditional columns to the dataframe.
+    -removes trials with no response or super fast responses
+    and add aditional columns to the dataframe (congruency etc.)
+    Arguments:
+    which dataset: expecon 1 or expecon 2
     Returns:
     data: pandas dataframe containing the preprocessed behavioral data
     """
@@ -62,16 +79,17 @@ def prepro_behavioral_data(expecon=1):
 
         data[['sayyes', 'isyes', 'cue', 'conf', 'respt1', 'resp2_t']] = \
             data[['sayyes', 'isyes', 'cue', 'conf',
-                   'respt1', 'resp2_t']].apply(pd.to_numeric, errors='coerce')
+                   'respt1', 'respt2']].apply(pd.to_numeric, errors='coerce')
+
+    # reset index
+    data = data.reset_index()
 
     # add a column that indicates correct responses & congruency
     data['correct'] = data.sayyes == data.isyes
     # Add a 'congruency' column
-    data['congruency'] = ((data.cue == 0.25) & (data.sayyes == 0)) | ((
-                          data.cue == 0.75) & (data.sayyes == 1))
+    data['congruency'] = ((data.cue == 0.25) & (data.sayyes == 0)) | ((data.cue == 0.75) & (data.sayyes == 1))
     # Add a 'congruency stimulus' column
-    data['congruency_stim'] = ((data.cue == 0.25) & (data.isyes == 0)) | ((
-                          data.cue == 0.75) & (data.isyes == 1))
+    data['congruency_stim'] = ((data.cue == 0.25) & (data.isyes == 0)) | ((data.cue == 0.75) & (data.isyes == 1))
     
     # add a column that combines the confidence ratings and the 
     # detection response
@@ -160,9 +178,10 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
 
 def exclude_data(expecon=1):
     """
-    Excludes participants and trials from the data based on the exclusion criteria.
+    Excludes experimental blocks from the data based on 
+    exclusion criteria (hitrates, fa rates).
     Arguments:
-    None
+    which dataset: expecon 1 or expecon 2
 
     Returns:
     data -- Pandas dataframe containing the data
@@ -192,30 +211,30 @@ def exclude_data(expecon=1):
     hitrate_per_block = signal.groupby(['ID', 'block']).mean()['sayyes']
 
     # Filter the grouped object based on hit rate conditions
-    filtered_groups = hitrate_per_block[(hitrate_per_block > 0.9) | (hitrate_per_block < 0.2)]
-    print('Blocks with hit rates > 0.9 or < 0.2: ', len(filtered_groups))
+    hitrate_abn = hitrate_per_block[(hitrate_per_block > 0.9) | (hitrate_per_block < 0.2)]
+    print('Blocks with hit rates > 0.9 or < 0.2: ', len(hitrate_abn))
 
     # Extract the ID and block information from the filtered groups
-    remove_hitrates = filtered_groups.reset_index()
+    remove_hitrates = hitrate_abn.reset_index()
 
     # Calculate hit rates by participant and cue condition
     noise = data[data.isyes == 0]
     farate_per_block = noise.groupby(['ID', 'block']).mean()['sayyes']
 
     # Filter the grouped object based on fa rate conditions
-    filtered_groups = farate_per_block[farate_per_block > 0.4]
-    print('Blocks with false alarm rates > 0.4: ', len(filtered_groups))
+    farate_abn = farate_per_block[farate_per_block > 0.4]
+    print('Blocks with false alarm rates > 0.4: ', len(farate_abn))
 
     # Extract the ID and block information from the filtered groups
-    remove_farates = filtered_groups.reset_index()
+    remove_farates = farate_abn.reset_index()
 
     # Filter the grouped objects based on the conditions
     #filtered_groups = hitrate_per_block[hitrate_per_block < farate_per_block]  # Hit rate < False alarm rate
-    filtered_groups = hitrate_per_block[hitrate_per_block - farate_per_block < 0.05]  # Difference < 0.1
-    print('Blocks with hit rates < false alarm rates: ', len(filtered_groups))
+    hit_fa = hitrate_per_block[hitrate_per_block - farate_per_block < 0.05]  # Difference < 0.1
+    print('Blocks with hit rates < false alarm rates: ', len(hit_fa))
           
     # Extract the ID and block information from the filtered groups
-    hitvsfarate = filtered_groups.reset_index()
+    hitvsfarate = hit_fa.reset_index()
 
     # Concatenate the dataframes
     combined_df = pd.concat([remove_hitrates, remove_farates, hitvsfarate])
@@ -227,6 +246,7 @@ def exclude_data(expecon=1):
     filtered_df = data.merge(unique_df, on=['ID', 'block'], how='left',
                              indicator=True,
                              suffixes=('', '_y'))
+    
     filtered_df = filtered_df[filtered_df['_merge'] == 'left_only']
 
     # Remove the '_merge' column
@@ -237,9 +257,22 @@ def exclude_data(expecon=1):
     return data, expecon
 
 def plot_mean_response_and_confidence(blue = '#0571b0', red = '#ca0020',
-                                      savepath=savepath_fig3):
-
-    data, expecon = exclude_data()
+                                      savepath=savepath_fig3, expecon=1):
+    """
+    Plots the mean detection response and mean confidence for each cue condition
+    with a boxplot.
+    Calculates test-statistics (Wilcoxon signed-rank test) 
+    # for the mean detection response and confidence between the cue conditions.
+    Arguments:
+    blue -- color for low cue condition
+    red -- color for high cue condition
+    savepath -- path to save the figure to
+    expecon -- which dataset: expecon 1 or expecon 2
+    Returns:
+    None
+    """
+    # load cleaned dataframe
+    data, expecon = exclude_data(expecon=expecon)
 
     # Calculate mean response per ID and cue
     mean_resp_id_cue = data.groupby(['cue', 'ID'])['sayyes'].mean().reset_index()
@@ -277,19 +310,20 @@ def plot_mean_response_and_confidence(blue = '#0571b0', red = '#ca0020',
     print(f"Wilcoxon statistic: {wilcoxon_statistic}")
     print(f"p-value: {p_value}")
 
+    return 'saved figures'
 
-def prepare_for_plotting(exclude_high_fa=False):
+def prepare_for_plotting(exclude_high_fa=False, expecon=1):
 
     """
     Prepares the data for plotting.
     Arguments:
     exclude_high_fa -- Boolean indicating whether to exclude participants with high false alarm rates
-    
+    expecon -- which dataset: expecon 1 or expecon 2
     Returns:
     data -- Pandas dataframe containing the data
     """
 
-    data, expecon = exclude_data()
+    data, expecon = exclude_data(expecon=expecon)
 
     # calculate hit rates, false alarm rates, d-prime, and criterion per participant and cue condition
     # and per condition
@@ -315,186 +349,41 @@ def prepare_for_plotting(exclude_high_fa=False):
     # Filter for correct trials only
     correct_only = data[data.correct == 1]
     incorrect_only = data[data.correct == 0]
-    yes_response = correct_only[correct_only.sayyes == 1]
-    no_response = correct_only[correct_only.sayyes == 0]
 
     # Calculate mean confidence for each participant and congruency condition
     data_grouped = correct_only.groupby(['ID', 'congruency']).mean()['conf']
     con_condition = data_grouped.unstack()[True].reset_index()
     incon_condition = data_grouped.unstack()[False].reset_index()
     conf_con = [con_condition, incon_condition]
-
-    # Calculate mean confidence for each participant and congruency condition
-    data_grouped = yes_response.groupby(['ID', 'congruency']).mean()['conf']
-    con_condition = data_grouped.unstack()[True].reset_index()
-    incon_condition = data_grouped.unstack()[False].reset_index()
-    conf_con_yes = [con_condition, incon_condition]
-
-    # Calculate mean confidence for each participant and congruency condition
-    data_grouped = no_response.groupby(['ID', 'congruency']).mean()['conf']
-    con_condition = data_grouped.unstack()[True].reset_index()
-    incon_condition = data_grouped.unstack()[False].reset_index()
-    conf_con_no = [con_condition, incon_condition]
-
-    # Calculate mean rts for each participant and congruency condition
-    data_grouped = correct_only.groupby(['ID', 'congruency_stim']).mean()['respt1']
-    con_condition = data_grouped.unstack()[True].reset_index()
-    incon_condition = data_grouped.unstack()[False].reset_index()
-    rt_con = [con_condition, incon_condition]
-
-    # Calculate mean rts for each participant and congruency condition
-    data_grouped = incorrect_only.groupby(['ID', 'congruency_stim']).mean()['respt1']
-    con_condition = data_grouped.unstack()[True].reset_index()
-    incon_condition = data_grouped.unstack()[False].reset_index()
-    rt_con_incorrect = [con_condition, incon_condition]
-
-    # Calculate mean rts for each participant and congruency condition
-    data_grouped = yes_response.groupby(['ID', 'congruency_stim']).mean()['respt1']
-    con_condition = data_grouped.unstack()[True].reset_index()
-    incon_condition = data_grouped.unstack()[False].reset_index()
-    rt_con_yes = [con_condition, incon_condition]
-
-    # Calculate mean rts for each participant and congruency condition
-    data_grouped = no_response.groupby(['ID', 'congruency_stim']).mean()['respt1']
-    con_condition = data_grouped.unstack()[True].reset_index()
-    incon_condition = data_grouped.unstack()[False].reset_index()
-    rt_con_no = [con_condition, incon_condition]
-
-    # Calculate mean accuracy for each participant and cue condition
-    data_grouped = data.groupby(['ID', 'cue']).mean()['correct']
-    acc_high = data_grouped.unstack()[0.75].reset_index()
-    acc_low = data_grouped.unstack()[0.25].reset_index()
-    acc_cue = [acc_low, acc_high]
-
-    # Calculate mean confidence for each participant and cue condition
-    data_grouped = data.groupby(['ID', 'cue']).mean()['conf']
-    conf_high = data_grouped.unstack()[0.75].reset_index()
-    conf_low = data_grouped.unstack()[0.25].reset_index()
-    conf_cue = [conf_low, conf_high]
     
-    conditions = df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, \
-                 conf_con_no, rt_con, rt_con_yes, rt_con_incorrect
+    conditions = df_sdt, conf_con
     
     return conditions, exclude_high_fa
 
-def correlate_sdt_with_questionnaire():
-    
-    # load questionarre data (uncertainty of intolerance)
-    q_path = Path('D:/expecon_ms/questionnaire/q_clean.csv')
 
-    q_data = pd.read_csv(q_path)
+def plot_figure1_grid(expecon=1):
 
-    data = exclude_data()
-
-    df_sdt = calculate_sdt_dataframe(data, "isyes", "sayyes", "ID", "cue")
-
-    high_c = list(df_sdt.criterion[df_sdt.cue ==0.75])
-    low_c = list(df_sdt.criterion[df_sdt.cue == 0.25])
-
-    high_d = list(df_sdt.dprime[df_sdt.cue ==0.75])
-    low_d = list(df_sdt.dprime[df_sdt.cue == 0.25])
-
-    diff_c= [x - y for x, y in zip(low_c, high_c)]
-    diff_d = [x - y for x, y in zip(low_d, high_d)]
-
-    # Assuming diff_c and q_data are numpy arrays or pandas Series
-
-    # Filter the arrays based on the condition q_data['iu_sum'] > 0
-    filtered_diff_c = np.array(diff_c)[q_data['iu_sum'] > 0]
-    filtered_iu_sum = q_data['iu_sum'][q_data['iu_sum'] > 0]
-
-    df = pd.DataFrame({'y': filtered_diff_c, 'X': filtered_iu_sum})
-
-    # Select columns representing questionnaire score and criterion change
-    X = df['X']
-    y = df['y']
-
-    # Drop missing values if necessary
-    df.dropna(subset=['X', 'y'], inplace=True)
-
-    # Fit the linear regression model
-    X = sm.add_constant(X)  # Add constant term for intercept
-    regression_model = sm.OLS(y, X)
-    regression_results = regression_model.fit()
-
-    # Extract slope, intercept, and p-value
-    slope = regression_results.params[1]
-    intercept = regression_results.params[0]
-    p_value = regression_results.pvalues[1]
-
-    # Make predictions
-    predictions = regression_results.predict(X)
-
-    # Set black or gray colors for the plot
-    data_color = 'black'
-    regression_line_color = 'gray'
-    text_color = 'black'
-
-    # Plot the regression line using seaborn regplot
-    sns.regplot(data=df, x='X', y='y', color=data_color)
-    plt.xlabel('Intolerance of Uncertainty score (zscored)', color=text_color)
-    plt.ylabel('Criterion Change', color=text_color)
-    plt.annotate(f'Slope: {slope:.2f}\n p-value: {p_value:.2f}', 
-                 xy=(0.05, 0.85), xycoords='axes fraction',
-                 color=text_color)
-    
-    savefig_path = Path('D:/expecon_ms/figs/manuscript_figures/Figure2B/')
-                        
-    plt.savefig(f'{savefig_path}linreg_c_q.png', dpi=300)
-    plt.savefig(f'{savefig_path}linreg_c_q.svg', dpi=300)
-    plt.show()
-
-
-def diff_from_optimal_criterion():
-
-    """ This function calculates the difference between the optimal criterion
-    and the mean criterion for each participant and cue condition."""
-
-    # calculate the optimal criterion (c) for a given base rate of signal and catch trials, and cost of hit and false alarm
-    def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_alarm):
-        llr = math.log((base_rate_signal / base_rate_catch) * (cost_hit / cost_false_alarm))
-        c = -0.5 * llr
-        return c
-
-    c_low = calculate_optimal_c(0.25, 0.75, 1, 1)
-    print("Optimal criterion (c) for low stimulus probability:", c_low)
-
-    c_high = calculate_optimal_c(0.75, 0.25, 1, 1)
-    print("Optimal criterion (c) for high stimulus probability:", c_high)
-
-    subop_low = [c - c_low for c in df_sdt.criterion[df_sdt.cue == 0.25]]
-    mean_low = np.mean(subop_low)
-    std_low = np.std(subop_low)
-    print(mean_low)
-    print(std_low)
-    
-    subop_high = [c - c_high for c in df_sdt.criterion[df_sdt.cue == 0.75]]
-    mean_high = np.mean(subop_high)
-    std_high = np.std(subop_high)
-    print(mean_high)
-    print(std_high)
-
-
-def plot_figure1_grid(savepath_fig1=savepath_fig1_expecon2):
-
-    """Plot the figure 1 grid and the behavioral data
-
+    """Plot the figure 1 grid and the behavioral data for the EXPECON study.
     Parameters
     ----------
-    savepath_fig1 : str
-        Path to save the figure to
-
+    expecon : int : which study to analyze
     Returns
     -------
     None
     """
 
+    # set save path
+    if expecon == 1:
+        savepath_fig1=savepath_fig1_expecon1
+    else:
+        savepath_fig1=savepath_fig1_expecon2
+
     # load data
-    conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=False)
+    conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=False,
+                                                       expecon=expecon)
 
     # unpack data
-    df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, \
-    rt_con_yes, rt_con_incorrect = conditions
+    df_sdt, conf_con = conditions
     
     # set colors for both conditions
     blue = '#0571b0'  # 0.25 cue
@@ -715,6 +604,8 @@ def plot_figure1_grid(savepath_fig1=savepath_fig1_expecon2):
                     format='png')
     plt.show()
 
+    return 'saved figure 1'
+
 
 def calc_stats():
 
@@ -811,8 +702,21 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     return ci_lower, ci_upper
 
 
-def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
-                        exclude_high_fa=False):
+def supplementary_plots(expecon=1):
+    """
+    supplementary plots for the behavioral data
+    Parameters:
+    ----------
+    expecon : int : which study to analyze
+    Returns:
+    -------
+    """
+    
+    # set save path
+    if expecon == 1:
+        savepath_fig1=savepath_fig1_expecon1
+    else:
+        savepath_fig1=savepath_fig1_expecon2
 
     # set colors for both conditions
     blue = '#2a95ffff'  # 0.25 cue
@@ -821,14 +725,27 @@ def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
     colors = [blue, red]
     medcolor = ['black', 'black']
 
-    # load data
-    conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=False)
+    data, expecon = exclude_data(expecon=expecon)
 
-    # unpack data
-    df_sdt, conf_con, conf_cue, acc_cue, conf_con_yes, conf_con_no, rt_con, \
-    rt_con_yes, rt_con_incorrect = conditions
+    # calculate hit rates, false alarm rates, d-prime, and criterion per participant and cue condition
+    # and per condition
+    df_sdt = calculate_sdt_dataframe(data, "isyes", "sayyes", "ID", "cue")
 
-    # save accuracy and confidence for both conditions
+    # Filter for correct trials only
+    correct_only = data[data.correct == 1]
+    incorrect_only = data[data.correct == 0]
+
+    # filter for yes and no responses
+    yes_response = correct_only[correct_only.sayyes == 1]
+    no_response = correct_only[correct_only.sayyes == 0]
+
+    # Calculate mean accuracy for each participant and cue condition
+    data_grouped = data.groupby(['ID', 'cue']).mean()['correct']
+    acc_high = data_grouped.unstack()[0.75].reset_index()
+    acc_low = data_grouped.unstack()[0.25].reset_index()
+    acc_cue = [acc_low, acc_high]
+
+    # accuracy per condition
     for index in range(len(acc_cue[0])):
         plt.plot(1, acc_cue[0].iloc[index, 1],
                  marker='', markersize=8, color=colors[0],
@@ -857,17 +774,18 @@ def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
     plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
     plt.ylabel('accuracy', fontname="Arial", fontsize=14)
 
-    if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}{Path("/")}acc_cue_exclhighfa.svg', dpi=300,
-                    bbox_inches='tight',
-                    format='svg')
-    else:
-        plt.savefig(f'{savepath_fig1}{Path("/")}acc_cue.svg', dpi=300,
+    plt.savefig(f'{savepath_fig1}{Path("/")}acc_cue.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
 
-    # is confidence higher for correct than incorrect responses?
+    # Calculate mean confidence for each participant and cue condition
+    data_grouped = data.groupby(['ID', 'cue']).mean()['conf']
+    conf_high = data_grouped.unstack()[0.75].reset_index()
+    conf_low = data_grouped.unstack()[0.25].reset_index()
+    conf_cue = [conf_low, conf_high]
+
+    # is confidence higher for a certain cue?
     for index in range(len(conf_cue[0])):
         plt.plot(1, conf_cue[0].iloc[index, 1],
                  marker='', markersize=8, color=colors[0],
@@ -894,19 +812,19 @@ def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
     # Set x-axis tick labels
     plt.xticks([1, 2], ['0.25', '0.75'])    
     plt.xlabel('P (Stimulus)', fontname="Arial", fontsize=14)
-    plt.ylabel('accuracy', fontname="Arial", fontsize=14)
-
     plt.ylabel('confidence', fontname="Arial", fontsize=14)
 
-    if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}{Path("/")}conf_cue_exclhighfa.svg', dpi=300,
-                    bbox_inches='tight',
-                    format='svg')
-    else:
-        plt.savefig(f'{savepath_fig1}{Path("/")}conf_cue.svg', dpi=300,
+    plt.savefig(f'{savepath_fig1}{Path("/")}conf_cue.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
+
+    # Calculate mean confidence for each participant and congruency condition
+    # for yes responses only
+    data_grouped = yes_response.groupby(['ID', 'congruency']).mean()['conf']
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
+    conf_con_yes = [con_condition, incon_condition]
 
     # congruency on confidence for yes and no responses
     colors = ['white', 'black']
@@ -941,15 +859,17 @@ def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
     plt.xlabel('Yes responses', fontname="Arial", fontsize=14)
     plt.ylabel('Confidence', fontname="Arial", fontsize=14)
 
-    if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_yes_exclhighfa.svg', dpi=300,
-                    bbox_inches='tight',
-                    format='svg')
-    else:
-        plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_yes.svg', dpi=300,
+    plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_yes.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
+
+    # Calculate mean confidence for each participant and congruency condition
+    # for no responses only
+    data_grouped = no_response.groupby(['ID', 'congruency']).mean()['conf']
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
+    conf_con_no = [con_condition, incon_condition]
 
     # congruency on confidence for no responses
     for index in range(len(conf_con_no[0])):
@@ -981,15 +901,16 @@ def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
     plt.xlabel('No responses', fontname="Arial", fontsize=14)
     plt.ylabel('Mean confidence', fontname="Arial", fontsize=14)
 
-    if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_no_exclhighfa.svg', dpi=300,
-                    bbox_inches='tight',
-                    format='svg')
-    else:
-        plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_no.svg', dpi=300,
+    plt.savefig(f'{savepath_fig1}{Path("/")}conf_con_no.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
+
+    # Calculate mean rts for each participant and congruency condition
+    data_grouped = correct_only.groupby(['ID', 'congruency_stim']).mean()['respt1']
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
+    rt_con = [con_condition, incon_condition]
 
     # Reaction times for stimulus congruent trials (correct only)
     for index in range(len(rt_con[0])):
@@ -1021,15 +942,16 @@ def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
     plt.xlabel('Correct trials only', fontname="Arial", fontsize=14)
     plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
 
-    if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}{Path("/")}rt_con_exclhighfa.svg', dpi=300,
-                    bbox_inches='tight',
-                    format='svg')
-    else:
-        plt.savefig(f'{savepath_fig1}{Path("/")}rt_con.svg', dpi=300,
+    plt.savefig(f'{savepath_fig1}{Path("/")}rt_con.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
+
+    # Calculate mean rts for each participant and congruency condition
+    data_grouped = incorrect_only.groupby(['ID', 'congruency_stim']).mean()['respt1']
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
+    rt_con_incorrect = [con_condition, incon_condition]
 
     # Incorrect trials only
     for index in range(len(rt_con_incorrect[0])):
@@ -1061,12 +983,7 @@ def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
     plt.xlabel('Incorrect trials only', fontname="Arial", fontsize=14)
     plt.ylabel('Mean response time', fontname="Arial", fontsize=14)
 
-    if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}{Path("/")}rt_con_incorrect_exclhighfa.svg', dpi=300,
-                    bbox_inches='tight',
-                    format='svg')
-    else:
-        plt.savefig(f'{savepath_fig1}{Path("/")}rt_con_incorrect.svg', dpi=300,
+    plt.savefig(f'{savepath_fig1}{Path("/")}rt_con_incorrect.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
     plt.show()
@@ -1075,7 +992,7 @@ def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
     x = df_sdt.criterion[df_sdt.cue == 0.75]
     y = df_sdt.dprime[df_sdt.cue == 0.75]
 
-    reg = sns.regplot(x, y)
+    reg = sns.regplot(x=x, y=y)
 
     # Fit a linear regression model to calculate the p-value
     model = sm.OLS(x, sm.add_constant(y))
@@ -1101,12 +1018,8 @@ def supplementary_plots(savepath_fig1=savepath_fig1_expecon2,
     plt.xlabel('dprime 0.75', fontname="Arial", fontsize=14)
     plt.ylabel('c 0.75', fontname="Arial", fontsize=14)
 
-    if exclude_high_fa is True:
-        plt.savefig(f'{savepath_fig1}{Path("/")}dprime_c_exclhighfa.svg', dpi=300,
+    plt.savefig(f'{savepath_fig1}{Path("/")}dprime_c.svg', dpi=300,
                     bbox_inches='tight',
                     format='svg')
-    else:
-        plt.savefig(f'{savepath_fig1}{Path("/")}dprime_c.svg', dpi=300,
-                    bbox_inches='tight',
-                    format='svg')
- 
+
+    return "saved all supplementary plots"
