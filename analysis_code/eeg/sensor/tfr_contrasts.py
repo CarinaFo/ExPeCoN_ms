@@ -6,16 +6,21 @@
 
 # import packages
 import os
+import pickle
 import random
-import subprocess
 import sys
 from pathlib import Path
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
 import pandas as pd
-from mne.stats import f_mway_rm, f_threshold_mway_rm, fdr_correction
+import pyvistaqt  # for proper 3D plotting
+import scipy
+import seaborn as sns
+from mne.stats import f_threshold_mway_rm, f_mway_rm, fdr_correction
+import subprocess
 
 # Specify the file path for which you want the last commit date
 file_path = "D:\expecon_ms\\analysis_code\\eeg\\sensor\\tfr_contrasts.py"
@@ -27,6 +32,7 @@ print("Last Commit Date for", file_path, ":", last_commit_date)
 sys.path.append('D:\\expecon_ms\\analysis_code')
 
 os.chdir('D:\\expecon_ms\\analysis_code')
+from behav import figure1
 from permutation_tests import cluster_correlation
 
 # for plots in new windows
@@ -282,7 +288,7 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=7, fmax=35):
     '''
 
     # load tfr data
-    tfr_a_all, tfr_b_all  = load_tfr_conds()
+    tfr_a_all, tfr_b_all  = visualize_contrasts()
 
     # average over participants
     gra_a = mne.grand_average(tfr_a_all) # high
@@ -313,7 +319,7 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=7, fmax=35):
 
     # now plot cluster permutation output in the second row
     # pick channels
-    ch_index = [tfr_a_all[0].ch_names.index(c) for c in channel_names]
+    ch_index = [tfr_c_all[0].ch_names.index(c) for c in channel_names]
 
     for t, a in zip(time_windows, axes_second_row):
 
@@ -356,28 +362,158 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=7, fmax=35):
                 times = tfr_a_all[0].copy().crop(t[0], t[1]).times
 
         # run function to plot significant cluster in time and frequency space
-        plot_cluster_test_output(T_obs = T_obs, cluster_p_values = cluster_p, clusters=clusters, fmin=7, fmax=35,
-                                data_cond=tfr_a_all, tmin=t[0], tmax=t[1], ax0=a[0], ax1=a[1])
+        plot_cluster_test_output(tobs = T_obs, cluster_p_values = cluster_p, clusters=clusters, fmin=7, fmax=35,
+                                data_cond=tfr_c_all, tmin=t[0], tmax=t[1], ax0=a[0], ax1=a[1])
 
     # finally save figure
     plt.savefig(f'{savedir_figure6}{Path("/")}fig6_{cond_a}_{cond_b}_tfr_{channel_names[0]}.svg', dpi=300, format='svg')
     plt.savefig(f'{savedir_figure6}{Path("/")}fig6_{cond_a}_{cond_b}_tfr_{channel_names[0]}.png', dpi=300, format='png')
 
 
+def cluster_perm_space_time_plot(tmin=-0.5, tmax=0, channel=['C4']):
+    """Plot cluster permutation results in space and time. This function prepares the
+    data for stats tests in 1D (permutation over timepoints) or 2D (permutation over
+    timepoints and channels). 
+    Significant cluster are plotted
+    Cluster output is correlated with behavioral outcome.
+    input:
+    tmin: start time of time window
+    tmax: end time of time window
+    channel: channel to plot
+    output:
+    None
+    """
+
+    conds = create_contrast()
+
+    # crop epochs and baseline correct
+    high = [ax.copy().crop(tmin, tmax).apply_baseline((-0.5, -0.4)) for ax in evo_c]
+    low = [bx.copy().crop(tmin, tmax).apply_baseline((-0.5, -0.4)) for bx in evo_d]
+
+    prevyes_high = [ax.copy().crop(tmin, tmax).apply_baseline((-0.5, -0.4))  for ax in evo_a]
+    prevno_high = [bx.copy().crop(tmin, tmax).apply_baseline((-0.5, -0.4)) for bx in evo_b]
+
+    if tmax <= 0:
+        a = [ax.copy().pick_channels(channel).crop(tmin, tmax) for ax in evo_a]
+        b = [bx.copy().pick_channels(channel).crop(tmin, tmax) for bx in evo_b]
+    else:
+        high = [ax.copy().pick_channels(channel).apply_baseline((-0.5,-0.4))
+                     .crop(tmin, tmax).average() for ax in evo_c]
+        low = [bx.copy().pick_channels(channel).apply_baseline((-0.5,-0.4))
+                    .crop(tmin, tmax).average() for bx in evo_d]
+
+    a_gra = mne.grand_average(a)
+    b_gra = mne.grand_average(b)
+
+    # colors from colorbrewer2.org
+    colors_prevchoice = ['#e66101', '#5e3c99'] # brown #d8b365 and green #5ab4ac
+    colors_highlow = ["#ca0020", '#0571b0'] # red and blue
+    colors_hitmiss = ['#d01c8b', '#018571'] # pink, darkgreen
+    linestyles=['--', '--']
+
+    # Create a 1x2 grid of subplots
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
+
+    mne.viz.plot_compare_evokeds({'prev_yes_choice': prevyes_high, 
+                                  'prev_no_choice': prevno_high}, 
+                                  combine='mean', picks=channel, 
+                                  show_sensors=False,
+                                  colors = colors_prevchoice, 
+                                  axes=axs[0], show=False, legend='lower right',
+                                  truncate_xaxis=False, truncate_yaxis=False)
+    
+    
+    mne.viz.plot_compare_evokeds({'0.75': high, '0.25': low}, 
+                                 picks=channel, show_sensors=False,
+                                colors = colors_highlow, axes=axs[1], 
+                                show=False, legend='lower right',
+                                truncate_xaxis=False, truncate_yaxis=False)
+    
+    # Adjust the layout to prevent overlapping
+    plt.tight_layout()
+    #figpath = Path('D:/expecon_ms/figs/manuscript_figures/Figure3/fig3.svg')
+    #plt.savefig(figpath)
+    plt.show()
+    
+    diff = mne.combine_evoked([a_gra,b_gra], weights=[1,-1])
+    topo = diff.plot_topo()
+    figpath = Path('D:/expecon_ms/figs/manuscript_figures/Figure3/topo.svg')
+    topo.savefig(figpath)
+   
+    X = np.array([ax.copy().crop(tmin, tmax).apply_baseline((-0.5,-0.4))
+                  .pick_channels(channel).data-bx.copy()
+                  .crop(tmin, tmax).apply_baseline((-0.5,-0.4)).
+                  pick_channels(channel).data for ax,bx in zip(conds[6], conds[7])])
+
+    t,p,h = mne.stats.permutation_t_test(np.squeeze(X))
+
+    times = conds[6][0].copy().crop(-0.5,0).times
+
+    sig_times = np.where(p<0.05)
+
+    print(times[sig_times])
+
+    X = np.transpose(X, [0, 2, 1]) # channels should be last dimension
+
+    # load example epoch to extract channel adjacency matrix
+    subj='007'
+    epochs = mne.read_epochs(f'{dir_cleanepochs}{Path("/")}P{subj}_epochs_after_ica-epo.fif')
+
+    ch_adjacency,_ = mne.channels.find_ch_adjacency(epochs.info, ch_type='eeg')
+
+    # threshold free cluster enhancement
+    threshold_tfce = dict(start=0, step=0.1)
+
+    # 2D cluster test
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X[:,:,:], n_permutations=10000,
+                                                                                    adjacency=ch_adjacency, 
+                                                                                    tail=0, 
+                                                                                    n_jobs=-1)
+
+    good_cluster_inds = np.where(cluster_p_values < 0.05)[0]
+    print(good_cluster_inds) # times where something significant happened
+    
+    min(cluster_p_values)
+    print(cluster_p_values) 
+
+    cluster_channel = np.unique(clusters[good_cluster_inds[0]][1])
+    cluster1_channel = np.unique(clusters[good_cluster_inds[1]][1])
+
+    ch_names_cluster0 = [evokeds_a_all[0].ch_names[c] for c in cluster_channel]
+    ch_names_cluster1 = [evokeds_a_all[0].ch_names[c] for c in cluster1_channel]
+
+    # cluster previous yes
+
+    cluster_channel = np.unique(clusters[good_cluster_inds[0]][1])
+    ch_names_cluster_prevyes = [evokeds_a_all[0].ch_names[c] for c in cluster_channel]
+    
+    # 1D cluster test
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(np.squeeze(X[:,:,:]), n_permutations=10000,
+                                                                                    tail=0, n_jobs=-1, threshold =threshold_tfce,
+                                                                                    )
+
+    good_cluster_inds = np.where(cluster_p_values < 0.05)[0] # times where something significant happened
+    print(good_cluster_inds)
+
+    min(cluster_p_values)
+    print(cluster_p_values)
+
+    for g in good_cluster_inds:
+        print(a_gra.times[clusters[g]])
+        print(cluster_p_values[g])
 def run_3D_cluster_test():
 
-    """run a 3D cluster permutation test (time, frequency and channels) on the difference between conditions"""
-
     # pick 9 channels as our cluster of channels we are interested in
-    [c.pick_channels(['C6', 'C4', 'C2', 'CP2', 'CP4', 'CP6']) for c in tfr_a_all]
-    [c.pick_channels(['C6', 'C4', 'C2', 'CP2', 'CP4', 'CP6']) for c in tfr_b_all]
+
+    [c.pick_channels(['C6', 'C4', 'C2', 'CP2', 'CP4', 'CP6']) for c in tfr_c_all]
+    [c.pick_channels(['C6', 'C4', 'C2', 'CP2', 'CP4', 'CP6']) for c in tfr_d_all]
     
     # definde adjaceny matrix for cluster permutation test
-    ch_adjacency = mne.channels.find_ch_adjacency(tfr_a_all[0].info,
+    ch_adjacency = mne.channels.find_ch_adjacency(tfr_c_all[0].info,
                                                   ch_type='eeg')
     
     # contrast data
-    X = np.array([h.copy().crop(tmin,tmax).data - l.copy().crop(tmin,tmax).data for h, l in zip(tfr_a_all, tfr_b_all)])
+    X = np.array([h.copy().crop(tmin,tmax).data - l.copy().crop(tmin,tmax).data for h, l in zip(tfr_c_all, tfr_d_all)])
 
     # frequency, time and channel adjacency
     com_adjacency = mne.stats.combine_adjacency(X.shape[2],
@@ -392,6 +528,7 @@ def run_3D_cluster_test():
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X,
                                                            n_permutations=100,
                                                            adjacency=com_adjacency,
+                                                        
                                                            n_jobs=-1)
     
     print(f'The minimum p-value is {min(cluster_p_values)}')
@@ -403,59 +540,33 @@ def run_3D_cluster_test():
 
     print("Index of the overall minimum value:", min_index)
 
-    return T_obs, clusters, cluster_p_values, H0
+    freqs = np.arange(fmin, fmax, 1)
 
+    # significant frequencies
+    freqs[np.unique(clusters[162][1])]
 
-def plot_cluster_test_output(T_obs=None, cluster_p_values=None, clusters=None, fmin=7, fmax=35,
+    # significant timepoints
+    times = tfr_a_all[0].copy().crop(tmin, tmax).times
+
+    times[np.unique(clusters[162][0])]
+
+def plot_cluster_test_output(tobs=None, cluster_p_values=None, clusters=None, fmin=7, fmax=35,
                              data_cond=None, tmin=0, tmax=0.5, ax0=0, ax1=0):
     
-    """Plot the cluster test output in time-frequency space
-    Parameters
-    ----------
-    T_obs : array
-    T-statistic from cluster permutation test
-    cluster_p_values : array
-    p-values from cluster permutation test
-    clusters : array
-    clusters from cluster permutation test
-    fmin : int
-    minimum frequency to plot
-    fmax : int
-    maximum frequency to plot
-    data_cond : list
-    list of tfr objects for each condition
-    tmin : int
-    minimum time to plot
-    tmax : int
-    maximum time to plot
-    ax0 : int
-    index of the axes in the first row
-    ax1 : int
-    index of the axes in the second row
-    ----------
-    Returns
-    -------
-    None
-    """
-
-    # frequency and time range
     freqs = np.arange(fmin, fmax, 1)
 
     times = 1e3 * data_cond[0].copy().crop(tmin,tmax).times
 
-    # define significant T-values (part of significant cluster)
     T_obs_plot = np.nan * np.ones_like(T_obs)
     for c, p_val in zip(clusters, cluster_p_values):
         if p_val <= 0.05:
             T_obs_plot[c] = T_obs[c]
     
-    # define vmin and vmax
     min_v = np.max(np.abs(T_obs))
 
     vmin = -min_v
     vmax = min_v
 
-    # plot T  values
     fig1 = axs[ax0, ax1].imshow(
         T_obs,
         cmap=plt.cm.bwr,
@@ -467,7 +578,6 @@ def plot_cluster_test_output(T_obs=None, cluster_p_values=None, clusters=None, f
         alpha=0.5,
     )
 
-    # plot significant clusters
     fig2 = axs[ax0, ax1].imshow(
         T_obs_plot,
         cmap=plt.cm.bwr,
@@ -481,38 +591,285 @@ def plot_cluster_test_output(T_obs=None, cluster_p_values=None, clusters=None, f
     # Add colorbar for each subplot
     fig.colorbar(fig2, ax = axs[ax0, ax1])
 
-    # add axes labels
     axs[ax0, ax1].set_xlabel("Time (ms)")
     axs[ax0, ax1].set_ylabel("Frequency (Hz)")
 
-    
-def run_cluster_correlation_2D(channel_names=['CP4']):
+def correlate_cluster_with_behav():
 
-    """run a 2D cluster correlation as implemented by Magda (correlate criterion with every voxel in TFR)
+    # correlate cluster with criterion change
+
+    fmin=min(np.unique(clusters[0][0]))
+    fmax=max(np.unique(clusters[0][0]))
+    tmin=min(np.unique(clusters[0][1]))
+    tmax=max(np.unique(clusters[0][1]))
+
+    #cluster before cue:
+    X1 = X[:,fmin:fmax, tmin:tmax]
+    X1 = X[:, min_index[0], min_index[1]]
+
+    X1 = X[:,10:12,50:95]
+   
+    X1 = np.mean(X1, axis=(1,2))
+
+    X1 = X1*10**10
+
+    # load signal detection dataframe
+    out = figure1.prepare_for_plotting()
+        
+    sdt = out[0][0]
+
+    crit_diff = np.array(sdt.criterion[sdt.cue == 0.75]) - np.array(sdt.criterion[sdt.cue == 0.25])
+
+    d_diff = np.array(sdt.dprime[sdt.cue == 0.75]) - np.array(sdt.dprime[sdt.cue == 0.25])
+
+    # load random effects from glmmer model
+    #re = pd.read_csv(f'{Path("D:/expecon_ms/data/behav/mixed_models/brms/brms_betaweights.csv")}')
+    re = pd.read_csv(f'{Path("D:/expecon_ms/data/behav/mixed_models/brms/regweights_6trials.csv")}')
+
+    np.corrcoef(re.criterion, X1)
+
+    scipy.stats.pearsonr(re.criterion, X1)
+
+    sns.regplot(re.criterion, X1)
+    
+    # contrast data
+    contrast_data = np.array([h.data-l.data for h, l in zip(power_a_all, power_b_all)])
+    times = power_a_all[0].times
+
+    high_data = np.array([h.pick_channels(['C4']).data for h in power_a_all])
+    low_data = np.array([l.pick_channels(['C4']).data for l in power_b_all])
+
+    # average over alpha band and participants
+    alpha_high = np.mean(high_data[:,:,1:7,:], axis=(0,1,2))
+    alpha_low = np.mean(low_data[:,:,1:7,:], axis=(0,1,2))
+
+    alpha_high_sub = np.mean(high_data[:,:,1:7,:], axis=(1 ,2))
+    alpha_low_sub = np.mean(low_data[:,:,1:7,:], axis=(1, 2))
+
+    diff = alpha_high_sub-alpha_low_sub
+    
+    t,p,H = mne.stats.permutation_t_test(diff)
+
+    print(f'{power_a_all[0].times[np.where(p<0.05)]} alpha')
+
+    alpha_sd_high = np.std(high_data[:,:,1:7,:], axis=(0,1,2))
+    alpha_sd_low = np.std(low_data[:,:,1:7,:], axis=(0,1,2))
+
+    beta_high = np.mean(high_data[:,:,9:,:], axis=(0,1,2))
+    beta_low = np.mean(low_data[:,:,9:,:], axis=(0,1,2))
+
+    beta_high_sub = np.mean(high_data[:,:,9:,:], axis=(1,2))
+    beta_low_sub = np.mean(low_data[:,:,9:,:], axis=(1,2))
+
+    diff = beta_high_sub-beta_low_sub
+
+    t,p,H = mne.stats.permutation_t_test(diff)
+
+    print(f'{power_a_all[0].times[np.where(p<0.05)]} beta')
+
+    beta_sd_high = np.std(high_data[:,:,12:16,:], axis=(0,1,2))
+    beta_sd_low = np.std(low_data[:,:,12:16,:], axis=(0,1,2))
+
+    plt.plot(np.linspace(tmin, tmax, alpha_high.shape[0]), alpha_high, label='alpha 0.75')
+    plt.plot(np.linspace(tmin, tmax, alpha_high.shape[0]), alpha_low, label='alpha 0.25')
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Power')
+    plt.savefig(f'{savedir_figure4}\\{cond_a}_{cond_b}_alpha.svg', dpi=300)
+
+    plt.plot(np.linspace(tmin, tmax, alpha_high.shape[0]), beta_high, label='beta high')
+    plt.plot(np.linspace(tmin, tmax, alpha_high.shape[0]), beta_low, label='beta low')
+
+    plt.legend()
+    plt.xlabel('Time (s)')
+    plt.ylabel('Power')
+    plt.savefig(f'{savedir_figure4}\\{cond_a}_{cond_b}_beta_zoom.svg', dpi=300)
+
+    contrast_data = np.array([h.crop(tmin,tmax).data-l.crop(tmin,tmax).data for h,l in zip (evokeds_high, evokeds_low)])
+    
+    X = contrast_data.mean(axis=0)
+
+    X_tfr = mne.time_frequency.AverageTFR(data=X, 
+                                          times=evokeds_high[0].times,
+                                          freqs=evokeds_high[0].freqs, 
+                                          nave=39, 
+                                          info=evokeds_high[0].info)
+    X_tfr.crop(-0.5,0).plot(picks=['CP4'])
+
+    topo = gra_a.plot_topo()
+    topo = gra_b.plot_topo()
+
+    tfr = gra_a.plot(picks=channel_names, combine='mean')[0]
+    tfr = low_gra.plot(picks=channel_names, combine='mean')[0]
+
+    topo = diff.plot_topo()
+    tfr = diff.copy().crop(-1,0).plot(picks=channel_names,
+                                  combine='mean')[0]
+
+    topo.savefig(f'{savedir_figure4}//{cond}_topo.svg')
+    
+    tfr.savefig(f'{savedir_figure4}//{cond}_baseline_tfr.svg')
+
+
+def run_2D_cluster_perm_test(channel_names=['C3', 'CP1','Pz','CP2','C4','C1','CP3','P1','P2','CPz','CP4','C2','FC4'],
+                             n_perm=10000):
+    
+    '''run a 2D cluster permutation test on the difference between conditions
     Parameters
     ----------
-    channel_names : list of char
-        channels to analyze
-    ----------
+    channel_names : list of char (channel names)
+    contrast_data : list
+        list containing the difference between conditions for each subject
+    n_perm : int (how many permutations for cluster test)
     Returns
     -------
     None
-    """
+    '''
+
+    prevyes_cluster = ['Fz', 'F3', 'FC1', 'CP1', 'Pz', 'P3', 'C4', 'FC2', 'F4', 'AF3', 'AFz', 'F1', 'FC3', 'C1','P1', 'P2', 'FC4', 'AF4', 'F2']
+    highlow_cluster1 = ['Fz','FC1','C3','Pz','P7','O1','Oz','P4','P8', 'CP2','Cz','C4','FC2','AF3','AFz','F1','C1','CP3','P1','PO7','PO3','POz','PO4','PO8','P6','P2','CP4','C2','AF4']
+
+    contrast_data = np.array([h.copy().crop(tmin,tmax).data-l.copy().crop(tmin,tmax).data
+                               for h,l in zip(high, low)])
+
+    spec_channel_list = []
+
+    for i, channel in enumerate(channel_names):
+        spec_channel_list.append(tfr_high_all[15].ch_names.index(channel))
+    spec_channel_list
+
+    mean_over_channels = np.mean(contrast_data[:, spec_channel_list, :, :], axis=(1))
+
+    threshold_tfce = dict(start=0, step=0.01)
+
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(
+                            mean_over_channels,
+                            n_jobs=-1,
+                            #threshold=threshold_tfce,
+                            n_permutations=n_perm,
+                            tail=0)
+    
+    print(f'The minimum p-value is {min(cluster_p_values)}')
+    
+    return T_obs, clusters, cluster_p_values, H0, mean_over_channels
+
+def plot2D_cluster_output(cond='hitmiss', tmin=-0.5, tmax=0):
+
+    '''plot the output of the 2D cluster permutation test
+    Parameters
+    ----------
+    cond : str
+        condition to plot (hitmiss or highlow)
+    tmin : float
+    tmax : float
+    Returns
+    -------
+    None
+    '''
+
+    cluster_p_values = cluster_p_values.reshape(mean_over_channels.shape[1]
+                                                ,mean_over_channels.shape[2])
+
+    # Apply the mask to the image
+    masked_img = T_obs.copy()
+    masked_img[np.where(cluster_p_values > 0.05)] = 0
+
+    vmax = np.max(T_obs)
+    vmin = np.min(T_obs)
+
+    #cnorm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)  # min, center & max ERDS
+    
+    # add time on the x axis 
+    x = np.linspace(tmin, tmax, X.shape[2])
+    y = np.arange(7, 35, 1)
+
+    # Plot the original image
+    fig = plt.imshow(T_obs, origin='lower',
+                     extent=[x[0], x[-1], y[0], y[-1]],
+                     aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
+    plt.colorbar()
+
+    # Add x and y labels
+    plt.xlabel('Time (s)')
+    plt.ylabel('Freq (Hz)')
+
+    # save figure
+    os.chdir(savedir_figure4)
+
+    fig.figure.savefig(f"cluster_perm_{cond}_{str(tmin)}_{str(tmax)}.svg")
+
+    # Show the plot
+    plt.show()
+
+        # Plot the masked image on top with lower transparency
+    fig = plt.imshow(masked_img, origin='lower', alpha=0.7, 
+                     extent=[x[0], x[-1], y[0], y[-1]],
+                     aspect='auto', vmin=vmin, vmax=vmax, cmap='viridis')
+    
+
+# Works but now nice plotting implemented yet, potentially also overkill
+# to run 3D cluster permutation test
+
+def run_3D_cluster_perm_test(contrast_data=None):
+
+    X = np.array([d.data for d in X])
+
+    # run 3D cluster permutation test
+    # definde adjaceny matrix for cluster permutation test
+   
+    ch_adjacency = mne.channels.find_ch_adjacency(tfr_high_all[0].info,
+                                                  ch_type='eeg')
+    # frequency, time and channel adjacency
+    com_adjacency = mne.stats.combine_adjacency(X.shape[2],
+                                                X.shape[3], ch_adjacency[0])
+    
+    # change axes to match the format of the function
+    X = np.transpose(X, [0, 3, 2, 1])
+
+    # threshold free cluster enhancement
+    threshold_tfce = dict(start=0, step=0.1)
+
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X,
+                                                           n_permutations=100,
+                                                           adjacency=com_adjacency,
+                                                           #threshold=threshold_tfce,
+                                                           n_jobs=-1)
+    
+    print(f'The minimum p-value is {min(cluster_p_values)}')
+    
+def run_cluster_correlation_2D(cond='lowhigh', channel_names=['CP4', 'CP6', 'C4', 'C6']):
+
+    # load behavioral data
+    df = pd.read_csv(f"{behavpath}//prepro_behav_data.csv")
+
+    # low - high exp. condition
+
+    crit_diff = np.array(sdt.criterion[sdt.cue == 0.75]) - np.array(sdt.criterion[sdt.cue == 0.25])
+
+    d_diff = np.array(sdt.dprime[sdt.cue == 0.75]) - np.array(sdt.dprime[sdt.cue == 0.25])
 
     # load random effects from glmmer model
     re = pd.read_csv("D:\expecon_ms\data\\behav\mixed_models\\brms\\brms_betaweights.csv")
     
-    # contrast data (high - low)
-    X = np.array([h.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names)
-                      .data - l.copy().
-                      crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names)
-                      .data for h, l in zip(tfr_a_all, tfr_b_all)])
-    
-    out = cluster_correlation.permutation_cluster_correlation_test(np.squeeze(X), 
-                                                             re.cue,
+    # Load the contrast list from disk
+
+    with open(f'{tfr_contrast_dir}\\'
+              f'diff_all_subs_{cond}.pickle', 'rb') as file:
+        contrast_data = pickle.load(file)
+
+    spec_channel_list = []
+
+    for i, channel in enumerate(channel_names):
+        spec_channel_list.append(contrast_data[15].ch_names.index(channel))
+    spec_channel_list
+
+    mean_over_channels = np.mean(contrast_data[:, spec_channel_list, :, :], axis=1)
+
+    out = cluster_correlation.permutation_cluster_correlation_test(mean_over_channels, 
+                                                             re.prev_choice, threshold=0.1, 
                                                              test='pearson')
 
-########################################################## Helper functions ################################################################
+########################################################## Helper functions
 
 def zero_pad_or_mirror_data(data, zero_pad=False):
     '''
@@ -547,10 +904,9 @@ def zero_pad_or_mirror_data(data, zero_pad=False):
     return np.squeeze(np.array(padded_list))
 
 
-def permute_trials(n_permutations=500, power_a=None, power_b=None):
+def permutate_trials(n_permutations=500, power_a=None, power_b=None):
 
-    """ Permute trials between two conditions and equalize trial counts,
-    then average across permutations. store in TFR object."""
+    """ Permutate trials between two conditions and equalize trial counts"""
 
     # store permutations
     power_a_perm, power_b_perm = [], [] 
@@ -587,11 +943,160 @@ def permute_trials(n_permutations=500, power_a=None, power_b=None):
     evoked_power_b = mne.time_frequency.AverageTFR(power.info, evoked_power_b_perm_arr, 
                                                         power.times, power.freqs, power_b.data.shape[0])
 
-    return evoked_power_a, evoked_power_b
+
+def extract_band_power():
+
+    df = [s.metadata for s in spectra]
+    df = pd.concat(df)
+
+    df_new = []
+
+    # Assign a sequential count for each row within each 'blocks' and 'subblock' group
+    for idx, id in enumerate(IDlist):
+        df_sub = df[df.ID == idx+7]
+        df_sub['trial_count'] = df_sub.groupby(['block', 'subblock']).cumcount()
+        df_new.append(df_sub)
+
+    df_new = pd.concat(df_new)
+
+    # add trial count to metadata
+    spectra_new = []
+
+    for i, spectrum in enumerate(spectra):
+        df_sub = df_new[df_new['ID'] == i+7]
+        spectrum.metadata = df_sub
+        spectra_new.append(spectrum)
+
+    # save freqs
+    freqs = spectra[0].freqs
+
+    # contrast conditions
+    spectra_high = [spectrum[((spectrum.metadata.cue == 0.75) & (spectrum.metadata.trial_count < 6))] for spectrum in spectra_new]
+    spectra_low = [spectrum[((spectrum.metadata.cue == 0.25) & (spectrum.metadata.trial_count < 6))] for spectrum in spectra_new]
+
+    # prepare for fooof (channel = C4 = index 24)
+    ch_index = spectra[0].ch_names.index('C4')
+
+    spectra_high_c4 = np.array([np.mean(np.log10(psd.get_data()[:, ch_index, :]), axis=0) for psd in spectra_high])
+    spectra_low_c4 = np.array([np.mean(np.log10(psd.get_data()[:, ch_index, :]), axis=0) for psd in spectra_low])
+    
+    spectra_high_allchannel = np.array([np.mean(np.log10(psd.get_data()), axis=0) for psd in spectra_high])
+    spectra_low_allchannel = np.array([np.mean(np.log10(psd.get_data()), axis=0) for psd in spectra_low])
+    
+    # t-test over difference
+    diff_channels = spectra_high_allchannel - spectra_low_allchannel
+
+    diff = spectra_high_c4 - spectra_low_c4
+
+    # permutation test
+    T,p,H = mne.stats.permutation_t_test(diff, n_permutations=10000, tail=0, n_jobs=-1)
+    print(np.where(p < 0.05))
+    freqs[np.where(p < 0.05)]
+
+    # 1D cluster test
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(diff, 
+                                                                                     n_permutations=10000, 
+                                                                                     tail=0, 
+                                                                                     n_jobs=-1)
+    
+    # 2D cluster test over frequencies and channels
+    ch_adjacency,_ = mne.channels.find_ch_adjacency(spectra[0].info,
+                                                  ch_type='eeg')
+    
+    # channels should be the last dimension for cluster test
+    diff_channels = np.transpose(diff_channels, [0, 2, 1])
+
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(diff_channels, 
+                                                                                     n_permutations=10000, 
+                                                                                     tail=0,
+                                                                                     adjacency=ch_adjacency,
+                                                                                     n_jobs=-1)
+
+    min(cluster_p_values)
+
+    # grand average over participants
+    gra_high = np.mean(spectra_high_c4, axis=0)
+    gra_low = np.mean(spectra_low_c4, axis=0)
+
+    # plot an example PSD
+    plt.plot(freqs, gra_high, label='0.75')
+    plt.plot(freqs, gra_low, label='0.25')
+    plt.legend()
+    plt.savefig('D:\\expecon_ms\\figs\\manuscript_figures\\Figure6_PSD\\high_low_psd.svg',
+                dpi=300)
+    
+    # average over frequency bands and log 10 transform
+    alpha_pow = [np.log10(np.mean(s.get_data()[:,:,0:4], axis=2)) for s in spectra]
+    beta_pow = [np.log10(s.get_data()[:,:,4:]) for s in spectra]
+  
+    # extract band power from the power spectrum in channel C4
+    alpha_pow = [p[:,ch_index] for p in alpha_pow]
+    beta_pow = [p[:,ch_index] for p in beta_pow]
+
+    # Flatten the list of tuples into one long list
+    alpha_pow = [item for sublist in alpha_pow for item in sublist]
+    beta_pow = [item for sublist in beta_pow for item in sublist]
+
+    # add band power to dataframe
+    df['alpha_pow'] = alpha_pow
+    df['beta_pow'] = beta_pow
+
+    # save dataframe
+    df.to_csv(f"{behavpath}//behav_power_df.csv")
+
+    beta_gr = df.groupby(['ID', 'cue'])['beta_pow'].mean()
+    alpha_gr = df.groupby(['ID', 'cue'])['alpha_pow'].mean()
+
+    power_gr = {'beta': beta_gr, 'alpha': alpha_gr}
+
+    for keys, values in power_gr.items():
+        # Extract values for low and high expectation conditions
+        low_expectation = values.loc[:, 0.25]
+        high_expectation = values.loc[:, 0.75]
+
+        # Perform paired t-test
+        t_statistic, p_value = scipy.stats.wilcoxon(low_expectation, high_expectation)
+
+        # Print the t-test results
+        print("Paired t-test results:")
+        print("t-statistic:", t_statistic)
+        print("p-value:", p_value)
+
+        plt.boxplot([low_expectation, high_expectation], labels=['Low Expectation', 'High Expectation'])
+
+        # Set plot title and labels
+        plt.title(f'{keys} Power Comparison')
+        plt.xlabel('Condition')
+        plt.ylabel(f'{keys} Power')
+
+        # plt.savefig('D:\\expecon_ms\\figs\\manuscript_figures\\Figure6_PSD\\boxplot_beta_diff.svg', dpi=300, format='svg')
+        # Display the plot
+        plt.show()
+
+        # low - high exp. condition
+
+    # load signal detection dataframe
+    out = figure1.prepare_for_plotting()
+        
+    sdt = out[0][0]
+
+    crit_diff = np.array(sdt.criterion[sdt.cue == 0.75]) - np.array(sdt.criterion[sdt.cue == 0.25])
+
+    d_diff = np.array(sdt.dprime[sdt.cue == 0.75]) - np.array(sdt.dprime[sdt.cue == 0.25])
+
+    # load random effects from glmmer model
+    re = pd.read_csv("D:\expecon_ms\data\\behav\mixed_models\\brms\\brms_betaweights.csv")
+    
+    low_expectation = beta_gr.loc[:, 0.25]
+    high_expectation = beta_gr.loc[:, 0.75]
+    diff = high_expectation - low_expectation
+
+    np.corrcoef(diff, re['cue_prev'])
+
+    scipy.stats.pearsonr(diff, re['cue'])
 
 
 def equalize_epochs(array1, array2):
-
     """
     Equalizes the number of epochs between two arrays along the first dimension.
 
@@ -630,9 +1135,7 @@ def equalize_epochs(array1, array2):
         return array_with_fewer_epochs, new_array_with_more_epochs
 
 
-def prepare_for_anova(channel_names=['CP4']):
-
-    """prepare data for ANOVA analysis (function not used in EXPECON paper)"""
+def prepare_for_anova(channel_names=['CP6']):
 
     n_conditions = 4
     n_replications = 43
@@ -647,6 +1150,7 @@ def prepare_for_anova(channel_names=['CP4']):
 
     # load all tfr or all evokeds
     all_tfr = [tfr_a_all, tfr_b_all, tfr_c_all, tfr_d_all]
+    all_evo = [evo_a, evo_b, evo_c, evo_d]
 
     tf_all_subs = []
     for t in all_tfr:
