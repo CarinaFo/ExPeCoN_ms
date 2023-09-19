@@ -4,20 +4,21 @@
 # author: Carina Forster
 # email: forster@cbs.mgp.de
 
+import pickle
 import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import mne
 import numpy as np
 import pandas as pd
+import scipy
 import seaborn as sns
 import statsmodels.api as sm
 import subprocess
 
 # Specify the file path for which you want the last commit date
-file_path = "D:\expecon_ms\\analysis_code\\eeg\\sensor\\evokeds.py"
+file_path = "D:\expecon_ms\\analysis_code\\eeg\\sensor\\evokeds\\evokeds.py"
 
 last_commit_date = subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", file_path]).decode("utf-8").strip()
 print("Last Commit Date for", file_path, ":", last_commit_date)
@@ -58,18 +59,18 @@ def create_contrast(drop_bads=False,
                     laplace=False,
                     subtract_evoked=False):
 
-    """ this function loads cleaned epoched data and creates evoked contrasts for different conditions
+    """ this function loads cleaned epoched data and creates contrasts.
     input: 
-    drop_bads: boolean, drop bad epochs if True
     laplace: apply CSD to data if boolean is True
     subtract_evoked: boolean, subtract evoked signal from each epoch
     output:
     list of condition evokeds
-    """
+       """
 
     all_trials, trials_removed = [], []
 
-    evokeds_signal_all, evokeds_noise_all, evokeds_hit_all, evokeds_miss_all = [], [], [], []
+    evokeds_high_hits_all, evokeds_low_hits_all, evokeds_high_all, evokeds_low_all, evokeds_prevyes_all = [], [], [], [], []
+    evokeds_prevno_all, evokeds_signal_all, evokeds_noise_all, evokeds_hit_all, evokeds_miss_all = [], [], [], [], []
 
     # metadata after epoch cleaning
     metadata_allsubs = []
@@ -163,11 +164,12 @@ def create_contrast(drop_bads=False,
 
     return conds
 
-
-def plot_evoked_contrast(tmin=-0.1, tmax=0.5, baseline_tmin=-0.1,
-                                 baseline_tmax=0, channel=['CP4']):
-
-    """Plot evoked  contrast for two conditions.
+def cluster_perm_space_time_plot(tmin=-0.1, tmax=0.5, channel=['CP4']):
+    """Plot cluster permutation results in space and time. This function prepares the
+    data for stats tests in 1D (permutation over timepoints) or 2D (permutation over
+    timepoints and channels). 
+    Significant cluster are plotted
+    Cluster output is correlated with behavioral outcome.
     input:
     tmin: start time of time window
     tmax: end time of time window
@@ -178,13 +180,26 @@ def plot_evoked_contrast(tmin=-0.1, tmax=0.5, baseline_tmin=-0.1,
 
     conds = create_contrast()
 
-    # crop and baseline correct the data 
-    hit = [ax.copy().apply_baseline((baseline_tmin, baseline_tmax))
-                    .crop(tmin, tmax) for ax in conds[2]]
-    miss = [bx.copy().apply_baseline((-0.1, 0))
-                .crop(tmin, tmax) for bx in conds[3]]
+    with open("D:\expecon_ms\data\eeg\sensor\erps\hits", "wb") as fp:   #Pickling
+        pickle.dump(conds[8], fp)
+    
+    with open("D:\expecon_ms\data\eeg\sensor\erps\miss", "wb") as fp:   #Pickling
+        pickle.dump(conds[9], fp)
 
     # get grand average over all subjects for plotting the results later
+    
+    a = [ax.copy().crop(tmin, tmax).filter(15,25) for ax in conds[2]]
+    b = [bx.copy().crop(tmin, tmax).filter(15,25) for bx in conds[3]]
+
+    if tmax <= 0:
+        a = [ax.copy().pick_channels(channel).crop(tmin, tmax) for ax in evokeds_a_all]
+        b = [bx.copy().pick_channels(channel).crop(tmin, tmax) for bx in evokeds_b_all]
+    else:
+        hit = [ax.copy().apply_baseline((-0.1, 0))
+                     .crop(tmin, tmax) for ax in conds[8]]
+        miss = [bx.copy().apply_baseline((-0.1, 0))
+                    .crop(tmin, tmax) for bx in conds[9]]
+
     a_gra = mne.grand_average(hit)
     b_gra = mne.grand_average(miss)
 
@@ -192,6 +207,7 @@ def plot_evoked_contrast(tmin=-0.1, tmax=0.5, baseline_tmin=-0.1,
     colors_prevchoice = ['#e66101', '#5e3c99'] # brown #d8b365 and green #5ab4ac
     colors_highlow = ["#ca0020", '#0571b0'] # red and blue
     colors_hitmiss = ['#d01c8b', '#018571'] # pink, darkgreen
+    linestyles=['--', '--']
 
     # Create a 3x1 grid of subplots
     fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(6, 12))
@@ -208,55 +224,29 @@ def plot_evoked_contrast(tmin=-0.1, tmax=0.5, baseline_tmin=-0.1,
                                        legend='lower right')
     # save image
     plt.tight_layout()
-    #figpath = Path('D:/expecon_ms/figs/manuscript_figures/figure5_hitmiss_roi/fig5_expecon1.svg')
-    #plt.savefig(figpath, dpi=300)
+    figpath = Path('D:/expecon_ms/figs/manuscript_figures/figure5_hitmiss_roi/fig5_expecon1.svg')
+    plt.savefig(figpath, dpi=300)
 
     plt.show()
     
     diff = mne.combine_evoked([a_gra,b_gra], weights=[1,-1])
-    topo = diff.plot_topo(title='hit-miss')
-    figpath = Path('D:/expecon_ms/figs/manuscript_figures/figure5_hitmiss_roi/topo_hitmiss_diff.svg')
+    topo = diff.plot_topo()
+    figpath = Path('D:/expecon_ms/figs/manuscript_figures/Figure3/topo.svg')
     topo.savefig(figpath)
-
-    return conds
-
-def run_cluster_perm_test():
-
-    """Run cluster permutation test for two conditions.
-    Either over 2 dimensions (channels and time) or over time only.)"""
-
-    # create data array for permutation test over time only
-    X = np.array([ax.copy().apply_baseline((baseline_tmin, baseline_tmax)).crop(tmin, tmax).pick_channels(['CP4'])
-                  .data-bx.copy().apply_baseline((baseline_tmin, baseline_tmax))
-                  .crop(tmin, tmax).pick_channels(['CP4']).data for ax, bx in zip(conds[2], conds[3])])
-
-    X.shape
+   
+    X = np.array([ax.copy().apply_baseline((-0.5, -0.4)).crop(tmin, tmax)
+                  .data-bx.copy().apply_baseline((-0.5, -0.4))
+                  .crop(tmin, tmax).data for ax, bx in zip(conds[2], conds[3])])
 
     t,p,h = mne.stats.permutation_t_test(np.squeeze(X))
 
-        
-    # 1D cluster test
-    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(np.squeeze(X), 
-                                                                    n_permutations=10000,
-                                                                    tail=0, 
-                                                                    n_jobs=-1)
-
-    times = conds[2][0].copy().crop(tmin, tmax).times
+    times = conds[2][0].copy().crop(-0.5,0).times
 
     sig_times = np.where(p < 0.05)
 
     print(times[sig_times])
 
-    # create data array for cluster permutation test over time and channels
-    X = np.array([ax.copy().apply_baseline((baseline_tmin, baseline_tmax)).crop(tmin, tmax)
-                  .data-bx.copy().apply_baseline((baseline_tmin, baseline_tmax))
-                  .crop(tmin, tmax).data for ax, bx in zip(conds[2], conds[3])])
-
-    X.shape
-
     X = np.transpose(X, [0, 2, 1]) # channels should be last dimension
-
-    X.shape
 
     # load example epoch to extract channel adjacency matrix
     subj='007'
@@ -267,34 +257,104 @@ def run_cluster_perm_test():
     # threshold free cluster enhancement
     threshold_tfce = dict(start=0, step=0.1)
 
-    # 2D cluster test over time and channels
-    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X, n_permutations=10000,
+    # 2D cluster test
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X[:,:,:], n_permutations=10000,
                                                                                     adjacency=ch_adjacency, 
                                                                                     tail=0, 
                                                                                     n_jobs=-1)
 
     good_cluster_inds = np.where(cluster_p_values < 0.05)[0]
+    print(good_cluster_inds) # times where something significant happened
+    
+    min(cluster_p_values)
+    print(cluster_p_values) 
+
+    cluster_channel = np.unique(clusters[good_cluster_inds[0]][1])
+    cluster1_channel = np.unique(clusters[good_cluster_inds[1]][1])
+
+    ch_names_cluster0 = [evokeds_a_all[0].ch_names[c] for c in cluster_channel]
+    ch_names_cluster1 = [evokeds_a_all[0].ch_names[c] for c in cluster1_channel]
+
+    # cluster previous yes
+
+    cluster_channel = np.unique(clusters[good_cluster_inds[0]][1])
+    ch_names_cluster_prevyes = [evokeds_a_all[0].ch_names[c] for c in cluster_channel]
+    
+    # 1D cluster test
+    T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(np.squeeze(X[:,:,:]), n_permutations=10000,
+                                                                                    tail=0, n_jobs=-1
+                                                                                    )
+
+    good_cluster_inds = np.where(cluster_p_values < 0.05)[0] # times where something significant happened
     print(good_cluster_inds)
 
-    return T_obs, clusters, cluster_p_values, H0, good_cluster_inds
-    
+    min(cluster_p_values)
+    print(cluster_p_values)
 
-def plot_cluster_perm_ouput():
+    for g in good_cluster_inds:
+        print(high[0].times[clusters[g]])
+        print(cluster_p_values[g])
 
-    """Plot cluster permutation test output."""
+    # load signal detection dataframe
+    out = figure1.prepare_for_plotting()
+        
+    sdt = out[0][0]
 
-    T_obs, clusters, cluster_p_values, H0, good_cluster_inds = run_cluster_perm_test()
+    crit_diff = np.array(sdt.criterion[sdt.cue == 0.75]) - np.array(sdt.criterion[sdt.cue == 0.25])
 
-    colors_hitmiss = ['#d01c8b', '#018571'] # pink, darkgreen
+    d_diff = np.array(sdt.dprime[sdt.cue == 0.75]) - np.array(sdt.dprime[sdt.cue == 0.25])
+
+    # load brms beta weights
+    reg_path = Path('D:/expecon_ms/data/behav/behav_df/brms_betaweights.csv')
+    df = pd.read_csv(reg_path)
+
+    # 1D test: average over timepoints
+    X_timeavg = np.mean(X[:,:,91:], axis=(1,2))
+
+    # average over significant timepoints
+    X_time = np.mean(X[:,np.unique(clusters[4][0]),:], axis=1)
+
+    # average over significant channels
+    X_time_channel = np.mean(X_time[:,np.unique(clusters[4][1])], axis=1)
+
+    # correlate with cluster
+    scipy.stats.pearsonr(df.cue_prev, x)
+
+    x = X_timeavg
+    x = x*10**5
+    y = df.prev_choice
+
+    sns.regplot(x, y, fit_reg=True)
+
+    # Fit the linear regression model using statsmodels
+    model = sm.OLS(y, sm.add_constant(x))
+    results = model.fit()
+
+    # Extract the regression weights
+    intercept = results.params[0]
+    slope = results.params[1]
+
+    # Plot the regression line
+    plt.plot(x, intercept + slope * x, color='blue')
+    reg_savepath = Path('D:/expecon_ms/figs/manuscript_figures/Figure3/regplot.svg')
+    plt.savefig(reg_savepath)
+    # Show the plot
+    plt.show()
+
+    # now plot the significant cluster(s)
+
     # configure variables for visualization
-    colors = {"hit": colors_hitmiss[0], "miss": colors_hitmiss[1]}
+    colors = {cond_a: colors_highlow[0], cond_b: colors_highlow[1]}
 
-    a = [a.copy().apply_baseline((baseline_tmin, baseline_tmax)).crop(tmin, tmax) for a in conds[2]]
-    b = [a.copy().apply_baseline((baseline_tmin, baseline_tmax)).crop(tmin, tmax) for a in conds[3]]
+    a = [a.copy().apply_baseline((-0.5, -0.4)).crop(tmin, tmax) for a in conds[2]]
+    b = [a.copy().apply_baseline((-0.5, -0.4)).crop(tmin, tmax) for a in conds[3]]
+
+    a_gra = mne.grand_average(a)
+    b_gra = mne.grand_average(b)
 
     # organize data for plotting
     # instead of grand average we could use the evoked data per subject so that we can plot CIs
-    grand_average = {"hit": a, "miss": b}
+    grand_average = {cond_a: a, cond_b: b}
 
         # loop over clusters
     for i_clu, clu_idx in enumerate(good_cluster_inds):
@@ -307,7 +367,7 @@ def plot_cluster_perm_ouput():
         t_map = T_obs[time_inds, ...].mean(axis=0)
 
         # get signals at the sensors contributing to the cluster
-        sig_times = a[0].times[time_inds]
+        sig_times = a_gra.times[time_inds]
 
         # create spatial mask
         mask = np.zeros((t_map.shape[0], 1), dtype=bool)
@@ -370,5 +430,5 @@ def plot_cluster_perm_ouput():
         fig.subplots_adjust(bottom=0.05)
 
         # save figure before showing the figure
-        plt.savefig(f'{save_dir_cluster_output}{Path("/")}{"hitmiss"}_{str(clu_idx)}.svg')
+        plt.savefig(f'{save_dir_cluster_output}{Path("/")}{cond}_{str(clu_idx)}_prestim_.svg')
         plt.show()
