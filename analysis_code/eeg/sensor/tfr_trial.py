@@ -14,6 +14,7 @@ import mne
 import numpy as np
 import pandas as pd
 import scipy
+import scipy.stats as stats
 import seaborn as sns
 
 # Specify the file path for which you want the last commit date
@@ -145,7 +146,7 @@ def power_criterion_corr():
         for keys, values in sdt_params.items(): # loop over the criterion and dprime difference
 
             # plot regression line
-            fig = sns.regplot(x = p_value, y = values)
+            fig = sns.regplot(p_value, values)
 
             plt.xlabel(f'{p_key} power difference')
             plt.ylabel(f'{keys} difference')
