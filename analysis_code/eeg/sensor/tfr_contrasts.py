@@ -56,8 +56,8 @@ IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '047', '048', '049']
 
 
-def compute_tfr(tmin=-0.5, tmax=0, fmax=35, fmin=3, laplace=0,
-                induced=False, mirror_data=1, psd=0, drop_bads=1):
+def compute_tfr(tmin=-1, tmax=0, fmax=35, fmin=3, laplace=0,
+                induced=False, mirror_data=1, drop_bads=1):
 
     '''calculate time-frequency representations per trial
       (induced power) using multitaper method.
@@ -73,7 +73,6 @@ def compute_tfr(tmin=-0.5, tmax=0, fmax=35, fmin=3, laplace=0,
         laplace: boolean, info: apply current source density transform
         induced : boolean, info: subtract evoked response from each epoch
         mirror_data : boolean, info: mirror the data on both sides to avoid edge artifacts
-        psd : boolean, info: calculate power spectral density
         drop_bads : boolean, 
             info: drop epochs with abnormal strong signal (> 200 mikrovolts)
         Returns
@@ -86,7 +85,7 @@ def compute_tfr(tmin=-0.5, tmax=0, fmax=35, fmin=3, laplace=0,
     cycles = freqs/4.0
     
     # store behavioral data and spectra
-    df_all, spectra_all = [], []
+    df_all = []
 
     # now loop over participants
     for idx, subj in enumerate(IDlist):
@@ -165,72 +164,56 @@ def compute_tfr(tmin=-0.5, tmax=0, fmax=35, fmin=3, laplace=0,
         # subtract evoked response from each epoch
         if induced:
             epochs = epochs.subtract_evoked()
-
-        # compute power spectral density
-        if psd:
-            # calculate prestimulus power per trial
-            spectrum = epochs.compute_psd(method='welch', fmin=fmin, fmax=fmax, 
-                                        tmin=tmin, tmax=tmax, n_jobs=-1,
-                                        n_per_seg=256)
-                
-            spec_data = spectrum.get_data()
-            spectra_all.append(spectrum)
-            spectrum_path = Path('D:/expecon_ms/data/eeg/sensor/psd/')
-
-            # save the spectra to disk
-            np.save(f'{spectrum_path}{Path("/")}{subj}_psd.npy', spec_data)
             
-        else:
-    
-            # Assign a sequential count for each row within each 'blocks' and 'subblock' group
-            epochs.metadata['trial_count'] = epochs.metadata.groupby(['block', 'subblock']).cumcount()
+        # Assign a sequential count for each row within each 'blocks' and 'subblock' group
+        epochs.metadata['trial_count'] = epochs.metadata.groupby(['block', 'subblock']).cumcount()
 
-            df_all.append(epochs.metadata)
+        df_all.append(epochs.metadata)
 
-            # create conditions
-            epochs_a = epochs[((epochs.metadata.cue == 0.75))]
-            epochs_b = epochs[((epochs.metadata.cue == 0.25))]
+        # create conditions
+        epochs_a = epochs[((epochs.metadata.cue == 0.75))]
+        epochs_b = epochs[((epochs.metadata.cue == 0.25))]
 
-            mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
+        mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
-            # set tfr path
-            tfr_path = Path('D:/expecon_ms/data/eeg/sensor/tfr')
+        # set tfr path
+        tfr_path = Path('D:/expecon_ms/data/eeg/sensor/tfr')
 
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_mirror-tfr.h5'):
-                    print('TFR already exists')
-            else:
-                tfr_a = mne.time_frequency.tfr_multitaper(epochs_a, 
-                                                            freqs=freqs,
-                                                            n_cycles=cycles,
-                                                            return_itc=False,
-                                                            n_jobs=-1, 
-                                                            average=True)
-                    
-                tfr_b = mne.time_frequency.tfr_multitaper(epochs_b, 
-                                                            freqs=freqs,
-                                                            n_cycles=cycles,
-                                                            return_itc=False,
-                                                            n_jobs=-1, 
-                                                            average=True)
-                    
-                tfr_a.save(f'{tfr_path}{Path("/")}{subj}_high_mirror-tfr.h5', 
-                        overwrite=True)
-                tfr_b.save(f'{tfr_path}{Path("/")}{subj}_low_mirror-tfr.h5', 
-                        overwrite=True)
-                    
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_single_trial_power-tfr.h5'):
+        if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_mirror-tfr.h5'):
                 print('TFR already exists')
-            else:
-                tfr = mne.time_frequency.tfr_multitaper(epochs, 
-                                                            freqs=freqs,
-                                                            n_cycles=cycles,
-                                                            return_itc=False,
-                                                            n_jobs=-1, 
-                                                            average=False,
-                                                            decim=2)
-                    
-                tfr.save(f'{tfr_path}{Path("/")}{subj}_single_trial_power-tfr.h5',
-                            overwrite=True)
+        else:
+            tfr_a = mne.time_frequency.tfr_multitaper(epochs_a, 
+                                                        freqs=freqs,
+                                                        n_cycles=cycles,
+                                                        return_itc=False,
+                                                        n_jobs=-1, 
+                                                        average=True)
+                
+            tfr_b = mne.time_frequency.tfr_multitaper(epochs_b, 
+                                                        freqs=freqs,
+                                                        n_cycles=cycles,
+                                                        return_itc=False,
+                                                        n_jobs=-1, 
+                                                        average=True)
+                
+            tfr_a.save(f'{tfr_path}{Path("/")}{subj}_high_mirror-tfr.h5', 
+                    overwrite=True)
+            tfr_b.save(f'{tfr_path}{Path("/")}{subj}_low_mirror-tfr.h5', 
+                    overwrite=True)
+                
+        if os.path.exists(f'{tfr_path}{Path("/")}{subj}_single_trial_power-tfr.h5'):
+            print('TFR already exists')
+        else:
+            tfr = mne.time_frequency.tfr_multitaper(epochs, 
+                                                        freqs=freqs,
+                                                        n_cycles=cycles,
+                                                        return_itc=False,
+                                                        n_jobs=-1, 
+                                                        average=False,
+                                                        decim=2)
+                
+            tfr.save(f'{tfr_path}{Path("/")}{subj}_single_trial_power-tfr.h5',
+                        overwrite=True)
 
     return 'Done with tfr/erp computation'
 
@@ -503,6 +486,154 @@ def cluster_perm_space_time_plot(tmin=-0.5, tmax=0, channel=['C4']):
     for g in good_cluster_inds:
         print(a_gra.times[clusters[g]])
         print(cluster_p_values[g])
+
+
+def compute_psd(tmin=-0.4, tmax=0, fmax=35, fmin=3,
+                induced=False, mirror_data=0, psd=1, drop_bads=1):
+
+    '''calculate power spectral density per trial
+
+        Parameters
+        ----------
+        tmin : float 
+        tmax : float
+        fmin: float
+        fmax: float
+        induced : boolean, info: subtract evoked response from each epoch
+        mirror_data : boolean, info: mirror the data on both sides to avoid edge artifacts
+        drop_bads : boolean, 
+            info: drop epochs with abnormal strong signal (> 200 mikrovolts)
+        Returns
+        ------
+        spectra_a_all: list
+            list of power spectral density for condition a
+        spectra_b_all: list
+            list of power spectral density for condition b
+        '''
+
+    # Define frequencies and cycles for multitaper method
+    freqs = np.arange(fmin, fmax, 1)
+    cycles = freqs/4.0
+    
+    # store behavioral data and spectra
+    df_all, spectra_a_all, spectra_b_all = [], [], []
+
+    # now loop over participants
+    for idx, subj in enumerate(IDlist):
+
+        # print participant ID
+        print('Analyzing ' + subj)
+
+        # load cleaned epochs (after ica component rejection)
+        epochs = mne.read_epochs(f'{dir_cleanepochs}'
+                                 f'/P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif')
+
+        # kick out blocks with too high or low hitrates and false alarm rates
+        ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
+        blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
+
+        # Check if the participant ID is in the list of IDs to delete
+        if pd.unique(epochs.metadata.ID) in ids_to_delete:
+
+            # Get the corresponding blocks to delete for the current participant
+            participant_blocks_to_delete = [block for id_, block in
+                                            zip(ids_to_delete, blocks_to_delete)
+                                            if id_ == pd.unique(epochs.metadata.ID)]
+            
+            # Drop the rows with the specified blocks from the dataframe
+            epochs = epochs[~epochs.metadata.block.isin(participant_blocks_to_delete)]
+            
+        # remove trials with rts >= 2.5 (no response trials) and trials with reaction times < 0.1
+        epochs = epochs[epochs.metadata.respt1 >= 0.1]
+        epochs = epochs[epochs.metadata.respt1 != 2.5]
+
+        # load behavioral data
+        data = pd.read_csv(f'{behavpath}//prepro_behav_data.csv')
+
+        # behavioral data for current participant
+        subj_data = data[data.ID == idx+7]
+
+        # get drop log from epochs
+        drop_log = epochs.drop_log
+
+        search_string = 'IGNORED'
+
+        indices = [index for index, tpl in enumerate(drop_log) if tpl and search_string not in tpl]
+
+        # drop bad epochs (too late recordings)
+        if indices:
+            epochs.metadata = subj_data.reset_index().drop(indices)
+        else:
+            epochs.metadata = subj_data
+
+        if drop_bads:
+            # drop epochs with abnormal strong signal (> 200 mikrovolts)
+            epochs.drop_bad(reject=dict(eeg=200e-6))
+
+        # crop epopchs in desired time window
+        epochs.crop(tmin=tmin, tmax=tmax)
+
+        # avoid leakage and edge artifacts by zero padding the data
+        if mirror_data:
+            
+            metadata = epochs.metadata
+            # zero pad the data on both sides to avoid leakage and edge artifacts
+            data = epochs.get_data()
+
+            data = zero_pad_or_mirror_data(data, zero_pad=False)
+
+            # put back into epochs structure
+            epochs = mne.EpochsArray(data, epochs.info, tmin=tmin * 2)
+
+            # add metadata back
+            epochs.metadata = metadata
+
+        # subtract evoked response from each epoch
+        if induced:
+            epochs = epochs.subtract_evoked()
+
+        # create conditions
+        epochs_a = epochs[((epochs.metadata.cue == 0.75))]
+        epochs_b = epochs[((epochs.metadata.cue == 0.25))]
+
+        # calculate prestimulus power per trial
+        spectrum_a = epochs_a.compute_psd(method='welch', fmin=fmin, fmax=fmax, 
+                                        tmin=tmin, tmax=tmax, n_jobs=-1,
+                                        n_per_seg=256)
+        
+        spectrum_b = epochs_b.compute_psd(method='welch', fmin=fmin, fmax=fmax, 
+                                        tmin=tmin, tmax=tmax, n_jobs=-1,
+                                        n_per_seg=256)
+        
+        spectra_a_all.append(spectrum_a)
+        spectra_b_all.append(spectrum_b)
+
+    return spectra_a_all, spectra_b_all
+
+
+def plot_spectra():
+
+    """Plot spectra for high and low condition"""
+
+    spectra_a_all, spectra_b_all = compute_psd()
+
+    colors_highlow = ["#ca0020", '#0571b0'] # red and blue
+
+    freqs = spectra_a_all[0].freqs
+
+    # average over epochs
+    a_evokeds = np.array([a.average().pick_channels(['CP4']).get_data() for a in spectra_a_all])
+    b_evokeds = np.array([b.average().pick_channels(['CP4']).get_data() for b in spectra_b_all])
+
+    plt.plot(freqs, np.log10(np.mean(a_evokeds, axis=0).squeeze()), color = colors_highlow[0], label='high')
+    plt.plot(freqs, np.log10(np.mean(b_evokeds, axis=0).squeeze()), color = colors_highlow[1], label='low')
+    plt.legend()
+    plt.xlabel('Freqs (Hz)')
+    plt.ylabel('log10 Power')
+    plt.savefig(f'{Path("D:/expecon_ms/figs/manuscript_figures/figure6_tfr_contrasts/")}PSD_highlow_CP4.png', dpi=300, format='png')
+    plt.show()
+
+
 def run_3D_cluster_test():
 
     # pick 9 channels as our cluster of channels we are interested in
