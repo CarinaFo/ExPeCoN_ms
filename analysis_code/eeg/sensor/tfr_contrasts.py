@@ -56,8 +56,8 @@ IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '047', '048', '049']
 
 
-def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
-                induced=False, mirror_data=0, psd=0, drop_bads=0):
+def compute_tfr(tmin=-0.5, tmax=0, fmax=35, fmin=3, laplace=0,
+                induced=False, mirror_data=1, psd=0, drop_bads=1):
 
     '''calculate time-frequency representations per trial
       (induced power) using multitaper method.
@@ -188,13 +188,15 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
             df_all.append(epochs.metadata)
 
             # create conditions
-            epochs_a = epochs[(epochs.metadata.cue == 0.75)]
-            epochs_b = epochs[(epochs.metadata.cue == 0.25)]
+            epochs_a = epochs[((epochs.metadata.cue == 0.75))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.25))]
+
+            mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
             # set tfr path
             tfr_path = Path('D:/expecon_ms/data/eeg/sensor/tfr')
 
-            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high-tfr.h5'):
+            if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_mirror-tfr.h5'):
                     print('TFR already exists')
             else:
                 tfr_a = mne.time_frequency.tfr_multitaper(epochs_a, 
@@ -211,9 +213,9 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
                                                             n_jobs=-1, 
                                                             average=True)
                     
-                tfr_a.save(f'{tfr_path}{Path("/")}{subj}_high_yes-tfr.h5', 
+                tfr_a.save(f'{tfr_path}{Path("/")}{subj}_high_mirror-tfr.h5', 
                         overwrite=True)
-                tfr_b.save(f'{tfr_path}{Path("/")}{subj}_high_no-tfr.h5', 
+                tfr_b.save(f'{tfr_path}{Path("/")}{subj}_low_mirror-tfr.h5', 
                         overwrite=True)
                     
             if os.path.exists(f'{tfr_path}{Path("/")}{subj}_single_trial_power-tfr.h5'):
@@ -233,7 +235,7 @@ def compute_tfr(tmin=-1, tmax=0.5, fmax=35, fmin=7, laplace=0,
     return 'Done with tfr/erp computation'
 
 
-def load_tfr_conds(cond_a='high', cond_b='low', mirror=0):
+def load_tfr_conds(cond_a='high', cond_b='low', mirror=1):
 
     '''load tfr data for two conditions
     Parameters
@@ -271,7 +273,7 @@ def load_tfr_conds(cond_a='high', cond_b='low', mirror=0):
 
     return tfr_a_all, tfr_b_all
 
-def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=7, fmax=35):
+def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=3, fmax=35):
 
     '''plot cluster permutation test output for tfr data (time and frequency cluster)
     Parameters
@@ -304,7 +306,7 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=7, fmax=35):
     # which time windows to plot
     time_windows = [(-1, -0.4), (-0.4, 0)]
     # for mirrored data
-    #time_windows = [(-1, -0.2)]
+    #time_windows = [(-0.4, 0)]
 
     # which axes to plot the time windows
     axes_first_row = [(0,0), (0,1)]
@@ -319,7 +321,7 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=7, fmax=35):
 
     # now plot cluster permutation output in the second row
     # pick channels
-    ch_index = [tfr_c_all[0].ch_names.index(c) for c in channel_names]
+    ch_index = [tfr_a_all[0].ch_names.index(c) for c in channel_names]
 
     for t, a in zip(time_windows, axes_second_row):
 
@@ -362,12 +364,12 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=7, fmax=35):
                 times = tfr_a_all[0].copy().crop(t[0], t[1]).times
 
         # run function to plot significant cluster in time and frequency space
-        plot_cluster_test_output(tobs = T_obs, cluster_p_values = cluster_p, clusters=clusters, fmin=7, fmax=35,
-                                data_cond=tfr_c_all, tmin=t[0], tmax=t[1], ax0=a[0], ax1=a[1])
+        plot_cluster_test_output(tobs = T_obs, cluster_p_values = cluster_p, clusters=clusters, fmin=fmin, fmax=fmax,
+                                data_cond=tfr_a_all, tmin=t[0], tmax=t[1], ax0=a[0], ax1=a[1])
 
     # finally save figure
-    plt.savefig(f'{savedir_figure6}{Path("/")}fig6_{cond_a}_{cond_b}_tfr_{channel_names[0]}.svg', dpi=300, format='svg')
-    plt.savefig(f'{savedir_figure6}{Path("/")}fig6_{cond_a}_{cond_b}_tfr_{channel_names[0]}.png', dpi=300, format='png')
+    plt.savefig(f'{savedir_figure6}{Path("/")}fig6_{cond_a}_{cond_b}_tfr_{channel_names[0]}_mirrored.svg', dpi=300, format='svg')
+    plt.savefig(f'{savedir_figure6}{Path("/")}fig6_{cond_a}_{cond_b}_tfr_{channel_names[0]}_mirrored.png', dpi=300, format='png')
 
 
 def cluster_perm_space_time_plot(tmin=-0.5, tmax=0, channel=['C4']):
