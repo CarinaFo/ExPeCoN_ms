@@ -193,11 +193,11 @@ ggsave('model_brain_behav_int.svg', dpi = 300, height = 8, width = 10, plot=g)
 total_effect <- glmer(sayyes ~ cue + prevresp + (cue + prevresp|ID), data = behav,  
                       family=binomial(link='probit'))
 
-fit.mediator <- glmer(beta_close_stimonset ~ cue + prevresp + (1|ID), data = behav) # only works with
+fit.mediator <- glmer(alpha_close_stimonset ~ cue*prevresp + (1|ID), data = behav) # only works with
 # glmer model not sure why not with lmer
 
-fit.dv <- glmer(sayyes ~ cue + beta_close_stimonset + isyes + prevresp + (1|ID),
+fit.dv <- glmer(sayyes ~ cue*isyes + alpha_close_stimonset + prevresp*cue + (1|ID),
                 data = behav,
                 family=binomial(link='probit'))
 
-results = mediate(fit.mediator, fit.dv, treat='cue', mediator='beta_close_stimonset', boot=F)
+results_beta_expecon1 = mediate(fit.mediator, fit.dv, treat='cue', mediator='alpha_close_stimonset', boot=F)
