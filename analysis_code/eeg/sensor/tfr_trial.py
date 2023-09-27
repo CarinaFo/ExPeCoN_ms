@@ -48,7 +48,7 @@ freq_list = np.arange(7, 35, 1)
 freq_bands = {'alpha': (7, 13), 'beta': (15, 25)}
 
 
-def save_band_power_per_trial(time_intervals={'close_stimonset': (-0.4, 0)},
+def save_band_power_per_trial(time_intervals={'close_stimonset': (-0.2, 0)},
                                               channel_name=['CP4']):
 
     """This function saves the power per trial per frequency band in a csv file. 

@@ -56,8 +56,8 @@ IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '047', '048', '049']
 
 
-def compute_tfr(tmin=-1, tmax=0, fmax=35, fmin=3, laplace=0,
-                induced=False, mirror_data=1, drop_bads=1):
+def compute_tfr(tmin=-0.4, tmax=0, fmax=35, fmin=3, laplace=0,
+                induced=False, mirror_data=0, drop_bads=1):
 
     '''calculate time-frequency representations per trial
       (induced power) using multitaper method.
