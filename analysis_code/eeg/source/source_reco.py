@@ -56,12 +56,13 @@ IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039','040', '041', '042', '043', '044','045', '046', '047', '048', '049']
 
 
-def run_source_reco(dics=1, path=beamformer_path):
+def run_source_reco(dics=1, path=beamformer_path, drop_bads=True):
 
     """ run source reconstruction on epoched EEG data using eLoreta or DICS beamforming
     for frequency source analysis.
     input: dics: 1 for DICS beamforming, 0 for eLoreta
     path: path to save source estimates
+    drop_bads: if True, bad epochs are dropped
     output: .stc files for each hemisphere that contain sourece reconstruction for 
     each participant: shape: verticesxtimepoints
     """
@@ -111,13 +112,14 @@ def run_source_reco(dics=1, path=beamformer_path):
         else:
             epochs.metadata = subj_data
 
+        # drop bad epochs
+        if drop_bads:
+            # drop epochs with abnormal strong signal (> 200 mikrovolts)
+            epochs.drop_bad(reject=dict(eeg=200e-6))
+
         # epochs for high and low probability condition
         epochs_high = epochs[epochs.metadata.cue == 0.75]
         epochs_low = epochs[epochs.metadata.cue == 0.25]
-
-        # average epochs
-        evokeds_high = epochs_high.average()
-        evokeds_low = epochs_low.average()
 
         if dics == 1:
                 
@@ -157,6 +159,10 @@ def run_source_reco(dics=1, path=beamformer_path):
             source_power_b.save(f'{path}\low_beta_{subj}')
 
         else:
+
+            # average epochs for mne
+            evokeds_high = epochs_high.average()
+            evokeds_low = epochs_low.average()
 
             # create noise covariance with a bias of data length
 

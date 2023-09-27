@@ -1,24 +1,19 @@
+# prepare files for source reconstruction in mne
 
+# author: Carina Forster
+# email: forster@cbs.mpg.de
+
+# import packages
 import mne
-import os
 import os.path as op
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 from mne.datasets import fetch_fsaverage
-from mne.minimum_norm import make_inverse_operator, apply_inverse
-from mne.minimum_norm import write_inverse_operator
-from mne.minimum_norm import read_inverse_operator
-from mne.minimum_norm import apply_inverse_epochs
 
 # mne includes a freesurfer average brain (I don't have individual MRIs for all subjects)
-
 fs_dir = fetch_fsaverage(verbose=True)
 subjects_dir = op.dirname(fs_dir)
 subject = 'fsaverage'
 
 # this extracts a certain brain area only
-
 label_S1 = 'rh.BA3a'
 fname_labelS1 = subjects_dir + '\\fsaverage\\label\\%s.label' % label_S1
 labelS1 = mne.read_label(fname_labelS1)
@@ -31,7 +26,6 @@ fname_labelaparc = subjects_dir + '\\fsaverage\\label\\%s.label' % label_aparc
 labelap = mne.read_label(fname_labelaparc)
 
 # from Minas code
-
 _oct = '6'
 
 trans_dir = op.join(subjects_dir, subject, 'bem', subject + '-trans.fif')
@@ -66,9 +60,13 @@ print("Leadfield size : %d sensors x %d dipoles" % leadfield.shape)
 # prepare noise covariance (only works with epochs)
 # should be computed over baseline time window
 
-os.chdir("D:\expecon_ms\data\eeg\prepro_ica\clean_epochs")
+# datapaths
+dir_cleanepochs = Path('D:/expecon_ms/data/eeg/prepro_ica/clean_epochs_corr')
 
-epochs = mne.read_epochs('P035_epochs_after_ica-epo.fif')
+subj='022'
+
+epochs = mne.read_epochs(f'{dir_cleanepochs}'
+                                    f'/P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif')
 
 noise_cov_reg = mne.compute_covariance(
     epochs, tmin=-1, tmax=-0.6, method='auto', rank=None, verbose=True)
