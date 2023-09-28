@@ -26,6 +26,7 @@ file_path = "D:\expecon_ms\\analysis_code\\eeg\\source\\source_reco.py"
 last_commit_date = subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", file_path]).decode("utf-8").strip()
 
 print("Last Commit Date for", file_path, ":", last_commit_date)
+
 # load source space files
 fs_dir = fetch_fsaverage(verbose=True)
 subjects_dir = op.dirname(fs_dir)
@@ -265,6 +266,9 @@ def spatio_temporal_source_test(data=None, n_perm=10000, jobs=-1,
     # Note that X needs to be a multi-dimensional array of shape
     # observations (subjects) × time × space, so we permute dimensions
 
+    # read data in for expecon 2
+    data = np.load("D:\expecon_ms\data\eeg\source\high_low_pre_beamformer\expecon2\source_beta_highlow.npy")
+
     X = np.transpose(data, [0, 2, 1])
 
     X_mean = np.mean(X[:,:,:], axis=1)
@@ -277,7 +281,7 @@ def spatio_temporal_source_test(data=None, n_perm=10000, jobs=-1,
 
     # put contrast or p values in source space
     fsave_vertices = [s['vertno'] for s in src]
-    stc = mne.SourceEstimate(t, tmin=-0.5, tstep=0.0001, vertices = fsave_vertices, subject='fsaverage')
+    stc = mne.SourceEstimate(X_avg, tmin=-0.5, tstep=0.0001, vertices = fsave_vertices, subject='fsaverage')
 
     brain = stc.plot(
         hemi='rh', views='medial', subjects_dir=subjects_dir,
