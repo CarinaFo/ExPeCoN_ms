@@ -21,8 +21,6 @@ options(mc.cores = parallel::detectCores())
 
 # Set the font family and size
 
-# Set the font family and size
-
 par(family = "Arial", cex = 1.2)
 
 expecon <- 2

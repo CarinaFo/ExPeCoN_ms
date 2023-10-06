@@ -42,13 +42,13 @@ IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
           '047', '048', '049']
 
 # frequencies from tfr calculation
-freq_list = np.arange(7, 35, 1)
+freq_list = np.arange(3, 35, 1)
 
 # define frequency bands we are interested in
 freq_bands = {'alpha': (7, 13), 'beta': (15, 25)}
 
 
-def save_band_power_per_trial(time_intervals={'close_stimonset': (-0.2, 0)},
+def save_band_power_per_trial(time_intervals={'pre': (-0.2, 0)},
                                               channel_name=['CP4']):
 
     """This function saves the power per trial per frequency band in a csv file. 
@@ -83,10 +83,8 @@ def save_band_power_per_trial(time_intervals={'close_stimonset': (-0.2, 0)},
 
             # now we average over the frequency band and time interval 
             # and add the column to the behavioral data frame
-            behav_data[f'alpha_{keys}'] = np.mean(power_crop.data[:, 0:7], 
-                                                  axis=1)  # 7-13 Hz
-            behav_data[f'beta_{keys}'] = np.mean(power_crop.data[:, 8:19], 
-                                                 axis=1) # 15-25 Hz
+            behav_data[f'{keys}_alpha'] = np.mean(power_crop.data[:, 4:11], axis=1)  # 7-13 Hz
+            behav_data[f'{keys}_beta'] = np.mean(power_crop.data[:, 12:23], axis=1) # 15-25 Hz
 
         # save the data in a list
         brain_behav.append(behav_data)
@@ -107,7 +105,7 @@ def power_criterion_corr():
     # load brain behav dataframe
     df = pd.read_csv(f'{behav_dir}{Path("/")}brain_behav.csv')
 
-    freqs = ['alpha_close_stimonset', 'beta_close_stimonset']
+    freqs = ['pre_alpha', 'pre_beta']
 
     diff_p_list = []
 
@@ -146,7 +144,7 @@ def power_criterion_corr():
         for keys, values in sdt_params.items(): # loop over the criterion and dprime difference
 
             # plot regression line
-            fig = sns.regplot(p_value, values)
+            fig = sns.regplot(x=p_value, y=values)
 
             plt.xlabel(f'{p_key} power difference')
             plt.ylabel(f'{keys} difference')

@@ -9,7 +9,7 @@ import pingouin as pg
 from pathlib import Path
 
 # load df
-df_lavaan = pd.read_csv(Path("D:/expecon_ms/analysis_code/behav/R\mediation/lavaan_mediation_multiple_alldata_expecon1.csv"))
+df_lavaan = pd.read_csv(Path("D:/expecon_ms/analysis_code/behav/R\mediation/lavaan_mediation_multiple_alldata_expecon2.csv"))
 
 df_lavaan2 = df_lavaan.pivot_table(values='est', index='subj_idx', columns='label').reset_index()
         

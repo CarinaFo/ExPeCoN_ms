@@ -1,33 +1,5 @@
 #####################################ExPeCoN study#################################################
-
-
-# Paradigm: 43 participants completed a behavioral and EEG study that consisted of 720 trials 
-# (360 signal trials) where they had to indicate whether they felt a weak (near-threshold) somato-
-# sensory stimulus and (yes/no) and give a confidence rating (guessing, sure)
-
-# The main manipulation was a within condition that instructed particioants abbout stimulus 
-# probabilites: in the high expectation condition (75 %) miniblocks of 12 trials contained 9 stimuli
-# in the low expectation condition (25 %) 12 trials contained 3 signal trials (randomized between
-# and within participants), to motivate participants to use those cues, we provided feedback after
-# each miniblock, we had 5 blocks in total with 144 trials per block (6 low and 6 high expectation)
-
-# we decided to cue the stimulus onset in order to analyze reaction times for catch trials(no signal)
-
-# the behavioral data contains prestimulus alpha and beta power per trial (-300 to stimulation onset)
-# estimated with morlet wavelets (4 cycles) averaged over significant channels, time and the beta 
-# frequency (14-30 Hz) (3D cluster based permutation test)
-
-# raw power values (log transform?)
-
-# Participants set a higher criterion if they expect less stimuli (more conservative c)
-
-# how is this change in c implemented in the brain? 
-
-# see literature on alpha power => excitability => criterion: Busch, Samaha etc.
-
-# Research question: does prestimulus power determine participants bias in a near-threshold
-# somatosensory detection task? Does the low-level previous choice prior interact with the top-down
-# prior?
+### prepare single trial power for generalized linear mixed effects modelling ######################
 
 # written by Carina Forster (2023)
 
@@ -65,19 +37,19 @@ if (expecon == 1) {
   # add prediction error per trial
   power$PE_abs = abs(power$isyes - power$cue)
   # Columns to process
-  columns_to_process <- c("alpha_close_stimonset", "beta_close_stimonset")
+  columns_to_process <- c("pre_alpha", "pre_beta")
   
 } else {
   
   setwd("D:/expecon_2")
   # Identify the relative path from your current working directory to the file
-  relative_path <- file.path("behav", "brain_behav.csv")
+  relative_path <- file.path("behav", "brain_behav_expecon2.csv")
   # Use the relative path to read the CSV file
   power <- read.csv(relative_path)
   # add prediction error per trial
   power$PE_abs = abs(power$isyes - power$cue)
   # expecon 2
-  columns_to_process <- c("alpha_close_stimonset", "beta_close_stimonset")
+  columns_to_process <- c("pre_alpha", "pre_beta")
 }
 
 # https://philippmasur.de/2018/05/23/how-to-center-in-multilevel-models/
@@ -135,18 +107,20 @@ for (col in columns_to_process) {
 # check whether trend removal has worked (remove trend for trials within block and trend over blocks)
 
 if (expecon == 1 && check_trend_removal == 1) {
-  summary(lmer(alpha_close_stimonset ~ trial + (1|ID), data=power, REML=T))
+  summary(lmer(pre_alpha ~ trial + (1|ID), data=power, REML=T))
 } else if (expecon == 2 && check_trend_removal == 1) {
-  summary(lmer(beta_close_stimonset ~ block + (1|ID), data=power, REML=T))
+  summary(lmer(pre_beta ~ block + (1|ID), data=power, REML=T))
 }
 
 
 if (expecon == 1) {
   # remove unnecessary variables 
   power <- power[, !(names(power) %in% c("index", "sayyes_y", "X", "Unnamed..0.1",
-                                         "Unnamed..0", "sayyes_y"))]
+                                         "Unnamed..0", "sayyes_y", "level_0"))]
   relative_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
 } else {
+  # remove unnecessary variables 
+  power <- power[, !(names(power) %in% c("index", "sayyes_y"))]
   relative_path <- file.path("behav", "brain_behav_cleanpower.csv")
 }
 

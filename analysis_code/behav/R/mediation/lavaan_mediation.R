@@ -56,8 +56,8 @@ behav$prevcue = as.factor(behav$prevcue)
 
 # drop nans
 mydata <- subset(behav, select=c(ID, isyes, sayyes, cue,conf,
-                                  prevresp, prevcorrect, prevconf, alpha_close_stimonset, 
-                                 beta_close_stimonset))
+                                  prevresp, prevcorrect, prevconf, pre_alpha, 
+                                 pre_beta))
 mydata <- na.omit(mydata)
 
 ## potentially take only previous correct or previous error trials (from Anne Urai, 2021)
@@ -78,12 +78,12 @@ if(prevfeedback == 'correct') {
 multipleMediation <- '
                       # a path in diagram (x on the mediator)
                       # first, define the regression equations
-                      alpha_close_stimonset ~ a1 * cue # + s1* prevresp
-                      beta_close_stimonset ~ a2 * cue # *prevresp
+                      pre_alpha ~ a1 * prevresp # + s1* prevresp
+                      pre_beta ~ a2 * prevresp # *prevresp
                       
                       # b path: 
-                      sayyes ~  b1 * alpha_close_stimonset + b2 * beta_close_stimonset +
-                                c * cue + d * isyes
+                      sayyes ~  b1 * pre_alpha + b2 * pre_beta +
+                                c * prevresp + d * isyes
                       
                       # b1 * alpha_close_stimonset +
                       #sayyes ~ b2 * beta_close_stimonset + c * cue
@@ -102,13 +102,14 @@ multipleMediation <- '
                       
                       # specify covariance between the two mediators
                       # https://paolotoffanin.wordpress.com/2017/05/06/multiple-mediator-analysis-with-lavaan/comment-page-1/
-                      alpha_close_stimonset ~~ beta_close_stimonset
+                      pre_alpha ~~ pre_beta
                       '
 
 singleMediation <- '
                       # first, define the regression equations
-                      beta_close_stimonset ~ a * cue
-                      sayyes ~ b * beta_close_stimonset + c * cue
+                      med ~ prevresp:cue
+                      pre_beta ~ a * med
+                      sayyes ~ b * pre_beta + c * med + d*isyes
 
                       # define the effects
                       indirect := a * b
@@ -132,7 +133,7 @@ for ( subj in unique(c(mydata$ID)) ) {
   summ2 = as.data.frame(param_estimates)
   summ2$subj_idx <- subj
   mediation_results <- rbind(mediation_results, summ2) # append
-  write.csv(mediation_results, file.path(datapath, 'lavaan_mediation_multiple_alldata_expecon1.csv')) # write at each iteration
+  write.csv(mediation_results, file.path(datapath, 'lavaan_mediation_multiple_alldata_expecon2.csv')) # write at each iteration
   print(subj)
   
 }
