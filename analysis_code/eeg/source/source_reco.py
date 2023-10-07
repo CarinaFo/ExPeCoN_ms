@@ -135,6 +135,7 @@ def run_source_reco(dics=1, path=beamformer_path, drop_bads=True):
             csd_a = mne.time_frequency.csd_morlet(epochs_high, freqs, tmin=-0.4, tmax=0)
             # csd for low prob trials only
             csd_b = mne.time_frequency.csd_morlet(epochs_low, freqs, tmin=-0.4, tmax=0)
+
             #csd_baseline = mne.time_frequency.csd_morlet(epochs, freqs, tmin=-1, tmax=-0.5)
 
             info = epochs.info
@@ -143,16 +144,15 @@ def run_source_reco(dics=1, path=beamformer_path, drop_bads=True):
             # separately, we average the CSD objects across frequencies.
             csd_a = csd_a.mean()
             csd_b = csd_b.mean()
+
             #csd_baseline = csd_baseline.mean()
 
             # Computing DICS spatial filters using the CSD that was computed on the entire
             # timecourse.
-
             filters = mne.beamformer.make_dics(info, fwd, csd, noise_csd=None,
                                 pick_ori='max-power', reduce_rank=True, real_filter=True)
 
-            # Applying DICS spatial filters separately to the CSD computed using the
-            # baseline and the CSD computed during the ERS activity.
+            # Applying DICS spatial filters separately  to each condition
             source_power_a, freqs = mne.beamformer.apply_dics_csd(csd_a, filters)
             source_power_b, freqs = mne.beamformer.apply_dics_csd(csd_b, filters)
 
@@ -265,7 +265,6 @@ def spatio_temporal_source_test(data=None, n_perm=10000, jobs=-1,
 
     # Note that X needs to be a multi-dimensional array of shape
     # observations (subjects) × time × space, so we permute dimensions
-
     # read data in for expecon 2
     data = np.load("D:\expecon_ms\data\eeg\source\high_low_pre_beamformer\expecon2\source_beta_highlow.npy")
 
@@ -313,9 +312,11 @@ def spatio_temporal_source_test(data=None, n_perm=10000, jobs=-1,
 
 def plot_cluster_output(clu=None):
 
-    """function that plots the cluster output of the cluster permutation test
+    """
+    function that plots the cluster output of the cluster permutation test
     input: cluster output
-    output: plot of cluster output"""
+    output: plot of cluster output
+    """
 
     # Select the clusters that are statistically significant at p < 0.05
     good_clusters_idx = np.where(clu[2] < 0.05)[0]
@@ -352,6 +353,7 @@ def plot_cluster_output(clu=None):
 
 
 def create_noise_cov(data_size, data_info):
+
     """
     Computes identity noise covariance with a bias of data length
     Method is by Mina Jamshidi Idaji (minajamshidi91@gmail.com)
