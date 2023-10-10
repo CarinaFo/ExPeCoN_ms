@@ -1,12 +1,12 @@
 #####################################ExPeCoN study#################################################
-# mediation analysis using the mediation package
+# causal mediation analysis brain-behavior
 
 # author: Carina Forster
 # email: forster@mpg.cbs.de
 
 # libraries
 library(lme4) # mixed models
-library(lmerTest) 
+library(lmerTest)  # for p-values of lmer models
 library(mediation)
 library(dplyr)
 
@@ -16,8 +16,8 @@ package_version <- packageVersion("mediation")
 # skip scientific notation
 options(scipen=999)
 
-# which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
-expecon <- 1
+# which dataset to analyze (1 => block design, 2 => trial-by-trial design)
+expecon <- 2
 
 ####################################brain behav#####################################################
 
@@ -43,20 +43,21 @@ if (expecon == 1) {
 ################################prepare variables for linear mixed modelling #######################
 
 # treatment variable can not be a factor for mediation analysis
-
 # make factors for categorical variables:
 behav$ID = as.factor(behav$ID) # subject ID
 
-# Remove NaN trials for model comparision (models neeed to have same amount of data)
+# Remove NaN trials
 behav <- na.omit(behav) 
 
 ######################## mediation #############################################################
 
 # https://towardsdatascience.com/doing-and-reporting-your-first-mediation-analysis-in-r-2fe423b92171
 
+# rename
 behav$beta <- behav$pre_beta
 behav$alpha <- behav$pre_alpha
 
+# dummy recode
 behav$cue <- ifelse(behav$cue == 0.25, 0, 1) 
 
 # Create a new variable "highlowbeta
@@ -71,15 +72,16 @@ behav <- behav %>%
 mediatorbeta  <- lmer(alpha ~ -1 + cue + (cue|ID), data = behav)
 summary(mediatorbeta)
 
+# without p-values, model for mediation function
 med.model  <- lme4::lmer(alpha ~ -1 + cue + (cue|ID), data = behav)
 summary(med.model)
 
-med.model  <- lme4::lmer(alpha ~ -1 + prevresp + (1|ID), data = behav)
+med.model  <- lme4::lmer(beta ~ -1 + prevresp + (1|ID), data = behav)
 summary(med.model)
 
 # fit outcome model
 out.model <- glmer(sayyes ~ isyes + cue + alpha + isyes*cue+
-                  (cue+isyes+cue*isyes|ID),
+                  (cue+isyes|ID),
                 data = behav,
                 control=glmerControl(optimizer="bobyqa",
                                      optCtrl=list(maxfun=2e5)),
@@ -87,9 +89,9 @@ out.model <- glmer(sayyes ~ isyes + cue + alpha + isyes*cue+
 
 summary(out.model)
 
-# for previous response instead of cue
+# outcome model with previous response instead of cue
 out.model <- glmer(sayyes ~ isyes + prevresp + beta + isyes*prevresp+
-                     (prevresp+isyes|ID),
+                     (prevresp+isyes+isyes*prevresp|ID),
                    data = behav,
                    control=glmerControl(optimizer="bobyqa",
                                         optCtrl=list(maxfun=2e5)),
@@ -97,29 +99,39 @@ out.model <- glmer(sayyes ~ isyes + prevresp + beta + isyes*prevresp+
 
 summary(out.model)
 
-# now fit mediation
-results_beta_expecon1 <- mediate(med.model, out.model, treat='cue', mediator='beta')
+# save mediation output
+setwd("D:/expecon_ms/data/behav/mediation/")
 
+# now fit mediation model for both datasets for beta power
+results_beta_expecon1 <- mediate(med.model, out.model, treat='cue', mediator='beta')
+summary(results_beta_expecon1)
+saveRDS(results_beta_expecon1, 'med_cue_beta_block.rds')
 results_beta_expecon2 <- mediate(med.model, out.model, treat='cue', mediator='beta')
 summary(results_beta_expecon2)
+saveRDS(results_beta_expecon2, 'med_cue_beta_trial.rds')
 
-# alpha
+# and for alpha power
 results_alpha_expecon1 <- mediate(med.model, out.model, treat='cue', mediator='alpha')
 summary(results_alpha_expecon1)
-
+saveRDS(results_alpha_expecon1, 'med_cue_alpha_block.rds')
 results_alpha_expecon2 <- mediate(med.model, out.model, treat='cue', mediator='alpha')
 summary(results_alpha_expecon2)
+saveRDS(results_alpha_expecon2, 'med_cue_alpha_trial.rds')
 
-# prev. response
+# now fit for previous response
 results_prev_expecon1 <- mediate(med.model, out.model, treat='prevresp', mediator='beta')
 summary(results_prev_expecon1)
-
+saveRDS(results_prev_expecon1, 'med_prevresp_block.rds')
 results_prev_expecon2 <- mediate(med.model, out.model, treat='prevresp', mediator='beta')
 summary(results_prev_expecon2)
+saveRDS(results_prev_expecon2, 'med_prevresp_trial.rds')
 
+# save results in a table
 extract_mediation_summary(results_beta_expecon1)
 
-# save mediation output
+
+
+# helper functions
 extract_mediation_summary <- function (x) { 
   
   clp <- 100 * x$conf.level
