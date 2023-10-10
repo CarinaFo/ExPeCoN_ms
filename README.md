@@ -19,5 +19,5 @@ Scripts for the manuscript Expectation Perception Confidence Neural Correlates (
 * Package requirements can be found in `requirements.txt`
 
 ## Citation
-In case you use this code please cite the following paper:
+In case you use this code, please cite the following paper:
 ...
