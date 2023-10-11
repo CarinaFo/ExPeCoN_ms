@@ -21,55 +21,13 @@ import pandas as pd
 import os
 import seaborn as sns
 import scipy.stats as stats
+from Pathlib import Path
 
 # %% Set global vars & paths  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # Set the paths for the behavioral data and the save path
-<<<<<<< HEAD
-behavpath = 'D:\\expecon_ms\\data\\behav'
-savepath = 'D:\\expecon_ms\\figs\\behavior'
-
-# Load the behavioral data from the specified path
-data = []
-for root, dirs, files in os.walk(behavpath):
-    for name in files:
-        if 'behav_cleaned_for_eeg.csv' in name:
-            data = pd.read_csv(os.path.join(root, name))
-
-# Clean up the dataframe by dropping unneeded columns
-columns_to_drop = ["Unnamed: 0", 'X', 'Unnamed..0', 'Unnamed: 0.1']
-data_clean = data.drop(columns_to_drop, axis=1)
-data = data_clean
-
-# Change the block number for participant 7's block 3
-data.loc[(144*2):(144*3), 'block'] = 4
-
-# Drop participants 32, 40 and 45
-
-data = data.drop(data[data.ID == 32].index)
-data = data.drop(data[data.ID == 40].index)
-data = data.drop(data[data.ID == 45].index)
-data = data.drop(data[data.ID == 16].index)
-
-# Remove blocks with hitrates < 0.2 or > 0.8
-data = data.drop(data[((data.ID == 10) & (data.block == 6))].index)
-data = data.drop(data[((data.ID == 12) & (data.block == 6))].index)
-data = data.drop(data[((data.ID == 26) & (data.block == 4))].index)
-data = data.drop(data[((data.ID == 30) & (data.block == 3))].index)
-data = data.drop(data[((data.ID == 39) & (data.block == 3))].index)
-
-# remove no response trials (respt1 == 2.5)
-data = data.drop(data[data.respt1 == 2.5].index)
-data = data.drop(data[data.respt1 < 0.1].index)
-data = data.drop(data[data.trial == 1].index)
-
-os.chdir(behavpath)
-data.to_csv("clean_bb.csv")
-=======
-behavpath = r'D:\expecon\data\behav_brain'
-savepath = r'D:\expecon_ms\figs\behavior'
-# TODO SIMON COMMENT: "preferably use relative paths, such that code can be run on other machines, too."
-#  Moreover you could use Pathlib to make usable on all OSs '\' is windows only
+behavpath = Path('D:/expecon/data/behav_brain')
+savepath = Path('D:/expecon_ms/figs/behavior')
 
 # Set the color palette for seaborn
 sns.color_palette("colorblind")[9]
@@ -174,7 +132,6 @@ if __name__ == "__main__":
     ax.set_xticks([1, 2])
     ax.set_xticklabels(['Low', 'High'], fontsize=14)
     ax.set_ylabel('Hit rate', fontsize=14)
->>>>>>> 29ccb096e09ed083deab3c1ebe0ace54ea043e49
 
     # Save the figure
     fig.savefig(os.path.join(savepath, "hitrate.svg"), bbox_inches='tight', format='svg')
@@ -303,9 +260,6 @@ if __name__ == "__main__":
     ax.set_xticks([1, 2])
     ax.set_xticklabels(['Low', 'High'])
 
-<<<<<<< HEAD
-# ### plot the criterion
-=======
     # ax.set_ylim(0,1)
     ax.set_yticks([-0.5, 0, .5, 1, 1.5])
     ax.set_yticklabels(['-0.5', '0.0', '.5', '1.0', '1.5'], fontsize=12)
@@ -327,7 +281,6 @@ if __name__ == "__main__":
 
     for patch, color in zip(confbox['medians'], medcolor):
         patch.set_color(color)
->>>>>>> 29ccb096e09ed083deab3c1ebe0ace54ea043e49
 
     ax.set_xticks([1, 2])
     ax.set_xticklabels(['Low', 'High'], fontsize=12)
@@ -625,14 +578,8 @@ if __name__ == "__main__":
 
     data_grouped = data.groupby(['ID', 'cue']).mean()['respt1']
 
-    data_grouped
-    # TODO SIMON COMMENT: "this should have no effect -> print(data_grouped)?!"
-
     con_condition = data_grouped.unstack()[0.25].reset_index()
     incon_condition = data_grouped.unstack()[0.75].reset_index()
-
-    con_condition
-    # TODO SIMON COMMENT: "same as above"
 
     green = '#2aff95'
     purple = '#2a2aff'
@@ -683,11 +630,7 @@ if __name__ == "__main__":
     print('reaction time cue diff significant? p_value (non parametric): ' + str(p))
 
     # congruency on rts
-
     data_grouped = data.groupby(['ID', 'congruency']).mean()['respt1']
-
-    data_grouped
-    # TODO SIMON COMMENT: "this should have no effect -> print(data_grouped)?!"
 
     con_condition = data_grouped.unstack()[1].reset_index()
     incon_condition = data_grouped.unstack()[0].reset_index()
@@ -711,8 +654,6 @@ if __name__ == "__main__":
     ax.set_xlim(0.5, 2.5)
     ax.set_xticks([1, 2])
     ax.set_xticklabels(["Low", 'High'])
-
-    # ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
 
     confbox = ax.boxplot([con_condition.iloc[:, 1], incon_condition.iloc[:, 1]],
                          patch_artist=True)
@@ -747,14 +688,8 @@ if __name__ == "__main__":
 
     data_grouped = data.groupby(['ID', 'correct']).mean()['respt1']
 
-    data_grouped
-    # TODO SIMON COMMENT: "this should have no effect -> print(data_grouped)?!"
-
     con_condition = data_grouped.unstack()[1].reset_index()
     incon_condition = data_grouped.unstack()[0].reset_index()
-
-    con_condition
-    # TODO SIMON COMMENT: "same as above"
 
     green = '#2aff95'
     purple = '#2a2aff'
@@ -772,8 +707,6 @@ if __name__ == "__main__":
     ax.set_xlim(0.5, 2.5)
     ax.set_xticks([1, 2])
     ax.set_xticklabels(["Low", 'High'])
-
-    # ax.set_yticklabels([0.0', '.5','1.0','1.5'],fontsize=12)
 
     confbox = ax.boxplot([con_condition.iloc[:, 1], incon_condition.iloc[:, 1]],
                          patch_artist=True)
