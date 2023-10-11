@@ -15,3 +15,4 @@ experimental_code\expeco\instr\
 *.pkl
 *.zip
 analysis_code\eeg\sensor\unused_scripts
+analysis_code\behav\misc
