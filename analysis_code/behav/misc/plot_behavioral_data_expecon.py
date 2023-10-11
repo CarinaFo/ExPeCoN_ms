@@ -16,17 +16,17 @@ Years:   Feb 06, 2023
 #  - change colors for congruency and accuracy plots
 
 # %% Import
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import seaborn as sns
 import scipy.stats as stats
-from Pathlib import Path
+from pathlib import Path
 
 # %% Set global vars & paths  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # Set the paths for the behavioral data and the save path
-behavpath = Path('D:/expecon/data/behav_brain')
+behavpath = Path('D:/expecon_ms/data/behav/behav_df')
 savepath = Path('D:/expecon_ms/figs/behavior')
 
 # Set the color palette for seaborn
@@ -738,3 +738,5 @@ if __name__ == "__main__":
     print('reaction time accuracy diff significant? p_value (non parametric): ' + str(p))
 
 #  o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END
+
+# %%
