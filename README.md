@@ -1,11 +1,12 @@
-Author(s): Carina Forster et al. (2023) <br>
-Status: Code is not yet reviewed
+# Expectation Perception Confidence Neural Correlates (`ExPeCoN`)
 
-`[Last update: April 28, 2023]`
+    Author(s): Carina Forster et al. (2023)
+    Status: Code is not yet reviewed
+    Last update: Oct 10, 2023
 ***
 
 ## Description
-Scripts for the manuscript Expectation Perception Confidence Neural Correlates (`ExPeCoN`)
+Scripts for the manuscript Expectation Perception Confidence Neural Correlates (`ExPeCoN`).
 
 `SIMON COMMENT: 'ExPeCoN' or 'expecon'? Keep coherent in all scripts and README.md`
 
@@ -19,5 +20,5 @@ Scripts for the manuscript Expectation Perception Confidence Neural Correlates (
 * Package requirements can be found in `requirements.txt`
 
 ## Citation
-In case you use this code please cite the following paper:
+In case you use this code, please cite the following paper:
 ...
