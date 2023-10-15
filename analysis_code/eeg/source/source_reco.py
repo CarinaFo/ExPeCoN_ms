@@ -184,25 +184,28 @@ def run_source_reco(dics=0, path=mne_path, drop_bads=True):
 
             # create noise covariance with a bias of data length
             #noise_cov = create_noise_cov(evokeds_high.data.shape, evokeds_high.info)
-
+            
+            # all epochs for noise covariance computation
             noise_cov = mne.compute_covariance(epochs, tmin=-0.4, tmax=0,
                                    method=['shrunk', 'empirical'],
                                    rank='info')
             
-            #mne.write_cov('covariance_prestim.cov', noise_cov)
+            # save covariance matrix
+            mne.write_cov('covariance_prestim.cov', noise_cov)
+
             # fixed forward solution for mne methods
             fwd_fixed = mne.convert_forward_solution(fwd, surf_ori=True)
 
             info = evoked_contrast.info
 
             inv_op = mne.minimum_norm.make_inverse_operator(info, fwd_fixed,
-                                                             noise_cov, 
-                                                             loose=0.2,
-                                                             depth=0.8)
+                                                            noise_cov, 
+                                                            loose=0.2,
+                                                            depth=0.8)
 
             evoked_contrast.set_eeg_reference(projection=True)  # needed for inverse modeling
 
-            method = "eLORETA"
+            method = "dSPM"
             snr = 3.
             lambda2 = 1. / snr ** 2  # regularization
 
