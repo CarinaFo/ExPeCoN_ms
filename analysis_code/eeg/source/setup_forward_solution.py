@@ -26,8 +26,9 @@ fname_labelaparc = subjects_dir + '\\fsaverage\\label\\%s.label' % label_aparc
 labelap = mne.read_label(fname_labelaparc)
 
 # from Minas code
-_oct = '6'
+_oct = '6'  # 6mm between sources
 
+# load files
 trans_dir = op.join(subjects_dir, subject, 'bem', subject + '-trans.fif')
 bem_sol_dir = op.join(subjects_dir, subject, 'bem', subject + '-5120-5120-5120-bem-sol.fif')
 src_dir = op.join(subjects_dir, subject, 'bem', subject + '-oct' + _oct + '-src.fif')
@@ -39,12 +40,12 @@ inv_op_dir = op.join(subjects_dir, subject, 'bem', subject + '-oct' + _oct + '-i
 # read source space
 
 src = mne.read_source_spaces(src_dir)
-src.save('D:\\expecon_ms\\data\\eeg\\source\\fsaverage-6oct-src.fif', overwrite=True)
+src.save('D:\\expecon_ms\\data\\eeg\\source\\fsaverage-6oct-src.fif', 
+         overwrite=True)
 
-# 3. #########################################    forward solution     #############################################
+#########################################    forward solution     #############################################
 
 # read forward solution
-
 fwd = mne.read_forward_solution(fwd_dir)
 mne.write_forward_solution('D:\\expecon_ms\\data\\eeg\\source\\fsaverage-6oct-fwd.fif',
                            fwd, overwrite=True)
@@ -52,27 +53,3 @@ mne.write_forward_solution('D:\\expecon_ms\\data\\eeg\\source\\fsaverage-6oct-fw
 leadfield = fwd['sol']['data']
 
 print("Leadfield size : %d sensors x %d dipoles" % leadfield.shape)
-
-# 6. #######################################    Noise Covariance ##################################################
-
-# Q: which fwd to use for EEG?
-
-# prepare noise covariance (only works with epochs)
-# should be computed over baseline time window
-
-# datapaths
-dir_cleanepochs = Path('D:/expecon_ms/data/eeg/prepro_ica/clean_epochs_corr')
-
-subj='022'
-
-epochs = mne.read_epochs(f'{dir_cleanepochs}'
-                                    f'/P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif')
-
-noise_cov_reg = mne.compute_covariance(
-    epochs, tmin=-1, tmax=-0.6, method='auto', rank=None, verbose=True)
-
-noise_cov_reg.save('D:\\expecon_ms\\data\\eeg\\source\\noise_cov_reg.fif', overwrite=True)
-
-inv_op = mne.minimum_norm.make_inverse_operator(epochs.info, fwd, noise_cov_reg, loose=0.2, depth=0.8)
-
-mne.minimum_norm.write_inverse_operator('D:\\expecon_ms\\data\\eeg\\source\\fsaverage-6oct-inv.fif', inv_op)
