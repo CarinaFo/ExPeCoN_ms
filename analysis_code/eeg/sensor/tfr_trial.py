@@ -1,4 +1,5 @@
-# this script averages power per trial in specific frequeny bands and saves it to a csv file
+# this script averages power per trial in specific frequeny bands and saves
+# single trial power as well as behavioral data in a csv file
 
 # author: Carina Forster
 # email: forster@cbs.mpg.de
@@ -14,18 +15,21 @@ import mne
 import numpy as np
 import pandas as pd
 import scipy
-import scipy.stats as stats
 import seaborn as sns
 
 # Specify the file path for which you want the last commit date
-file_path = "D:\expecon_ms\\analysis_code\\eeg\\sensor\\tfr_trial.py"
+file_path = Path("D:/expecon_ms/analysis_code/eeg/sensor/tfr_trial.py")
 
 last_commit_date = subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", file_path]).decode("utf-8").strip()
 print("Last Commit Date for", file_path, ":", last_commit_date)
 
-sys.path.append(f'{Path("D:/expecon_ms/analysis_code")}')
-os.chdir(f'{Path("D:/expecon_ms/analysis_code")}')
-from behav import figure1
+# own modules
+modulepath = Path('D:/expecon_ms/analysis_code/behav')
+# add path to sys.path.append() if package isn't found
+sys.path.append(modulepath)
+
+os.chdir(modulepath)
+from python import figure1
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 14, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})

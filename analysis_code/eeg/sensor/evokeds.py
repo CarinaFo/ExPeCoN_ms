@@ -7,6 +7,7 @@
 import pickle
 import sys
 from pathlib import Path
+import os
 
 import matplotlib.pyplot as plt
 import mne
@@ -18,18 +19,18 @@ import statsmodels.api as sm
 import subprocess
 
 # Specify the file path for which you want the last commit date
-file_path = "D:\expecon_ms\\analysis_code\\eeg\\sensor\\evokeds\\evokeds.py"
+file_path = Path("D:/expecon_ms/analysis_code/eeg/sensor/evokeds.py")
 
 last_commit_date = subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", file_path]).decode("utf-8").strip()
 print("Last Commit Date for", file_path, ":", last_commit_date)
 
 # own modules
-modulepath = Path('D:/expecon_ms/analysis_code')
+modulepath = Path('D:/expecon_ms/analysis_code/behav')
 # add path to sys.path.append() if package isn't found
 sys.path.append(modulepath)
 
-os.chdir('D:/expecon_ms/analysis_code')
-from behav import figure1
+os.chdir(modulepath)
+from python import figure1
 
 # for plotting in new window (copy to interpreter)
 # %matplotlib qt
