@@ -1,6 +1,7 @@
 # Make the necessary imports
 import pandas as pd
 from ydata_profiling import ProfileReport
+from pathlib import Path
 
 expecon = 2
 
