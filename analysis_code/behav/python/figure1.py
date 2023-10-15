@@ -19,7 +19,7 @@ import seaborn as sns
 import statsmodels.api as sm
 
 # Specify the file path for which you want the last commit date
-file_path = "D:\expecon_ms\\analysis_code\\behav\\figure1.py"
+file_path = Path("D:/expecon_ms/analysis_code/behav/python/figure1.py")
 
 last_commit_date = subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", file_path]).decode("utf-8").strip()
 print("Last Commit Date for", file_path, ":", last_commit_date)
