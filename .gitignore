@@ -14,5 +14,5 @@ experimental_code\expeco\instr\
 *.npy
 *.pkl
 *.zip
-analysis_code\eeg\sensor\unused_scripts\
 analysis_code\untracked_analysis_scripts_behav\
+analysis_code\untracked_analysis_scripts_eeg\
