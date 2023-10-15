@@ -27,6 +27,8 @@ last_commit_date = subprocess.check_output(["git", "log", "-1", "--format=%cd", 
 
 print("Last Commit Date for", file_path, ":", last_commit_date)
 
+plot_alignment = False
+
 # load source space files
 fs_dir = fetch_fsaverage(verbose=True)
 subjects_dir = op.dirname(fs_dir)
@@ -36,6 +38,7 @@ _oct = '6'
 
 fwd_dir = op.join(subjects_dir, subject, 'bem', subject + '-oct' + _oct + '-fwd.fif')
 src_fname = op.join(subjects_dir, subject, 'bem', subject + '-oct' + _oct + '-src.fif')
+trans_dir = op.join(subjects_dir, subject, 'bem', subject + '-trans.fif')
 
 # Read the source space and the forward solution
 src = mne.read_source_spaces(src_fname)
@@ -43,6 +46,20 @@ fwd = mne.read_forward_solution(fwd_dir)
 
 # datapaths
 dir_cleanepochs = Path('D:/expecon_ms/data/eeg/prepro_ica/clean_epochs_corr')
+
+subj='008'
+
+# load cleaned epochs (after ica component rejection)
+epochs = mne.read_epochs(f'{dir_cleanepochs}'
+                            f'/P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif')
+
+# check alignment
+if plot_alignment:
+
+    mne.viz.plot_alignment(epochs.info, trans_dir, subject=subject, dig=False, src=src,
+                                subjects_dir=subjects_dir, verbose=True, meg=False,
+                                eeg=True)
+
 behavpath = Path('D:/expecon_ms/data/behav/behav_df/')
 
 # save paths for beamforming
@@ -57,7 +74,7 @@ IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016', 
           '037', '038', '039','040', '041', '042', '043', '044','045', '046', '047', '048', '049']
 
 
-def run_source_reco(dics=1, path=beamformer_path, drop_bads=True):
+def run_source_reco(dics=0, path=mne_path, drop_bads=True):
 
     """ run source reconstruction on epoched EEG data using eLoreta or DICS beamforming
     for frequency source analysis.
@@ -136,8 +153,6 @@ def run_source_reco(dics=1, path=beamformer_path, drop_bads=True):
             # csd for low prob trials only
             csd_b = mne.time_frequency.csd_morlet(epochs_low, freqs, tmin=-0.4, tmax=0)
 
-            #csd_baseline = mne.time_frequency.csd_morlet(epochs, freqs, tmin=-1, tmax=-0.5)
-
             info = epochs.info
 
             # To compute the source power for a frequency band, rather than each frequency
@@ -145,10 +160,7 @@ def run_source_reco(dics=1, path=beamformer_path, drop_bads=True):
             csd_a = csd_a.mean()
             csd_b = csd_b.mean()
 
-            #csd_baseline = csd_baseline.mean()
-
-            # Computing DICS spatial filters using the CSD that was computed on the entire
-            # timecourse.
+            # Computing DICS spatial filters using the CSD that was computed for all epochs
             filters = mne.beamformer.make_dics(info, fwd, csd, noise_csd=None,
                                 pick_ori='max-power', reduce_rank=True, real_filter=True)
 
@@ -165,32 +177,42 @@ def run_source_reco(dics=1, path=beamformer_path, drop_bads=True):
             evokeds_high = epochs_high.average()
             evokeds_low = epochs_low.average()
 
+            evoked_contrast = mne.combine_evoked([evokeds_high, evokeds_low], [0.5, -0.5])
+            evoked_contrast.crop(-0.4, 0)
+            # filter in beta band
+            evoked_contrast.filter(15, 25)
+
             # create noise covariance with a bias of data length
+            #noise_cov = create_noise_cov(evokeds_high.data.shape, evokeds_high.info)
 
-            noise_cov = create_noise_cov(evokeds_high.data.shape, evokeds_high.info)
-
+            noise_cov = mne.compute_covariance(epochs, tmin=-0.4, tmax=0,
+                                   method=['shrunk', 'empirical'],
+                                   rank='info')
+            
             #mne.write_cov('covariance_prestim.cov', noise_cov)
+            # fixed forward solution for mne methods
+            fwd_fixed = mne.convert_forward_solution(fwd, surf_ori=True)
 
-            inv_op = mne.minimum_norm.make_inverse_operator(evokeds_high.info, fwd, noise_cov)
+            info = evoked_contrast.info
 
-            # loose=1.0, fixed=False
-            evokeds_high.set_eeg_reference(projection=True)  # needed for inverse modeling
+            inv_op = mne.minimum_norm.make_inverse_operator(info, fwd_fixed,
+                                                             noise_cov, 
+                                                             loose=0.2,
+                                                             depth=0.8)
 
-            conditiona_stc = mne.minimum_norm.apply_inverse(evokeds_high, inv_op, lambda2=0.05,
-                                                            method='eLORETA', pick_ori='normal')
+            evoked_contrast.set_eeg_reference(projection=True)  # needed for inverse modeling
+
+            method = "eLORETA"
+            snr = 3.
+            lambda2 = 1. / snr ** 2  # regularization
+
+            stc = mne.minimum_norm.apply_inverse(evoked_contrast, inv_op, lambda2,
+                    method=method, pick_ori=None)
             
-            inv_op = mne.minimum_norm.make_inverse_operator(evokeds_low.info, fwd, noise_cov)
-
-            evokeds_low.set_eeg_reference(projection=True)  # needed for inverse modelingS
-
-            conditionb_stc = mne.minimum_norm.apply_inverse(evokeds_low, inv_op, lambda2=0.05,
-                                                            method='eLORETA', pick_ori='normal')
-            
-            conditiona_stc.save(f'{path}/high_{subj}', overwrite=True)
-            conditionb_stc.save(f'{path}/low_{subj}', overwrite=True)
+            stc.save(f'{path}/contrast_highlow_{subj}')
 
 
-def create_source_contrast_array(path=beamformer_path):
+def create_source_contrast_array(path=mne_path):
 
     """function loads source estimates per participant and contrasts them, 
     beforestoring the contrast in a numpy array.
@@ -199,25 +221,37 @@ def create_source_contrast_array(path=beamformer_path):
     shape of numpy array:
     participantsxverticesxtimepoints
     """
+    if path == mne_path:
+        stc_all = []
 
-    stc_all, stc_high_all, stc_low_all = [], [], []
+        for subj in IDlist:
 
-    for subj in IDlist:
+            stc = mne.read_source_estimate(f'{path}/contrast_highlow_{subj}')
 
-        stc_high = mne.read_source_estimate(f'{path}\\high_beta_{subj}')
-        stc_low = mne.read_source_estimate(f'{path}\\low_beta_{subj}')
+            stc_all.append(stc.data)
 
-        stc_diff = stc_high.data-stc_low.data
+        stc_array = np.array(stc_all)   
 
-        stc_high_all.append(stc_high.data)
-        stc_low_all.append(stc_low.data)
-        stc_all.append(stc_diff)
+    else:
 
-    stc_low = np.array(stc_low_all)
-    stc_high = np.array(stc_high_all)
-    stc_array = np.array(stc_all)
+        stc_all, stc_high_all, stc_low_all = [], [], []
 
-    data = stc_array
+        for subj in IDlist:
+
+            stc_high = mne.read_source_estimate(f'{path}\\high_beta_{subj}')
+            stc_low = mne.read_source_estimate(f'{path}\\low_beta_{subj}')
+
+            stc_diff = stc_high.data-stc_low.data
+
+            stc_high_all.append(stc_high.data)
+            stc_low_all.append(stc_low.data)
+            stc_all.append(stc_diff)
+
+        stc_low = np.array(stc_low_all)
+        stc_high = np.array(stc_high_all)
+        stc_array = np.array(stc_all)
+
+        data = stc_array
 
     return stc_array
 
@@ -280,7 +314,7 @@ def spatio_temporal_source_test(data=None, n_perm=10000, jobs=-1,
 
     # put contrast or p values in source space
     fsave_vertices = [s['vertno'] for s in src]
-    stc = mne.SourceEstimate(X_avg, tmin=-0.5, tstep=0.0001, vertices = fsave_vertices, subject='fsaverage')
+    stc = mne.SourceEstimate(X_avg, tmin=-0.4, tstep=0.0001, vertices = fsave_vertices, subject='fsaverage')
 
     brain = stc.plot(
         hemi='rh', views='medial', subjects_dir=subjects_dir,
