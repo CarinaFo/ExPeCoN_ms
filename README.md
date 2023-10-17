@@ -2,23 +2,81 @@
 
     Author(s): Carina Forster et al. (2023)
     Status: Code is not yet reviewed
-    Last update: Oct 10, 2023
+    Last update: Oct 18, 2023
 ***
+## Open ToDos before:
+- [ ] add readme/note to folder `code/experiment_code`, referring to author(s)
+- [ ] ...
 
 ## Description
+
 Scripts for the manuscript Expectation Perception Confidence Neural Correlates (`ExPeCoN`).
 
-`SIMON COMMENT: 'ExPeCoN' or 'expecon'? Keep coherent in all scripts and README.md`
+## Project structure
 
-## Contents
+*A brief description of the folder structure of the project (Where is what?).* [`TODO`]
 
-## Data
-* data will be uploaded to [OSF](https://osf.io)
+The project structure is based on [`scilaunch`](https://github.com/SHEscher/scilaunch).
 
-## Setup & requirements 
-* Python 3.x 
-* Package requirements can be found in `requirements.txt`
+### Data
+* data will be uploaded to [OSF](https://osf.io) [`TODO`]
 
-## Citation
-In case you use this code, please cite the following paper:
-...
+## Install research code as package
+
+First, clone the project to a local folder:
+
+```shell
+git clone https://github.com/CarinaFo/ExPeCoN_ms.git
+```
+
+Create a conda environment specific to `expecon_ms`:
+
+```shell
+conda env create -f expecon.yml
+# the environment is called expecon_3.9
+```
+
+And activate it:
+
+```shell
+conda activate expecon_3.9
+
+# Add the conda environment to jupyter (notebook)
+python -m ipykernel install --user --name=expecon_3.9
+```
+
+Install the project code `expecon_ms` as Python package:
+
+```shell
+cd expecon_ms
+pip install -e .
+```
+
+**Note**: The `-e` flag installs the package in editable mode,
+i.e., changes to the code will be directly reflected in the installed package.
+Moreover, the code keeps its access to the research data in the underlying folder structure.
+Thus, the `-e` flag is recommended to use.
+
+*R*-scripts of the analysis are stored in `./code/Rscripts/`.
+
+### Explore data and analysis
+Use jupyter notebooks to explore the data and analysis:
+
+```shell
+jupyter lab code/notebooks/expecon_ms.ipynb &
+```
+
+## Publications
+
+*List resulted publications of this project here (including papers, posters, talks, ...)* [`TODO`]
+
+In case you use this code, please cite the following paper: ... [`TODO`]
+
+## Preregistration
+
+*If applicable, was the project pre-registered and if yes, when and where (link)* [`TODO`]
+
+## Contributors/Collaborators
+
+*Name people who are involved in this project, their position and/or contribution.
+Optional: add contact data* [`TODO`]
