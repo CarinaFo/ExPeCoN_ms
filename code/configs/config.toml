@@ -1,0 +1,32 @@
+# Config file for expecon_ms
+# Drop all relevant paths, parameters, etc. here
+# They can be accessed in the code via:
+#   from expecon_ms.configs import config, path_to, params
+
+PROJECT_NAME = "expecon_ms"
+
+# all paths are relative to the PROJECT_ROOT folder named 'expecon_ms'
+[paths]
+DATA = "./data"
+RESULTS = "./results"
+
+[paths.data]
+CACHE = "./data/cache"
+
+[paths.data.eeg.preprocessed.stimulus]
+filter_0_1hz = "./data/eeg/prepro_stim/filter_0.1Hz"
+filter_1hz = "./data/eeg/prepro_stim/filter_1Hz"
+
+[params]
+weight_decay = 0.01  # TODO: dummy parameter
+
+# Follwing creates arrays of tables
+# [[tester]]
+# id = 3
+# name = "Nomis"
+#
+# [[tester]]
+# id = 2
+# name = "aniraC"
+
+# Note store private configs in same folder: "./[PRIVATE_PREFIX]_configs.toml"
