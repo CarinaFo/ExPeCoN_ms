@@ -23,9 +23,9 @@ from expecon_ms.configs import PROJECT_ROOT, config, path_to
 # Specify the file path for which you want the last commit date
 __file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/preprocessing/prepro.py")  # == __file__
 
-last_commit_date = subprocess.check_output(
-    ["git", "log", "-1", "--format=%cd", "--follow", __file__path]
-).decode("utf-8").strip()
+last_commit_date = (
+    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
+)
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # set save paths
@@ -45,6 +45,7 @@ id_list = config.participants.ID_list
 
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+
 
 def concatenate():
     """
@@ -83,7 +84,6 @@ def concatenate():
         # extract events from annotations and store trigger counts in a list
 
         if subj == "031":
-
             raw_1 = mne.io.read_raw_brainvision(raw_fname1)
             raw_2 = mne.io.read_raw_brainvision(raw_fname2)
             raw_3 = mne.io.read_raw_brainvision(raw_fname3)
@@ -99,7 +99,6 @@ def concatenate():
             raw = mne.concatenate_raws([raw_1, raw_2, raw_3, raw_4])
 
         else:
-
             raw_1 = mne.io.read_raw_brainvision(raw_fname1)
             raw_2 = mne.io.read_raw_brainvision(raw_fname2)
             raw_3 = mne.io.read_raw_brainvision(raw_fname3)
@@ -144,39 +143,50 @@ def remove_trials(filename: str | Path = "raw_behav_data.csv"):
     # (35 trials in total)
 
     # Create a list of tuples to store each condition
-    conditions = [(7, 2, [1]),
-                  (8, 3, [1]),
-                  (9, 5, [1]),
-                  (10, 4, [1, 2, 3, 4, 5]),
-                  (12, 2, [1, 2, 3]),
-                  (12, 6, [1, 2]),
-                  (16, 3, [1]),
-                  (16, 5, [1, 2]),
-                  (18, 5, [1, 2, 3]),
-                  (20, 3, [1]),
-                  (22, 3, [1, 2, 3]),
-                  (24, 3, [1]),
-                  (24, 4, [1, 2, 3, 4]),
-                  (24, 5, [1, 2, 3]),
-                  (24, 6, [1]),
-                  (28, 5, [1]),
-                  (35, 2, [1]),
-                  (42, 5, [1])]
+    conditions = [
+        (7, 2, [1]),
+        (8, 3, [1]),
+        (9, 5, [1]),
+        (10, 4, [1, 2, 3, 4, 5]),
+        (12, 2, [1, 2, 3]),
+        (12, 6, [1, 2]),
+        (16, 3, [1]),
+        (16, 5, [1, 2]),
+        (18, 5, [1, 2, 3]),
+        (20, 3, [1]),
+        (22, 3, [1, 2, 3]),
+        (24, 3, [1]),
+        (24, 4, [1, 2, 3, 4]),
+        (24, 5, [1, 2, 3]),
+        (24, 6, [1]),
+        (28, 5, [1]),
+        (35, 2, [1]),
+        (42, 5, [1]),
+    ]
 
     # Iterate over the list of conditions and drop the rows for each condition
     for cond in conditions:
         df_behav = df_behav.drop(
             df_behav.index[
                 (df_behav["ID"] == cond[0]) & (df_behav["block"] == cond[1]) & (df_behav["trial"].isin(cond[2]))
-                ]
+            ]
         )
 
     df_behav.to_csv(behav_path / "behav_cleaned_for_eeg.csv")
 
 
-def prepro(trigger: str = "stimulus", l_freq: float = 0.1, h_freq: int = 40,
-           tmin: float = -1.5, tmax: float = 1.5, resample_rate: int = 250, sf: int = 2500,
-           detrend: int = 1, ransac: int = 1, autoreject: int = 0):
+def prepro(
+    trigger: str = "stimulus",
+    l_freq: float = 0.1,
+    h_freq: int = 40,
+    tmin: float = -1.5,
+    tmax: float = 1.5,
+    resample_rate: int = 250,
+    sf: int = 2500,
+    detrend: int = 1,
+    ransac: int = 1,
+    autoreject: int = 0,
+):
     """
     Bandpass-filter the data using a finite response filter.
 
@@ -212,7 +222,6 @@ def prepro(trigger: str = "stimulus", l_freq: float = 0.1, h_freq: int = 40,
 
     # loop over participants
     for index, subj in enumerate(id_list):
-
         # if file exists, skip
         if (save_dir_stim / f"P{subj}_epochs_stim_0.1Hzfilter-epo.fif").exists():
             print(f"{subj} already exists")
@@ -237,7 +246,6 @@ def prepro(trigger: str = "stimulus", l_freq: float = 0.1, h_freq: int = 40,
 
         # add stimulus onset cue as a trigger to event structure
         if trigger == "cue":
-
             cue_timings = [i - int(0.4 * sf) for i in events[:, 0]]
 
             # subtract 0.4*sampling frequency to get the cue time stamps
@@ -290,7 +298,6 @@ def prepro(trigger: str = "stimulus", l_freq: float = 0.1, h_freq: int = 40,
         # epochs, takes quite long and removes a lot of epochs due to
         # blink artifacts)
         if ransac:
-
             print(f"Run ransac for {subj}")
 
             ransac = Ransac(verbose="progressbar", picks=picks, n_jobs=3)
@@ -306,7 +313,6 @@ def prepro(trigger: str = "stimulus", l_freq: float = 0.1, h_freq: int = 40,
         # detect bad epochs
         # now feed the clean channels into Autoreject to detect bad trials
         if autoreject:
-
             ar = AutoReject()
 
             epochs, reject_log = ar.fit_transform(epochs)
@@ -362,8 +368,7 @@ def add_reaction_time_trigger() -> None:
     rt = metadata_index.respt1
 
     # add event trigger
-    rt_timings = [event + int(rt[index] * sf) for index, event in
-                 enumerate(events[:, 0])]
+    rt_timings = [event + int(rt[index] * sf) for index, event in enumerate(events[:, 0])]
 
     rt_n_ts = copy.deepcopy(events)
     rt_n_ts[:, 0] = rt_timings
