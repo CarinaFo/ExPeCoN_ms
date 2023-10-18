@@ -27,9 +27,9 @@ from expecon_ms.configs import PROJECT_ROOT, path_to
 # Specify the file path for which you want the last commit date
 __file__path = Path(PROJECT_ROOT, "code/expecon_ms/behav/corr_sdt.py")  # == __file__
 
-last_commit_date = subprocess.check_output(
-    ["git", "log", "-1", "--format=%cd", "--follow", __file__path]
-).decode("utf-8").strip()
+last_commit_date = (
+    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
+)
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # Set Arial as the default font
@@ -38,6 +38,7 @@ plt.rcParams["font.size"] = 14
 
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+
 
 def calculate_sdt_dataframe(
     df: pd.DataFrame, signal_col: str, response_col: str, subject_col: str, condition_col: str
@@ -65,17 +66,12 @@ def calculate_sdt_dataframe(
 
     for subject in subjects:
         for condition in conditions:
-            subset = df[(df[subject_col] == subject) &
-                         (df[condition_col] == condition)]
+            subset = df[(df[subject_col] == subject) & (df[condition_col] == condition)]
 
-            detect_hits = subset[(subset[signal_col] is True) &
-                                 (subset[response_col] is True)].shape[0]
-            detect_misses = subset[(subset[signal_col] is True) &
-                                   (subset[response_col] is False)].shape[0]
-            false_alarms = subset[(subset[signal_col] is False) &
-                                  (subset[response_col] is True)].shape[0]
-            correct_rejections = subset[(subset[signal_col] is False) &
-                                        (subset[response_col] is False)].shape[0]
+            detect_hits = subset[(subset[signal_col] is True) & (subset[response_col] is True)].shape[0]
+            detect_misses = subset[(subset[signal_col] is True) & (subset[response_col] is False)].shape[0]
+            false_alarms = subset[(subset[signal_col] is False) & (subset[response_col] is True)].shape[0]
+            correct_rejections = subset[(subset[signal_col] is False) & (subset[response_col] is False)].shape[0]
 
             # log linear correction (Hautus, 1995)
             hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
@@ -157,9 +153,12 @@ def correlate_sdt_with_questionnaire(expecon: int = 1):
     sns.regplot(data=df, x="X", y="y", color=data_color)
     plt.xlabel(xlabel="Intolerance of Uncertainty score (zscored)", color=text_color)
     plt.ylabel(ylabel="Criterion Change", color=text_color)
-    plt.annotate(text=f"Slope: {slope:.2f}\n p-value: {p_value:.2f}",
-                 xy=(0.05, 0.85), xycoords="axes fraction",
-                 color=text_color)
+    plt.annotate(
+        text=f"Slope: {slope:.2f}\n p-value: {p_value:.2f}",
+        xy=(0.05, 0.85),
+        xycoords="axes fraction",
+        color=text_color,
+    )
 
     for fm in ["png", "svg"]:
         plt.savefig(Path(path_to.figures.manuscript.figure2) / f"linreg_c_q.{fm}", dpi=300)
@@ -172,6 +171,7 @@ def diff_from_optimal_criterion() -> None:
 
     Do this for each participant and cue condition.
     """
+
     def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_alarm) -> float:
         """
         Calculate the optimal criterion (c).
