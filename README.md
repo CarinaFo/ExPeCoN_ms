@@ -6,7 +6,7 @@
 ***
 ## Open ToDos before:
 - [ ] add readme/note to folder `code/experiment_code`, referring to author(s)
-- [ ] continue refactoring. Not done yet: `./eeg/sensor/*.py` & `./eeg/source/*.py`
+- [ ] continue refactoring. Not done yet: `./eeg/source/*.py`
 - [ ] review functionality
 - [ ] ...
 

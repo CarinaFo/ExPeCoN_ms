@@ -20,7 +20,7 @@ import mne
 import pandas as pd
 from mne_icalabel import label_components
 
-from expecon_ms.configs import PROJECT_ROOT, path_to, config
+from expecon_ms.configs import PROJECT_ROOT, config, path_to
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 

@@ -29,6 +29,7 @@ ICA = "./data/eeg/prepro_ica"
 PSD = "./data/eeg/prepro_ica/psd"
 ICA_solution = "./data/eeg/prepro_ica/ica_solution"
 ICA_components = "./data/eeg/prepro_ica/ica_comps"
+clean_epochs = "./data/eeg/prepro_ica/clean_epochs_corr"
 
 [paths.data.eeg.preprocessed.stimulus]
 filter_0_1hz = "./data/eeg/prepro_stim/filter_0.1Hz"
