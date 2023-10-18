@@ -13,6 +13,17 @@ RESULTS = "./results"
 [paths.data]
 CACHE = "./data/cache"
 
+[paths.data.eeg]
+RAW = "./data/eeg/raw_concatenated"
+
+[paths.data.eeg.preprocessed]
+ICA = "./data/eeg/prepro_ica"
+
+[paths.data.eeg.preprocessed.ica]
+PSD = "./data/eeg/prepro_ica/psd"
+ICA_solution = "./data/eeg/prepro_ica/ica_solution"
+ICA_components = "./data/eeg/prepro_ica/ica_comps"
+
 [paths.data.eeg.preprocessed.stimulus]
 filter_0_1hz = "./data/eeg/prepro_stim/filter_0.1Hz"
 filter_1hz = "./data/eeg/prepro_stim/filter_1Hz"
