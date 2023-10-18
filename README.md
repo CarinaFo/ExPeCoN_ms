@@ -6,6 +6,7 @@
 ***
 ## Open ToDos before:
 - [ ] add readme/note to folder `code/experiment_code`, referring to author(s)
+- [ ] continue refactoring
 - [ ] ...
 
 ## Description
