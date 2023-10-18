@@ -34,9 +34,9 @@ from expecon_ms.configs import PROJECT_ROOT, path_to
 # Specify the file path for which you want the last commit date
 __file__path = Path(PROJECT_ROOT, "code/expecon_ms/behav/figure1.py")  # == __file__
 
-last_commit_date = subprocess.check_output(
-    ["git", "log", "-1", "--format=%cd", "--follow", __file__path]
-).decode("utf-8").strip()
+last_commit_date = (
+    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
+)
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # Set Arial as the default font
@@ -48,6 +48,7 @@ save_path_fig1_expecon1 = Path(path_to.figures.manuscript.figure1)
 
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+
 
 def prepro_behavioral_data(expecon: int = 1):
     """
@@ -65,7 +66,6 @@ def prepro_behavioral_data(expecon: int = 1):
     data: pandas dataframe containing the preprocessed behavioral data
     """
     if expecon == 1:
-
         # analyze expecon 1 behavioral data
         behav_path = Path(path_to.data.behavior)
         # Load the behavioral data from the specified path
@@ -97,9 +97,9 @@ def prepro_behavioral_data(expecon: int = 1):
         data = data.rename(columns={"resp1_t": "respt1"})  # detection rt
         data = data.rename(columns={"resp2_t": "respt2"})  # confidence rt
 
-        data[["sayyes", "isyes", "cue", "conf", "respt1", "resp2_t"]] = \
-            data[["sayyes", "isyes", "cue", "conf",
-                  "respt1", "respt2"]].apply(pd.to_numeric, errors="coerce")
+        data[["sayyes", "isyes", "cue", "conf", "respt1", "resp2_t"]] = data[
+            ["sayyes", "isyes", "cue", "conf", "respt1", "respt2"]
+        ].apply(pd.to_numeric, errors="coerce")
 
     # reset index
     data = data.reset_index()
@@ -114,10 +114,14 @@ def prepro_behavioral_data(expecon: int = 1):
     # add a column that combines the confidence ratings and the
     # detection response
     conf_resp = [
-        4 if data.loc[i, "sayyes"] == 1 and data.loc[i, "conf"] == 1 else
-        3 if data.loc[i, "sayyes"] == 0 and data.loc[i, "conf"] == 1 else
-        2 if data.loc[i, "sayyes"] == 1 and data.loc[i, "conf"] == 0 else
-        1 for i in range(len(data))
+        4
+        if data.loc[i, "sayyes"] == 1 and data.loc[i, "conf"] == 1
+        else 3
+        if data.loc[i, "sayyes"] == 0 and data.loc[i, "conf"] == 1
+        else 2
+        if data.loc[i, "sayyes"] == 1 and data.loc[i, "conf"] == 0
+        else 1
+        for i in range(len(data))
     ]
 
     data["conf_resp"] = conf_resp
@@ -167,17 +171,12 @@ def calculate_sdt_dataframe(df, signal_col, response_col, subject_col, condition
 
     for subject in subjects:
         for condition in conditions:
-            subset = df[(df[subject_col] == subject) &
-                        (df[condition_col] == condition)]
+            subset = df[(df[subject_col] == subject) & (df[condition_col] == condition)]
 
-            detect_hits = subset[(subset[signal_col] is True) &
-                                 (subset[response_col] is True)].shape[0]
-            detect_misses = subset[(subset[signal_col] is True) &
-                                   (subset[response_col] is False)].shape[0]
-            false_alarms = subset[(subset[signal_col] is False) &
-                                  (subset[response_col] is True)].shape[0]
-            correct_rejections = subset[(subset[signal_col] is False) &
-                                        (subset[response_col] is False)].shape[0]
+            detect_hits = subset[(subset[signal_col] is True) & (subset[response_col] is True)].shape[0]
+            detect_misses = subset[(subset[signal_col] is True) & (subset[response_col] is False)].shape[0]
+            false_alarms = subset[(subset[signal_col] is False) & (subset[response_col] is True)].shape[0]
+            correct_rejections = subset[(subset[signal_col] is False) & (subset[response_col] is False)].shape[0]
 
             # log linear correction (Hautus, 1995)
             hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
@@ -426,19 +425,36 @@ def plot_figure1_grid(expecon: int = 1):
 
     # Plot hit rate
     for index in range(len(df_sdt.hit_rate[df_sdt.cue == 0.25])):
-        hr_ax.plot(1, df_sdt.hit_rate[df_sdt.cue == 0.25].iloc[index],
-                   marker="", markersize=8, color=colors[0],
-                   markeredgecolor=colors[0], alpha=.5)
-        hr_ax.plot(2, df_sdt.hit_rate[df_sdt.cue == 0.75].iloc[index],
-                   marker="", markersize=8, color=colors[1],
-                   markeredgecolor=colors[1], alpha=.5)
-        hr_ax.plot([1, 2], [df_sdt.hit_rate[df_sdt.cue == 0.25].iloc[index],
-                            df_sdt.hit_rate[df_sdt.cue == 0.75].iloc[index]],
-                   marker="", markersize=0, color="gray", alpha=.25)
+        hr_ax.plot(
+            1,
+            df_sdt.hit_rate[df_sdt.cue == 0.25].iloc[index],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        hr_ax.plot(
+            2,
+            df_sdt.hit_rate[df_sdt.cue == 0.75].iloc[index],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        hr_ax.plot(
+            [1, 2],
+            [df_sdt.hit_rate[df_sdt.cue == 0.25].iloc[index], df_sdt.hit_rate[df_sdt.cue == 0.75].iloc[index]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    hr_box = hr_ax.boxplot([df_sdt.hit_rate[df_sdt.cue == 0.25],
-                            df_sdt.hit_rate[df_sdt.cue == 0.75]],
-                           patch_artist=True)
+    hr_box = hr_ax.boxplot(
+        [df_sdt.hit_rate[df_sdt.cue == 0.25], df_sdt.hit_rate[df_sdt.cue == 0.75]], patch_artist=True
+    )
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(hr_box["boxes"], colors):
@@ -451,26 +467,42 @@ def plot_figure1_grid(expecon: int = 1):
 
     hr_ax.set_ylabel("hit rate", fontname="Arial", fontsize=14)
     hr_ax.set_yticklabels(["0", "0.5", "1.0"], fontname="Arial", fontsize=12)
-    hr_ax.text(1.3, 1, "***", verticalalignment="center", fontname="Arial",
-               fontsize="18")
+    hr_ax.text(1.3, 1, "***", verticalalignment="center", fontname="Arial", fontsize="18")
 
     # Plot fa rate
     fa_rate_ax = fig.add_subplot(gs[5, 0])
 
     for index in range(len(df_sdt.fa_rate[df_sdt.cue == 0.25])):
-        fa_rate_ax.plot(1, df_sdt.fa_rate[df_sdt.cue == 0.25].iloc[index],
-                       marker="", markersize=8, color=colors[0],
-                       markeredgecolor=colors[0], alpha=.5)
-        fa_rate_ax.plot(2, df_sdt.fa_rate[df_sdt.cue == 0.75].iloc[index],
-                       marker="", markersize=8, color=colors[1],
-                       markeredgecolor=colors[1], alpha=.5)
-        fa_rate_ax.plot([1, 2], [df_sdt.fa_rate[df_sdt.cue == 0.25].iloc[index],
-                                df_sdt.fa_rate[df_sdt.cue == 0.75].iloc[index]],
-                       marker="", markersize=0, color="gray", alpha=.25)
+        fa_rate_ax.plot(
+            1,
+            df_sdt.fa_rate[df_sdt.cue == 0.25].iloc[index],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        fa_rate_ax.plot(
+            2,
+            df_sdt.fa_rate[df_sdt.cue == 0.75].iloc[index],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        fa_rate_ax.plot(
+            [1, 2],
+            [df_sdt.fa_rate[df_sdt.cue == 0.25].iloc[index], df_sdt.fa_rate[df_sdt.cue == 0.75].iloc[index]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    fa_box = fa_rate_ax.boxplot([df_sdt.fa_rate[df_sdt.cue == 0.25],
-                                df_sdt.fa_rate[df_sdt.cue == 0.75]],
-                               patch_artist=True)
+    fa_box = fa_rate_ax.boxplot(
+        [df_sdt.fa_rate[df_sdt.cue == 0.25], df_sdt.fa_rate[df_sdt.cue == 0.75]], patch_artist=True
+    )
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(fa_box["boxes"], colors):
@@ -483,26 +515,43 @@ def plot_figure1_grid(expecon: int = 1):
 
     fa_rate_ax.set_ylabel("fa rate", fontname="Arial", fontsize=14)
     fa_rate_ax.set_yticklabels(["0", "0.5", "1.0"], fontname="Arial", fontsize=12)
-    fa_rate_ax.text(1.3, 1, "***", verticalalignment="center", fontname="Arial",
-                   fontsize="18")
+    fa_rate_ax.text(1.3, 1, "***", verticalalignment="center", fontname="Arial", fontsize="18")
 
     # Plot dprime
     dprime_ax = fig.add_subplot(gs[4:, 1])
 
     # Plot individual data points
     for index in range(len(df_sdt.dprime[df_sdt.cue == 0.25])):
-        dprime_ax.plot(1, df_sdt.dprime[df_sdt.cue == 0.25].iloc[index],
-                       marker="", markersize=8, color=colors[0],
-                       markeredgecolor=colors[0], alpha=.5)
-        dprime_ax.plot(2, df_sdt.dprime[df_sdt.cue == 0.75].iloc[index],
-                       marker="", markersize=8, color=colors[1],
-                       markeredgecolor=colors[1], alpha=.5)
-        dprime_ax.plot([1, 2], [df_sdt.dprime[df_sdt.cue == 0.25].iloc[index],
-                                df_sdt.dprime[df_sdt.cue == 0.75].iloc[index]],
-                       marker="", markersize=0, color="gray", alpha=.25)
+        dprime_ax.plot(
+            1,
+            df_sdt.dprime[df_sdt.cue == 0.25].iloc[index],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        dprime_ax.plot(
+            2,
+            df_sdt.dprime[df_sdt.cue == 0.75].iloc[index],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        dprime_ax.plot(
+            [1, 2],
+            [df_sdt.dprime[df_sdt.cue == 0.25].iloc[index], df_sdt.dprime[df_sdt.cue == 0.75].iloc[index]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    dprime_box = dprime_ax.boxplot([df_sdt.dprime[df_sdt.cue == 0.25],
-                                    df_sdt.dprime[df_sdt.cue == 0.75]], patch_artist=True)
+    dprime_box = dprime_ax.boxplot(
+        [df_sdt.dprime[df_sdt.cue == 0.25], df_sdt.dprime[df_sdt.cue == 0.75]], patch_artist=True
+    )
 
     for patch, color in zip(dprime_box["boxes"], colors):
         patch.set_facecolor(color)
@@ -513,31 +562,46 @@ def plot_figure1_grid(expecon: int = 1):
         patch.set_color(color)
 
     dprime_ax.set_ylabel("dprime", fontname="Arial", fontsize=14)
-    dprime_ax.text(1.4, 3, "n.s.", verticalalignment="center", fontname="Arial",
-                   fontsize="13")
+    dprime_ax.text(1.4, 3, "n.s.", verticalalignment="center", fontname="Arial", fontsize="13")
     dprime_ax.set_ylim(0, 3.0)
     dprime_ax.set_yticks([0, 1.5, 3.0])
-    dprime_ax.set_yticklabels(["0", "1.5", "3.0"], fontname="Arial",
-                              fontsize=12)
+    dprime_ax.set_yticklabels(["0", "1.5", "3.0"], fontname="Arial", fontsize=12)
 
     # Plot criterion
     crit_ax = fig.add_subplot(gs[4:, 2])
 
     # Plot individual data points
     for index in range(len(df_sdt.criterion[df_sdt.cue == 0.25])):
-        crit_ax.plot(1, df_sdt.criterion[df_sdt.cue == 0.25].iloc[index],
-                     marker="", markersize=8, color=colors[0],
-                     markeredgecolor=colors[0], alpha=.5)
-        crit_ax.plot(2, df_sdt.criterion[df_sdt.cue == 0.75].iloc[index],
-                     marker="", markersize=8, color=colors[1],
-                     markeredgecolor=colors[1], alpha=.5)
-        crit_ax.plot([1, 2], [df_sdt.criterion[df_sdt.cue == 0.25].iloc[index],
-                              df_sdt.criterion[df_sdt.cue == 0.75].iloc[index]],
-                     marker="", markersize=0, color="gray", alpha=.25)
+        crit_ax.plot(
+            1,
+            df_sdt.criterion[df_sdt.cue == 0.25].iloc[index],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        crit_ax.plot(
+            2,
+            df_sdt.criterion[df_sdt.cue == 0.75].iloc[index],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        crit_ax.plot(
+            [1, 2],
+            [df_sdt.criterion[df_sdt.cue == 0.25].iloc[index], df_sdt.criterion[df_sdt.cue == 0.75].iloc[index]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    crit_box = crit_ax.boxplot([df_sdt.criterion[df_sdt.cue == 0.25],
-                                df_sdt.criterion[df_sdt.cue == 0.75]],
-                               patch_artist=True)
+    crit_box = crit_ax.boxplot(
+        [df_sdt.criterion[df_sdt.cue == 0.25], df_sdt.criterion[df_sdt.cue == 0.75]], patch_artist=True
+    )
 
     for patch, color in zip(crit_box["boxes"], colors):
         patch.set_facecolor(color)
@@ -548,33 +612,46 @@ def plot_figure1_grid(expecon: int = 1):
         patch.set_color(color)
 
     crit_ax.set_ylabel("c", fontname="Arial", fontsize=14)
-    crit_ax.text(1.4, 1.5, "***", verticalalignment="center", fontname="Arial",
-                 fontsize="13")
+    crit_ax.text(1.4, 1.5, "***", verticalalignment="center", fontname="Arial", fontsize="13")
     crit_ax.set_ylim(-0.5, 1.5)
     crit_ax.set_yticks([-0.5, 0.5, 1.5])
-    crit_ax.set_yticklabels(["-0.5", "0.5", "1.5"], fontname="Arial",
-                            fontsize=12)
+    crit_ax.set_yticklabels(["-0.5", "0.5", "1.5"], fontname="Arial", fontsize=12)
     # Plot confidence
     conf_ax = fig.add_subplot(gs[4:, 3])
 
     # Plot individual data points
     for index in range(len(conf_con[0])):
-        conf_ax.plot(1, conf_con[0].iloc[index, 1],
-                     marker="", markersize=8, color=colors[0],
-                     markeredgecolor=colors[0], alpha=.5)
-        conf_ax.plot(2, conf_con[1].iloc[index, 1],
-                     marker="", markersize=8, color=colors[1],
-                     markeredgecolor=colors[1], alpha=.5)
-        conf_ax.plot([1, 2], [conf_con[0].iloc[index, 1],
-                              conf_con[1].iloc[index, 1]],
-                     marker="", markersize=0, color="gray", alpha=.25)
+        conf_ax.plot(
+            1,
+            conf_con[0].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        conf_ax.plot(
+            2,
+            conf_con[1].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        conf_ax.plot(
+            [1, 2],
+            [conf_con[0].iloc[index, 1], conf_con[1].iloc[index, 1]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
     conf_ax.set_ylabel("high confidence", fontname="Arial", fontsize=14)
-    conf_box = conf_ax.boxplot([conf_con[0].iloc[:, 1], conf_con[1].iloc[:, 1]],
-                               patch_artist=True)
+    conf_box = conf_ax.boxplot([conf_con[0].iloc[:, 1], conf_con[1].iloc[:, 1]], patch_artist=True)
 
-    conf_ax.text(1.4, 1.0, "***", verticalalignment="center", fontname="Arial",
-                 fontsize="13")
+    conf_ax.text(1.4, 1.0, "***", verticalalignment="center", fontname="Arial", fontsize="13")
 
     # Set the face color and alpha for the boxes in the plot
     colors = ["white", "black"]
@@ -598,13 +675,10 @@ def plot_figure1_grid(expecon: int = 1):
         plots.set_xlim(0.5, 2.5)
         plots.set_xticklabels(["", ""])
         if plots != hr_ax:
-            plots.set_xticklabels(["0.25", "0.75"], fontname="Arial",
-                                  fontsize=12)
+            plots.set_xticklabels(["0.25", "0.75"], fontname="Arial", fontsize=12)
             plots.set_xlabel("P (Stimulus)", fontname="Arial", fontsize=14)
         if plots == conf_ax:
-            plots.set_xticklabels(["congruent", "incongruent"],
-                                  fontname="Arial", fontsize=12,
-                                  rotation=30)
+            plots.set_xticklabels(["congruent", "incongruent"], fontname="Arial", fontsize=12, rotation=30)
             plots.set_xlabel("")
 
     for fm in ["svg", "png"]:
@@ -629,11 +703,12 @@ def calc_stats():
     for cond in cond_list:
         ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(
             x1=df_sdt[cond][df_sdt.cue == 0.25].reset_index(drop=True),
-            x2=df_sdt[cond][df_sdt.cue == 0.75].reset_index(drop=True))
+            x2=df_sdt[cond][df_sdt.cue == 0.75].reset_index(drop=True),
+        )
 
     ci_lower, ci_upper = bootstrap_ci_effect_size_wilcoxon(
         conf[0].reset_index(drop=True).drop("ID", axis=1).iloc[:, 0],
-        conf[1].reset_index(drop=True).drop("ID", axis=1).iloc[:, 0]
+        conf[1].reset_index(drop=True).drop("ID", axis=1).iloc[:, 0],
     )
     # TODO(simon): ci_lower, ci_upper are not used: maybe print() them?
 
@@ -754,18 +829,34 @@ def supplementary_plots(expecon: int = 1):
 
     # accuracy per condition
     for index in range(len(acc_cue[0])):
-        plt.plot(1, acc_cue[0].iloc[index, 1],
-                 marker="", markersize=8, color=colors[0],
-                 markeredgecolor=colors[0], alpha=.5)
-        plt.plot(2, acc_cue[1].iloc[index, 1],
-                 marker="", markersize=8, color=colors[1],
-                 markeredgecolor=colors[1], alpha=.5)
-        plt.plot([1, 2], [acc_cue[0].iloc[index, 1],
-                          acc_cue[1].iloc[index, 1]],
-                 marker="", markersize=0, color="gray", alpha=.25)
+        plt.plot(
+            1,
+            acc_cue[0].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        plt.plot(
+            2,
+            acc_cue[1].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        plt.plot(
+            [1, 2],
+            [acc_cue[0].iloc[index, 1], acc_cue[1].iloc[index, 1]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    acc_box = plt.boxplot([acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1]],
-                          patch_artist=True)
+    acc_box = plt.boxplot([acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1]], patch_artist=True)
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(acc_box["boxes"], colors):
@@ -792,18 +883,34 @@ def supplementary_plots(expecon: int = 1):
 
     # is confidence higher for a certain cue?
     for index in range(len(conf_cue[0])):
-        plt.plot(1, conf_cue[0].iloc[index, 1],
-                 marker="", markersize=8, color=colors[0],
-                 markeredgecolor=colors[0], alpha=.5)
-        plt.plot(2, conf_cue[1].iloc[index, 1],
-                 marker="", markersize=8, color=colors[1],
-                 markeredgecolor=colors[1], alpha=.5)
-        plt.plot([1, 2], [conf_cue[0].iloc[index, 1],
-                          conf_cue[1].iloc[index, 1]],
-                 marker="", markersize=0, color="gray", alpha=.25)
+        plt.plot(
+            1,
+            conf_cue[0].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        plt.plot(
+            2,
+            conf_cue[1].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        plt.plot(
+            [1, 2],
+            [conf_cue[0].iloc[index, 1], conf_cue[1].iloc[index, 1]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    conf_box = plt.boxplot([conf_cue[0].iloc[:, 1], conf_cue[1].iloc[:, 1]],
-                           patch_artist=True)
+    conf_box = plt.boxplot([conf_cue[0].iloc[:, 1], conf_cue[1].iloc[:, 1]], patch_artist=True)
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(conf_box["boxes"], colors):
@@ -834,19 +941,34 @@ def supplementary_plots(expecon: int = 1):
 
     # Plot individual data points
     for index in range(len(conf_con_yes[0])):
-        plt.plot(1, conf_con_yes[0].iloc[index, 1],
-                 marker="", markersize=8, color=colors[0],
-                 markeredgecolor=colors[0], alpha=.5)
-        plt.plot(2, conf_con_yes[1].iloc[index, 1],
-                 marker="", markersize=8, color=colors[1],
-                 markeredgecolor=colors[1], alpha=.5)
-        plt.plot([1, 2], [conf_con_yes[0].iloc[index, 1],
-                          conf_con_yes[1].iloc[index, 1]],
-                 marker="", markersize=0, color="gray", alpha=.25)
+        plt.plot(
+            1,
+            conf_con_yes[0].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        plt.plot(
+            2,
+            conf_con_yes[1].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        plt.plot(
+            [1, 2],
+            [conf_con_yes[0].iloc[index, 1], conf_con_yes[1].iloc[index, 1]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    conf_con_yes_box = plt.boxplot([conf_con_yes[0].iloc[:, 1],
-                                    conf_con_yes[1].iloc[:, 1]],
-                                   patch_artist=True)
+    conf_con_yes_box = plt.boxplot([conf_con_yes[0].iloc[:, 1], conf_con_yes[1].iloc[:, 1]], patch_artist=True)
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(conf_con_yes_box["boxes"], colors):
@@ -874,19 +996,34 @@ def supplementary_plots(expecon: int = 1):
 
     # congruency on confidence for no responses
     for index in range(len(conf_con_no[0])):
-        plt.plot(1, conf_con_no[0].iloc[index, 1],
-                 marker="", markersize=8, color=colors[0],
-                 markeredgecolor=colors[0], alpha=.5)
-        plt.plot(2, conf_con_no[1].iloc[index, 1],
-                 marker="", markersize=8, color=colors[1],
-                 markeredgecolor=colors[1], alpha=.5)
-        plt.plot([1, 2], [conf_con_no[0].iloc[index, 1],
-                          conf_con_no[1].iloc[index, 1]],
-                 marker="", markersize=0, color="gray", alpha=.25)
+        plt.plot(
+            1,
+            conf_con_no[0].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        plt.plot(
+            2,
+            conf_con_no[1].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        plt.plot(
+            [1, 2],
+            [conf_con_no[0].iloc[index, 1], conf_con_no[1].iloc[index, 1]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    conf_con_no_box = plt.boxplot([conf_con_no[0].iloc[:, 1],
-                                   conf_con_no[1].iloc[:, 1]],
-                                  patch_artist=True)
+    conf_con_no_box = plt.boxplot([conf_con_no[0].iloc[:, 1], conf_con_no[1].iloc[:, 1]], patch_artist=True)
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(conf_con_no_box["boxes"], colors):
@@ -913,19 +1050,22 @@ def supplementary_plots(expecon: int = 1):
 
     # Reaction times for stimulus congruent trials (correct only)
     for index in range(len(rt_con[0])):
-        plt.plot(1, rt_con[0].iloc[index, 1],
-                 marker="", markersize=8, color=colors[0],
-                 markeredgecolor=colors[0], alpha=.5)
-        plt.plot(2, rt_con[1].iloc[index, 1],
-                 marker="", markersize=8, color=colors[1],
-                 markeredgecolor=colors[1], alpha=.5)
-        plt.plot([1, 2], [rt_con[0].iloc[index, 1],
-                          rt_con[1].iloc[index, 1]],
-                 marker="", markersize=0, color="gray", alpha=.25)
+        plt.plot(
+            1, rt_con[0].iloc[index, 1], marker="", markersize=8, color=colors[0], markeredgecolor=colors[0], alpha=0.5
+        )
+        plt.plot(
+            2, rt_con[1].iloc[index, 1], marker="", markersize=8, color=colors[1], markeredgecolor=colors[1], alpha=0.5
+        )
+        plt.plot(
+            [1, 2],
+            [rt_con[0].iloc[index, 1], rt_con[1].iloc[index, 1]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    rt_con_box = plt.boxplot([rt_con[0].iloc[:, 1],
-                              rt_con[1].iloc[:, 1]],
-                             patch_artist=True)
+    rt_con_box = plt.boxplot([rt_con[0].iloc[:, 1], rt_con[1].iloc[:, 1]], patch_artist=True)
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(rt_con_box["boxes"], colors):
@@ -952,19 +1092,34 @@ def supplementary_plots(expecon: int = 1):
 
     # Incorrect trials only
     for index in range(len(rt_con_incorrect[0])):
-        plt.plot(1, rt_con_incorrect[0].iloc[index, 1],
-                 marker="", markersize=8, color=colors[0],
-                 markeredgecolor=colors[0], alpha=.5)
-        plt.plot(2, rt_con_incorrect[1].iloc[index, 1],
-                 marker="", markersize=8, color=colors[1],
-                 markeredgecolor=colors[1], alpha=.5)
-        plt.plot([1, 2], [rt_con_incorrect[0].iloc[index, 1],
-                          rt_con_incorrect[1].iloc[index, 1]],
-                 marker="", markersize=0, color="gray", alpha=.25)
+        plt.plot(
+            1,
+            rt_con_incorrect[0].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[0],
+            markeredgecolor=colors[0],
+            alpha=0.5,
+        )
+        plt.plot(
+            2,
+            rt_con_incorrect[1].iloc[index, 1],
+            marker="",
+            markersize=8,
+            color=colors[1],
+            markeredgecolor=colors[1],
+            alpha=0.5,
+        )
+        plt.plot(
+            [1, 2],
+            [rt_con_incorrect[0].iloc[index, 1], rt_con_incorrect[1].iloc[index, 1]],
+            marker="",
+            markersize=0,
+            color="gray",
+            alpha=0.25,
+        )
 
-    rt_con_in_box = plt.boxplot([rt_con_incorrect[0].iloc[:, 1],
-                                 rt_con_incorrect[1].iloc[:, 1]],
-                                patch_artist=True)
+    rt_con_in_box = plt.boxplot([rt_con_incorrect[0].iloc[:, 1], rt_con_incorrect[1].iloc[:, 1]], patch_artist=True)
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(rt_con_in_box["boxes"], colors):
@@ -1005,10 +1160,8 @@ def supplementary_plots(expecon: int = 1):
 
     font = {"family": "Arial", "size": 14}
 
-    plt.annotate(equation, xy=(0.05, 0.9), xycoords="axes fraction",
-                 fontproperties=font)
-    plt.annotate(p_value_text, xy=(0.05, 0.8), xycoords="axes fraction",
-                 fontproperties=font)
+    plt.annotate(equation, xy=(0.05, 0.9), xycoords="axes fraction", fontproperties=font)
+    plt.annotate(p_value_text, xy=(0.05, 0.8), xycoords="axes fraction", fontproperties=font)
 
     plt.xlabel(xlabel="dprime 0.75", fontname="Arial", fontsize=14)
     plt.ylabel(ylabel="c 0.75", fontname="Arial", fontsize=14)

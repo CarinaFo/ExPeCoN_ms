@@ -27,9 +27,9 @@ from expecon_ms.configs import PROJECT_ROOT, config, path_to
 # Specify the file path for which you want the last commit date
 __file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/preprocessing/ica.py")  # == __file__
 
-last_commit_date = subprocess.check_output(
-    ["git", "log", "-1", "--format=%cd", "--follow", __file__path]
-).decode("utf-8").strip()
+last_commit_date = (
+    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
+)
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # directory where to find the cleaned, epoched data
@@ -67,7 +67,6 @@ def run_ica(infomax: int = 1, save_psd=0):
         None
     """
     for subj in id_list:
-
         # Read the epoch data for the current participant (1Hz filtered data for ICA)
         epochs = mne.read_epochs(epochs_for_ica_dir / f"P{subj}_epochs_stim-epo.fif")
 
@@ -81,13 +80,10 @@ def run_ica(infomax: int = 1, save_psd=0):
 
         if infomax == 1:
             # Fit ICA using infomax method with extended parameters
-            ica = mne.preprocessing.ICA(method="infomax",
-                                        fit_params=dict(extended=True)).fit(
-                                        epochs, picks=picks)
+            ica = mne.preprocessing.ICA(method="infomax", fit_params=dict(extended=True)).fit(epochs, picks=picks)
         else:
             # Fit ICA using fastica method
-            ica = mne.preprocessing.ICA(method="fastica").fit(
-                epochs, picks=picks)
+            ica = mne.preprocessing.ICA(method="fastica").fit(epochs, picks=picks)
 
         save_data(data=ica, identifier=subj)  # save ICA solution
 
@@ -135,8 +131,7 @@ def label_ica_correction():
         inds_to_exclude = eog_inds + ecg_inds
 
         # plot ICs applied to raw data, with ECG matches highlighted
-        ica_sol.plot_sources(epochs, show_scrollbars=False, block=False,
-                             show=False, picks=list(range(21)))
+        ica_sol.plot_sources(epochs, show_scrollbars=False, block=False, show=False, picks=list(range(21)))
         # save figures
         plt.savefig(save_dir_ica_comps / f"ica_sources_{subj}")
 
@@ -230,9 +225,7 @@ def label_iclabel():
         epochs_filter.set_eeg_reference("average", ch_type="eeg")
 
         # save the cleaned epochs
-        epochs_filter.save(
-            Path(save_dir_ica, "clean_epochs_iclabel", f"{subj}_epochs_after_ica_0.1Hzfilter-epo.fif")
-        )
+        epochs_filter.save(Path(save_dir_ica, "clean_epochs_iclabel", f"{subj}_epochs_after_ica_0.1Hzfilter-epo.fif"))
         print(f"Saved ICA cleaned epochs for participant {subj}")
 
     # save a dataframe with info on how many components were removed

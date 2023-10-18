@@ -1,13 +1,15 @@
-# this script averages power per trial in specific frequeny bands and saves
-# single trial power as well as behavioral data in a csv file
+#!/usr/bin/python3
+"""
+The script averages power per trial in specific frequency bands.
 
-# author: Carina Forster
-# email: forster@cbs.mpg.de
+Moreover, it saves single trial power as well as behavioral data in a csv file.
 
-# import packages
-import os
+Author: Carina Forster
+Contact: forster@cbs.mpg.de
+Years: 2023
+"""
+# %% Import
 import subprocess
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -17,69 +19,71 @@ import pandas as pd
 import scipy
 import seaborn as sns
 
-# Specify the file path for which you want the last commit date
-file_path = Path("D:/expecon_ms/analysis_code/eeg/sensor/tfr_trial.py")
-
-last_commit_date = subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", file_path]).decode("utf-8").strip()
-print("Last Commit Date for", file_path, ":", last_commit_date)
-
-# own modules
-modulepath = Path('D:/expecon_ms/analysis_code/behav')
-# add path to sys.path.append() if package isn't found
-sys.path.append(modulepath)
-
-os.chdir(modulepath)
 from expecon_ms.behav import figure1
+from expecon_ms.configs import PROJECT_ROOT, config, path_to
+
+# %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+
+# Specify the file path for which you want the last commit date
+__file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/sensor/tfr_trial.py")  # == __file__
+
+last_commit_date = (
+    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
+)
+print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # set font to Arial and font size to 22
-plt.rcParams.update({'font.size': 14, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
+plt.rcParams.update({"font.size": 14, "font.family": "sans-serif", "font.sans-serif": "Arial"})
 
 # set directory paths
-behav_dir = Path('D:/expecon_ms/data/behav/behav_df/')
-tfr_dir = Path('D:/expecon_ms/data/eeg/sensor/tfr')
-savedir_fig7 = Path('D:/expecon_ms/figs/manuscript_figures/figure7_brain_behav')
+behav_dir = Path(path_to.data.behavior.behavior_df)
+tfr_dir = Path(path_to.data.eeg.sensor.tfr)
 
-IDlist = ['007', '008', '009', '010', '011', '012', '013', '014', '015', '016',
-          '017', '018', '019', '020', '021', '022', '023', '024', '025', '026',
-          '027', '028', '029', '030', '031', '032', '033', '034', '035', '036',
-          '037', '038', '039', '040', '041', '042', '043', '044', '045', '046',
-          '047', '048', '049']
+id_list = config.participants.ID_list
 
 # frequencies from tfr calculation
 freq_list = np.arange(3, 35, 1)
 
 # define frequency bands we are interested in
-freq_bands = {'alpha': (7, 13), 'beta': (15, 25)}
+freq_bands = {"alpha": (7, 13), "beta": (15, 25)}
 
 
-def save_band_power_per_trial(time_intervals={'pre': (-0.2, 0)},
-                                              channel_name=['CP4']):
+# %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-    """This function saves the power per trial per frequency band in a csv file.
+
+# TODO(simon): defaults should not be mutable
+def save_band_power_per_trial(time_intervals={"pre": (-0.2, 0)}, channel_name=["CP4"]):
+    """
+    Save the power per trial per frequency band in a csv file.
+
     The power is calculated for the time interval specified and averaged over
     the specified channel and frequency band.
     Power is calculated for the following frequency bands:
         - alpha (7-13 Hz)
         - beta (15-25 Hz)
-    Return:
-        - csv file with power per trial per frequency band
-    """
 
+    Args:
+    ----
+    time_intervals: dict: Dictionary with time intervals of interest.
+    channel_name: list: List with channel names of interest.
+
+    Return:
+    ------
+    csv file with power per trial per frequency band
+    """
     # save single subject dataframes in a list
     brain_behav = []
 
     # loop over subjects
-    for subj in IDlist:
-
+    for subj in id_list:
         # load single trial power
-        power = mne.time_frequency.read_tfrs(f'{tfr_dir}{Path("/")}{subj}_single_trial_power-tfr.h5')[0]
+        power = mne.time_frequency.read_tfrs(tfr_dir / f"{subj}_single_trial_power-tfr.h5")[0]
 
         # get behavioral data
         behav_data = power.metadata
 
         # loop over the time intervals
         for keys, time in time_intervals.items():
-
             power_crop = power.copy().crop(tmin=time[0], tmax=time[1]).pick_channels(channel_name)
 
             # now we average over time and channels
@@ -87,50 +91,50 @@ def save_band_power_per_trial(time_intervals={'pre': (-0.2, 0)},
 
             # now we average over the frequency band and time interval
             # and add the column to the behavioral data frame
-            behav_data[f'{keys}_alpha'] = np.mean(power_crop.data[:, 4:11], axis=1)  # 7-13 Hz
-            behav_data[f'{keys}_beta'] = np.mean(power_crop.data[:, 12:23], axis=1) # 15-25 Hz
+            behav_data[f"{keys}_alpha"] = np.mean(power_crop.data[:, 4:11], axis=1)  # 7-13 Hz
+            behav_data[f"{keys}_beta"] = np.mean(power_crop.data[:, 12:23], axis=1)  # 15-25 Hz
 
         # save the data in a list
         brain_behav.append(behav_data)
 
     # concatenate the list of dataframes and save as csv
-    pd.concat(brain_behav).to_csv(f'{behav_dir}{Path("/")}brain_behav.csv')
+    pd.concat(brain_behav).to_csv(behav_dir / "brain_behav.csv")
 
     return brain_behav
 
 
 def power_criterion_corr():
-
-    """This function correlates the power difference between low and high
-    expectations trials with the difference in dprime and criterion for
-    different frequency bands and plots a regression plot.
     """
+    Correlate the power difference between low and high expectations trials.
 
+    Difference is measured in dprime and criterion for different frequency bands.
+    TODO(simon): improve slightly
+    Plot a regression plot.
+    """
     # load brain behav dataframe
-    df = pd.read_csv(f'{behav_dir}{Path("/")}brain_behav.csv')
+    df_brain_behav = pd.read_csv(behav_dir / "brain_behav.csv")
 
-    freqs = ['pre_alpha', 'pre_beta']
+    freqs = ["pre_alpha", "pre_beta"]
 
     diff_p_list = []
 
     # now get power per participant and per condition
     for f in freqs:
-
-        power = df.groupby(['ID', 'cue']).mean()[f]
+        power = df_brain_behav.groupby(["ID", "cue"]).mean()[f]
 
         low = power.unstack()[0.25].reset_index()
         high = power.unstack()[0.75].reset_index()
 
         # log transform and calculate the difference
-        diff_p = np.log(np.array(low[0.25]))-np.log(np.array(high[0.75]))
+        diff_p = np.log(np.array(low[0.25])) - np.log(np.array(high[0.75]))
 
         diff_p_list.append(diff_p)
 
     # add the power difference to a dictionary
-    power_dict = {'alpha': diff_p_list[0], 'beta': diff_p_list[1]}
+    power_dict = {"alpha": diff_p_list[0], "beta": diff_p_list[1]}
 
     # load random effects
-    #re = pd.read_csv(f'{Path("D:/expecon_ms/data/behav/mixed_models/brms/random_effects.csv")}')
+    # re = pd.read_csv(Path("./data/behav/mixed_models/brms/random_effects.csv"))  # TODO(simon): rm if not needed
 
     # load behavioral SDT data
     out = figure1.prepare_for_plotting()
@@ -142,19 +146,27 @@ def power_criterion_corr():
     dprime_diff = np.array(sdt.dprime[sdt.cue == 0.25]) - np.array(sdt.dprime[sdt.cue == 0.75])
 
     # add the sdt data to a dictionary
-    sdt_params = {'dprime': dprime_diff, 'criterion': c_diff}
+    sdt_params = {"dprime": dprime_diff, "criterion": c_diff}
 
-    for p_key, p_value in power_dict.items(): # loop over the power difference
-        for keys, values in sdt_params.items(): # loop over the criterion and dprime difference
-
+    for p_key, p_value in power_dict.items():  # loop over the power difference
+        for keys, values in sdt_params.items():  # loop over the criterion and dprime difference
             # plot regression line
             fig = sns.regplot(x=p_value, y=values)
 
-            plt.xlabel(f'{p_key} power difference')
-            plt.ylabel(f'{keys} difference')
+            plt.xlabel(f"{p_key} power difference")
+            plt.ylabel(f"{keys} difference")
             plt.show()
             # calculate correlation
             print(scipy.stats.spearmanr(p_value, values))
             # save figure
-            fig.figure.savefig(f'{savedir_fig7}{Path("/")}{p_key}_{keys}_.svg')
+            fig.figure.savefig(Path(path_to.figures.manuscript.figure7, f"{p_key}_{keys}_.svg"))
+            # TODO(simon): do you want the final '_' here?
             plt.show()
+
+
+# %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+
+if __name__ == "__main__":
+    pass
+
+# o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END
