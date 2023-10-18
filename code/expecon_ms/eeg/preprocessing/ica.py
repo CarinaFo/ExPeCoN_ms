@@ -20,32 +20,32 @@ import mne
 import pandas as pd
 from mne_icalabel import label_components
 
-from expecon_ms.configs import path_to
+from expecon_ms.configs import PROJECT_ROOT, path_to
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # Specify the file path for which you want the last commit date
-file_path = Path("./code/expecon_ms/eeg/preprocessing/ica.py")  # == __file__
+__file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/preprocessing/ica.py")  # == __file__
 
 last_commit_date = subprocess.check_output(
-    ["git", "log", "-1", "--format=%cd", "--follow", file_path]
+    ["git", "log", "-1", "--format=%cd", "--follow", __file__path]
 ).decode("utf-8").strip()
-print("Last Commit Date for", file_path, ":", last_commit_date)
+print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # directory where to find the cleaned, epoched data
 epochs_for_data_analysis = Path(path_to.data.eeg.preprocessed.stimulus.filter_0_1hz)
 epochs_for_ica_dir = Path(path_to.data.eeg.preprocessed.stimulus.filter_1hz)
 
-# directory where to save the ica cleaned epochs
-save_dir_ica = Path("./data/eeg/prepro_ica")  # TODO: move to config.toml
-save_dir_psd = Path("./data/eeg/prepro_ica/psd")  # TODO: move to config.toml
+# directory where to save the ICA cleaned epochs
+save_dir_ica = Path(path_to.data.eeg.preprocessed.ICA)
 
-# directory of ica solution
-save_dir_ica_sol = Path("./data/eeg/prepro_ica/ica_solution")  # TODO: move to config.toml
-save_dir_ica_comps = Path("./data/eeg/prepro_ica/ica_comps")  # TODO: move to config.toml
+
+# directory of the ICA solution
+save_dir_ica_sol = Path(path_to.data.eeg.preprocessed.ica.ICA_solution)
+save_dir_ica_comps = Path(path_to.data.eeg.preprocessed.ica.ICA_components)
 
 # raw EEG data
-raw_dir = Path("./data/eeg/raw_concatenated")  # TODO: move to config.toml
+raw_dir = Path(path_to.data.eeg.RAW)
 
 # participant IDs
 IDlist = ["007", "008", "009", "010", "011", "012", "013", "014", "015", "016",
@@ -73,7 +73,7 @@ def run_ica(infomax: int = 1, save_psd=0):
     for subj in IDlist:
 
         # Read the epoch data for the current participant (1Hz filtered data for ICA)
-        epochs = mne.read_epochs(Path(epochs_for_ica_dir, f"P{subj}_epochs_stim-epo.fif"))
+        epochs = mne.read_epochs(epochs_for_ica_dir / f"P{subj}_epochs_stim-epo.fif")
 
         # Pick EEG channels for ICA
         picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
@@ -81,7 +81,7 @@ def run_ica(infomax: int = 1, save_psd=0):
         if save_psd:
             # Compute and plot the power spectral density (PSD)
             epochs.compute_psd(fmax=40, picks=picks).plot(show=False)
-            plt.savefig(Path(save_dir_psd, f"PSD_{subj}.png"))
+            plt.savefig(Path(path_to.data.eeg.preprocessed.ica.PSD, f"PSD_{subj}.png"))
 
         if infomax == 1:
             # Fit ICA using infomax method with extended parameters
@@ -93,19 +93,19 @@ def run_ica(infomax: int = 1, save_psd=0):
             ica = mne.preprocessing.ICA(method="fastica").fit(
                 epochs, picks=picks)
 
-        save_data(data=ica, id=subj)  # save ica solution
+        save_data(data=ica, identifier=subj)  # save ICA solution
 
     return "Done with ICA"
 
 
-def label_icacorr():
+def label_ica_correction():
     """
     Perform template matching for blink and cardiac artifact detection.
 
     (correlate ICA components with eye movements and cardiac related activity.
 
     To detect blink and cardiac artifacts, we use the mne function detect_artifacts.
-    The cleaned data will be saved as a -epo.fif file.
+    The cleaned data will be saved as an -epo.fif file.
     - referencing to common average after ICA.
 
     Args:
@@ -123,13 +123,13 @@ def label_icacorr():
     comps_removed = []
 
     for subj in IDlist:
-        file_path = Path(epochs_for_ica_dir, f"P{subj}_epochs_stim-epo.fif")
+        file_path = epochs_for_ica_dir / f"P{subj}_epochs_stim-epo.fif"
 
         # load epochs
         epochs = mne.read_epochs(file_path, preload=True)
 
-        # load ica solution
-        ica_sol = load_pickle(f"{save_dir_ica_sol}{Path('/')}icas_{subj}.pkl")  # TODO: adapt
+        # load ICA solution
+        ica_sol = load_pickle(save_dir_ica_sol / f"icas_{subj}.pkl")
 
         # correlate components with ECG and EOG
         eog_inds, _ = ica_sol.find_bads_eog(epochs, ch_name=ch_name_blinks)
@@ -142,35 +142,35 @@ def label_icacorr():
         ica_sol.plot_sources(epochs, show_scrollbars=False, block=False,
                              show=False, picks=list(range(21)))
         # save figures
-        plt.savefig(f"{save_dir_ica_comps}{Path('/')}ica_sources_{subj}")  # TODO: adapt
+        plt.savefig(save_dir_ica_comps / f"ica_sources_{subj}")
 
         ica_sol.plot_components(inst=epochs, show=False, picks=list(range(21)))
-        plt.savefig(f"{save_dir_ica_comps}{Path('/')}ica_comps_{subj}")  # TODO: adapt
+        plt.savefig(save_dir_ica_comps / f"ica_comps_{subj}")
 
         ica_sol.plot_components(inst=epochs, show=False, picks=inds_to_exclude)
-        plt.savefig(f"{save_dir_ica_comps}{Path('/')}ica_del_{subj}")  # TODO: adapt
+        plt.savefig(save_dir_ica_comps / f"ica_del_{subj}")
 
         ica_sol.exclude = inds_to_exclude
 
         comps_removed.append(len(inds_to_exclude))
 
         # now load the highpass filtered data
-        filt_path = f"{epochs_for_data_analysis}{Path('/')}P{subj}_epochs_stim_0.1Hzfilter-epo.fif"  # TODO: adapt
+        filter_path = epochs_for_data_analysis / f"P{subj}_epochs_stim_0.1Hzfilter-epo.fif"
 
-        epochs_filt = mne.read_epochs(filt_path, preload=True)
-        # apply an ica solution (reject components that are not brain related)
-        ica_sol.apply(epochs_filt)
+        epochs_filter = mne.read_epochs(filter_path, preload=True)
+        # apply an ICA solution (reject components that are not brain related)
+        ica_sol.apply(epochs_filter)
 
-        # rereference to average
-        epochs_filt.set_eeg_reference("average", ch_type="eeg")
+        # reference to average
+        epochs_filter.set_eeg_reference("average", ch_type="eeg")
 
         # save the cleaned epochs
-        epochs_filt.save(f"{save_dir_ica}{Path('/')}clean_epochs_corr{Path('/')}P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif")  # TODO: adapt
+        epochs_filter.save(save_dir_ica / f"clean_epochs_corr/P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif")
 
-        print(f"Saved ica cleaned epochs for participant {subj}.")
+        print(f"Saved ICA cleaned epochs for participant {subj}.")
 
     # save a dataframe with info on how many components were removed
-    pd.DataFrame(comps_removed).to_csv(f"{save_dir_ica}{Path('/')}ica_components_0.1Hzfilter.csv")  # TODO: adapt
+    pd.DataFrame(comps_removed).to_csv(save_dir_ica / "ica_components_0.1Hzfilter.csv")
 
     return comps_removed
 
@@ -188,77 +188,77 @@ def label_iclabel():
         str: Message indicating the completion of removing ICA components.
     """
     # Store the count of removed ICA components for each participant
-    icalist = []
+    ica_list = []
 
     for subj in IDlist:
         file_path = Path(epochs_for_ica_dir, f"P{subj}_epochs_stim-epo.fif")
 
-        # Load the clean epochs (1 Hz filtered)
+        # Load the clean epochs (1-Hz filtered)
         epochs_ica = mne.read_epochs(file_path)
 
-        # load ica solution
-        ica_sol = load_pickle(f"{save_dir_ica_sol}{Path('/')}icas_{subj}.pkl")  # TODO: adapt
+        # load ICA solution
+        ica_sol = load_pickle(save_dir_ica_sol / f"icas_{subj}.pkl")
 
-        # use icalabel to label components
+        # use ICA label to label components
         label_components(epochs_ica, ica_sol, method="iclabel")
 
         # Get indices of non-brain or other labeled components to exclude
-        all_nonbrain = []
+        all_non_brain = []
 
-        for label in ica_sol.labels_.keys():
+        for label in ica_sol.labels_:
             if label not in ["brain", "other"]:
-                all_nonbrain.append(ica_sol.labels_[label])
+                all_non_brain.append(ica_sol.labels_[label])
 
         # unpack list of lists
-        exclude_idx = [item for sublist in all_nonbrain for item in sublist]
+        exclude_idx = [item for sublist in all_non_brain for item in sublist]
 
         print(f"Excluding these ICA components for participant {subj}: {exclude_idx}")
 
         # Save the count of excluded components per participant for methods part
-        icalist.append(len(exclude_idx))
+        ica_list.append(len(exclude_idx))
 
         # now load the highpass filtered data
-        filt_path = Path(epochs_for_data_analysis, f"P{subj}_epochs_stim_0.1Hzfilter-epo.fif")
+        filter_path = epochs_for_data_analysis / f"P{subj}_epochs_stim_0.1Hzfilter-epo.fif"
 
-        epochs_filt = mne.read_epochs(filt_path, preload=True)
+        epochs_filter = mne.read_epochs(filter_path, preload=True)
 
         # set the indices to exclude
         ica_sol.exclude = exclude_idx
 
         # Remove the non-brain components from the clean epochs
-        ica_sol.apply(epochs_filt)
+        ica_sol.apply(epochs_filter)
 
-        # rereference to average
-        epochs_filt.set_eeg_reference("average", ch_type="eeg")
+        # reference to average
+        epochs_filter.set_eeg_reference("average", ch_type="eeg")
 
         # save the cleaned epochs
-        epochs_filt.save(
+        epochs_filter.save(
             Path(save_dir_ica, "clean_epochs_iclabel", f"{subj}_epochs_after_ica_0.1Hzfilter-epo.fif")
         )
         print(f"Saved ICA cleaned epochs for participant {subj}")
 
     # save a dataframe with info on how many components were removed
 
-    pd.DataFrame(icalist).to_csv(Path(save_dir_ica, "clean_epochs_iclabel", "ica_components_0.1Hzfilter.csv"))
+    pd.DataFrame(ica_list).to_csv(Path(save_dir_ica, "clean_epochs_iclabel", "ica_components_0.1Hzfilter.csv"))
 
     return "Done with removing ICA components"
 
 
 # Helper functions
-def save_data(data, id):
+def save_data(data, identifier):
     """
     Save data to a pickle file.
 
     Args:
     ----
         data: The data to be saved.
-        id: The identifier to be included in the filename.
+        identifier: The identifier to be included in the filename.
 
     Returns:
     -------
         None
     """
-    with Path(save_dir_ica, f"icas_{id}.pkl").open("wb") as f:
+    with Path(save_dir_ica, f"icas_{identifier}.pkl").open("wb") as f:
         pickle.dump(data, f)
 
 
@@ -274,7 +274,7 @@ def load_pickle(file_path: str | Path):
     -------
         The loaded data.
     """
-    with open(file_path, "rb") as f:
+    with Path(file_path).open("rb") as f:
         return pickle.load(f)
 
 
