@@ -46,7 +46,6 @@ inv_op_dir = subjects_dir / f"{subject}/bem/{subject}-oct{_oct}-inv.fif"
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 if __name__ == "__main__":
-
     # %% Source space >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
     # read the source space
