@@ -18,8 +18,9 @@ pass
 
 def main():
     """Run the main."""
-    print(f"Access service x using my private key: {config.service_x.api_key}")  # TODO dummy code
-    print(f"{path_to.data.cache}/{params.weight_decay}/")  # TODO dummy code
+    # TODO dummy code
+    config.show()
+    print(f"{path_to.data.CACHE}/{params.weight_decay}/")
 
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o

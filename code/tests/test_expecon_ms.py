@@ -30,6 +30,7 @@ def test_content(response):
 
 
 def test_label_iclabel():
+    """Test label_iclabel function."""
     assert label_iclabel() is None
 
 

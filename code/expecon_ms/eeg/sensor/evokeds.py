@@ -18,6 +18,8 @@ import seaborn as sns
 import statsmodels.api as sm
 import subprocess
 
+from expecon_ms.behav import figure1
+
 # Specify the file path for which you want the last commit date
 file_path = Path("D:/expecon_ms/analysis_code/eeg/sensor/evokeds.py")
 
@@ -30,7 +32,7 @@ modulepath = Path('D:/expecon_ms/analysis_code/behav')
 sys.path.append(modulepath)
 
 os.chdir(modulepath)
-from python import figure1
+
 
 # for plotting in new window (copy to interpreter)
 # %matplotlib qt
@@ -61,7 +63,7 @@ def create_contrast(drop_bads=False,
                     subtract_evoked=False):
 
     """ this function loads cleaned epoched data and creates contrasts.
-    input: 
+    input:
     laplace: apply CSD to data if boolean is True
     subtract_evoked: boolean, subtract evoked signal from each epoch
     output:
@@ -83,7 +85,7 @@ def create_contrast(drop_bads=False,
 
         # load cleaned epochs
         epochs = mne.read_epochs(f'{dir_cleanepochs}{Path("/")}P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif')
-        
+
         ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
         blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
 
@@ -94,10 +96,10 @@ def create_contrast(drop_bads=False,
             participant_blocks_to_delete = [block for id_, block in
                                             zip(ids_to_delete, blocks_to_delete)
                                             if id_ == pd.unique(epochs.metadata.ID)]
-            
+
             # Drop the rows with the specified blocks from the dataframe
             epochs = epochs[~epochs.metadata.block.isin(participant_blocks_to_delete)]
-            
+
         # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
         before_rt_removal = len(epochs.metadata)
         epochs = epochs[epochs.metadata.respt1 >= 0.1]
@@ -168,7 +170,7 @@ def create_contrast(drop_bads=False,
 def cluster_perm_space_time_plot(tmin=-0.1, tmax=0.5, channel=['CP4']):
     """Plot cluster permutation results in space and time. This function prepares the
     data for stats tests in 1D (permutation over timepoints) or 2D (permutation over
-    timepoints and channels). 
+    timepoints and channels).
     Significant cluster are plotted
     Cluster output is correlated with behavioral outcome.
     input:
@@ -183,12 +185,12 @@ def cluster_perm_space_time_plot(tmin=-0.1, tmax=0.5, channel=['CP4']):
 
     with open("D:\expecon_ms\data\eeg\sensor\erps\hits", "wb") as fp:   #Pickling
         pickle.dump(conds[8], fp)
-    
+
     with open("D:\expecon_ms\data\eeg\sensor\erps\miss", "wb") as fp:   #Pickling
         pickle.dump(conds[9], fp)
 
     # get grand average over all subjects for plotting the results later
-    
+
     a = [ax.copy().crop(tmin, tmax).filter(15,25) for ax in conds[2]]
     b = [bx.copy().crop(tmin, tmax).filter(15,25) for bx in conds[3]]
 
@@ -229,12 +231,12 @@ def cluster_perm_space_time_plot(tmin=-0.1, tmax=0.5, channel=['CP4']):
     plt.savefig(figpath, dpi=300)
 
     plt.show()
-    
+
     diff = mne.combine_evoked([a_gra,b_gra], weights=[1,-1])
     topo = diff.plot_topo()
     figpath = Path('D:/expecon_ms/figs/manuscript_figures/Figure3/topo.svg')
     topo.savefig(figpath)
-   
+
     X = np.array([ax.copy().apply_baseline((-0.5, -0.4)).crop(tmin, tmax)
                   .data-bx.copy().apply_baseline((-0.5, -0.4))
                   .crop(tmin, tmax).data for ax, bx in zip(conds[2], conds[3])])
@@ -260,15 +262,15 @@ def cluster_perm_space_time_plot(tmin=-0.1, tmax=0.5, channel=['CP4']):
 
     # 2D cluster test
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(X[:,:,:], n_permutations=10000,
-                                                                                    adjacency=ch_adjacency, 
-                                                                                    tail=0, 
+                                                                                    adjacency=ch_adjacency,
+                                                                                    tail=0,
                                                                                     n_jobs=-1)
 
     good_cluster_inds = np.where(cluster_p_values < 0.05)[0]
     print(good_cluster_inds) # times where something significant happened
-    
+
     min(cluster_p_values)
-    print(cluster_p_values) 
+    print(cluster_p_values)
 
     cluster_channel = np.unique(clusters[good_cluster_inds[0]][1])
     cluster1_channel = np.unique(clusters[good_cluster_inds[1]][1])
@@ -280,7 +282,7 @@ def cluster_perm_space_time_plot(tmin=-0.1, tmax=0.5, channel=['CP4']):
 
     cluster_channel = np.unique(clusters[good_cluster_inds[0]][1])
     ch_names_cluster_prevyes = [evokeds_a_all[0].ch_names[c] for c in cluster_channel]
-    
+
     # 1D cluster test
     T_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(np.squeeze(X[:,:,:]), n_permutations=10000,
                                                                                     tail=0, n_jobs=-1
@@ -298,7 +300,7 @@ def cluster_perm_space_time_plot(tmin=-0.1, tmax=0.5, channel=['CP4']):
 
     # load signal detection dataframe
     out = figure1.prepare_for_plotting()
-        
+
     sdt = out[0][0]
 
     crit_diff = np.array(sdt.criterion[sdt.cue == 0.75]) - np.array(sdt.criterion[sdt.cue == 0.25])
@@ -411,7 +413,7 @@ def cluster_perm_space_time_plot(tmin=-0.1, tmax=0.5, channel=['CP4']):
         mne.viz.plot_compare_evokeds(
             grand_average,
             title=title,
-            picks=ch_inds, 
+            picks=ch_inds,
             combine='mean',
             axes=ax_signals,
             colors=colors,

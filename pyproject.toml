@@ -168,6 +168,7 @@ ignore = [
     "E402",  # Module level import not at top of file (covert by ISORT)
     # "E501",  # Ignore line-length since we use 119
     # "ERA001",  # Found commented-out code
+    "NPY002",  # numpy random generator
     "S301",  # suspicious-pickle-usage
     "TD002",  # Missing author in To-Do
     "TD003",  # Missing issue link on the line following a To-Do

@@ -29,15 +29,15 @@ modulepath = Path('D:/expecon_ms/analysis_code/behav')
 sys.path.append(modulepath)
 
 os.chdir(modulepath)
-from python import figure1
+from expecon_ms.behav import figure1
 
 # for plots in new windows
 # %matplotlib qt
 
 # set font to Arial and font size to 22
-plt.rcParams.update({'font.size': 14, 'font.family': 'sans-serif', 
+plt.rcParams.update({'font.size': 14, 'font.family': 'sans-serif',
                      'font.sans-serif': 'Arial'})
-    
+
 # datapaths
 dir_cleanepochs = Path('D:/expecon_ms/data/eeg/prepro_ica/clean_epochs_corr')
 behavpath = Path('D:/expecon_ms/data/behav/behav_df')
@@ -62,14 +62,14 @@ def compute_tfr(tmin=-0.4, tmax=0, fmax=35, fmin=3, laplace=0,
 
         Parameters
         ----------
-        tmin : float 
+        tmin : float
         tmax : float
         fmin: float
         fmax: float
         laplace: boolean, info: apply current source density transform
         induced : boolean, info: subtract evoked response from each epoch
         mirror_data : boolean, info: mirror the data on both sides to avoid edge artifacts
-        drop_bads : boolean, 
+        drop_bads : boolean,
             info: drop epochs with abnormal strong signal (> 200 mikrovolts)
         Returns
         -------
@@ -79,7 +79,7 @@ def compute_tfr(tmin=-0.4, tmax=0, fmax=35, fmin=3, laplace=0,
     # Define frequencies and cycles for multitaper method
     freqs = np.arange(fmin, fmax, 1)
     cycles = freqs/4.0
-    
+
     # store behavioral data and spectra
     df_all = []
 
@@ -104,10 +104,10 @@ def compute_tfr(tmin=-0.4, tmax=0, fmax=35, fmin=3, laplace=0,
             participant_blocks_to_delete = [block for id_, block in
                                             zip(ids_to_delete, blocks_to_delete)
                                             if id_ == pd.unique(epochs.metadata.ID)]
-            
+
             # Drop the rows with the specified blocks from the dataframe
             epochs = epochs[~epochs.metadata.block.isin(participant_blocks_to_delete)]
-            
+
         # remove trials with rts >= 2.5 (no response trials) and trials with reaction times < 0.1
         epochs = epochs[epochs.metadata.respt1 >= 0.1]
         epochs = epochs[epochs.metadata.respt1 != 2.5]
@@ -144,7 +144,7 @@ def compute_tfr(tmin=-0.4, tmax=0, fmax=35, fmin=3, laplace=0,
 
         # avoid leakage and edge artifacts by zero padding the data
         if mirror_data:
-            
+
             metadata = epochs.metadata
             # zero pad the data on both sides to avoid leakage and edge artifacts
             data = epochs.get_data()
@@ -160,7 +160,7 @@ def compute_tfr(tmin=-0.4, tmax=0, fmax=35, fmin=3, laplace=0,
         # subtract evoked response from each epoch
         if induced:
             epochs = epochs.subtract_evoked()
-            
+
         # Assign a sequential count for each row within each 'blocks' and 'subblock' group
         epochs.metadata['trial_count'] = epochs.metadata.groupby(['block', 'subblock']).cumcount()
 
@@ -178,36 +178,36 @@ def compute_tfr(tmin=-0.4, tmax=0, fmax=35, fmin=3, laplace=0,
         if os.path.exists(f'{tfr_path}{Path("/")}{subj}_high_mirror-tfr.h5'):
                 print('TFR already exists')
         else:
-            tfr_a = mne.time_frequency.tfr_multitaper(epochs_a, 
+            tfr_a = mne.time_frequency.tfr_multitaper(epochs_a,
                                                         freqs=freqs,
                                                         n_cycles=cycles,
                                                         return_itc=False,
-                                                        n_jobs=-1, 
+                                                        n_jobs=-1,
                                                         average=True)
-                
-            tfr_b = mne.time_frequency.tfr_multitaper(epochs_b, 
+
+            tfr_b = mne.time_frequency.tfr_multitaper(epochs_b,
                                                         freqs=freqs,
                                                         n_cycles=cycles,
                                                         return_itc=False,
-                                                        n_jobs=-1, 
+                                                        n_jobs=-1,
                                                         average=True)
-                
-            tfr_a.save(f'{tfr_path}{Path("/")}{subj}_high_mirror-tfr.h5', 
+
+            tfr_a.save(f'{tfr_path}{Path("/")}{subj}_high_mirror-tfr.h5',
                     overwrite=True)
-            tfr_b.save(f'{tfr_path}{Path("/")}{subj}_low_mirror-tfr.h5', 
+            tfr_b.save(f'{tfr_path}{Path("/")}{subj}_low_mirror-tfr.h5',
                     overwrite=True)
-                
+
         if os.path.exists(f'{tfr_path}{Path("/")}{subj}_single_trial_power-tfr.h5'):
             print('TFR already exists')
         else:
-            tfr = mne.time_frequency.tfr_multitaper(epochs, 
+            tfr = mne.time_frequency.tfr_multitaper(epochs,
                                                         freqs=freqs,
                                                         n_cycles=cycles,
                                                         return_itc=False,
-                                                        n_jobs=-1, 
+                                                        n_jobs=-1,
                                                         average=False,
                                                         decim=2)
-                
+
             tfr.save(f'{tfr_path}{Path("/")}{subj}_single_trial_power-tfr.h5',
                         overwrite=True)
 
@@ -220,7 +220,7 @@ def load_tfr_conds(cond_a='high', cond_b='low', mirror=1):
     Parameters
     ----------
     cond_a : str
-        which condition tfr to load 
+        which condition tfr to load
     cond_b : str
         which condition tfr to load
     mirror : boolean
@@ -242,11 +242,11 @@ def load_tfr_conds(cond_a='high', cond_b='low', mirror=1):
         if mirror:
             tfr_a = mne.time_frequency.read_tfrs(f'{tfr_path}{Path("/")}{subj}_{cond_a}_mirror-tfr.h5', condition=0)
             tfr_b = mne.time_frequency.read_tfrs(f'{tfr_path}{Path("/")}{subj}_{cond_b}_mirror-tfr.h5', condition=0)
-   
+
         else:
             tfr_a = mne.time_frequency.read_tfrs(f'{tfr_path}{Path("/")}{subj}_{cond_a}-tfr.h5', condition=0)
             tfr_b = mne.time_frequency.read_tfrs(f'{tfr_path}{Path("/")}{subj}_{cond_b}-tfr.h5', condition=0)
-   
+
         tfr_a_all.append(tfr_a)
         tfr_b_all.append(tfr_b)
 
@@ -257,7 +257,7 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=3, fmax=35):
 
     '''plot cluster permutation test output for tfr data (time and frequency cluster)
     Parameters
-    channel_names : list of char 
+    channel_names : list of char
         channels to analyze
     fmin : int
         minimum frequency to plot
@@ -318,7 +318,7 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=3, fmax=35):
             X = np.squeeze(X)
 
         print(X.shape) # should be participants x frequencies x timepoints
-        
+
         threshold_tfce = dict(start=0, step=0.1)
 
         # run cluster test over time and frequencies (no need to define adjacency)
@@ -334,7 +334,7 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=3, fmax=35):
             print(f'The minimum p-value is {min(cluster_p)}')
 
             good_cluster_inds = np.where(cluster_p < 0.05)
-            
+
             if len(good_cluster_inds[0]) > 0:
 
                 # Find the index of the overall minimum value
@@ -356,7 +356,7 @@ def plot_tfr_cluster_test_output(channel_names=['CP4'], fmin=3, fmax=35):
 
 def plot_cluster_test_output(tobs=None, cluster_p_values=None, clusters=None, fmin=7, fmax=35,
                              data_cond=None, tmin=0, tmax=0.5, ax0=0, ax1=0):
-    
+
     freqs = np.arange(fmin, fmax, 1)
 
     times = 1e3 * data_cond[0].copy().crop(tmin,tmax).times
@@ -365,7 +365,7 @@ def plot_cluster_test_output(tobs=None, cluster_p_values=None, clusters=None, fm
     for c, p_val in zip(clusters, cluster_p_values):
         if p_val <= 0.05:
             T_obs_plot[c] = T_obs[c]
-    
+
     min_v = np.max(np.abs(T_obs))
 
     vmin = -min_v
@@ -407,7 +407,7 @@ def zero_pad_or_mirror_data(data, zero_pad=False):
 
     if zero_pad:
         padded_list=[]
-        
+
         zero_pad = np.zeros(data.shape[2])
         # loop over epochs
         for epoch in range(data.shape[0]):
@@ -437,7 +437,7 @@ def permutate_trials(n_permutations=500, power_a=None, power_b=None):
     """ Permutate trials between two conditions and equalize trial counts"""
 
     # store permutations
-    power_a_perm, power_b_perm = [], [] 
+    power_a_perm, power_b_perm = [], []
 
     for i in range(n_permutations):
         if power_b.data.shape[0] > power_a.data.shape[0]:
@@ -466,7 +466,7 @@ def permutate_trials(n_permutations=500, power_a=None, power_b=None):
     evoked_power_b_perm_arr = np.mean(np.array([p.data for p in power_b_perm]), axis=0)
 
     # put back into TFR object
-    evoked_power_a = mne.time_frequency.AverageTFR(power.info, evoked_power_a_perm_arr, 
+    evoked_power_a = mne.time_frequency.AverageTFR(power.info, evoked_power_a_perm_arr,
                                                         power.times, power.freqs, power_a.data.shape[0])
-    evoked_power_b = mne.time_frequency.AverageTFR(power.info, evoked_power_b_perm_arr, 
+    evoked_power_b = mne.time_frequency.AverageTFR(power.info, evoked_power_b_perm_arr,
                                                         power.times, power.freqs, power_b.data.shape[0])

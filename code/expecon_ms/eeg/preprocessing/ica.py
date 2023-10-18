@@ -20,7 +20,7 @@ import mne
 import pandas as pd
 from mne_icalabel import label_components
 
-from expecon_ms.configs import PROJECT_ROOT, path_to
+from expecon_ms.configs import PROJECT_ROOT, path_to, config
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -48,11 +48,7 @@ save_dir_ica_comps = Path(path_to.data.eeg.preprocessed.ica.ICA_components)
 raw_dir = Path(path_to.data.eeg.RAW)
 
 # participant IDs
-IDlist = ["007", "008", "009", "010", "011", "012", "013", "014", "015", "016",
-          "017", "018", "019", "020", "021", "022", "023", "024", "025", "026",
-          "027", "028", "029", "030", "031", "032", "033", "034", "035", "036",
-          "037", "038", "039", "040", "041", "042", "043", "044", "045", "046",
-          "047", "048", "049"]
+id_list = config.participants.ID_list
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -70,7 +66,7 @@ def run_ica(infomax: int = 1, save_psd=0):
     -------
         None
     """
-    for subj in IDlist:
+    for subj in id_list:
 
         # Read the epoch data for the current participant (1Hz filtered data for ICA)
         epochs = mne.read_epochs(epochs_for_ica_dir / f"P{subj}_epochs_stim-epo.fif")
@@ -122,7 +118,7 @@ def label_ica_correction():
 
     comps_removed = []
 
-    for subj in IDlist:
+    for subj in id_list:
         file_path = epochs_for_ica_dir / f"P{subj}_epochs_stim-epo.fif"
 
         # load epochs
@@ -177,20 +173,22 @@ def label_ica_correction():
 
 def label_iclabel():
     """
-    Apply automatic labeling of ICA components using the iclabel function.
+    Apply automatic labeling of ICA components using the iclabel method.
 
     This works now with python 3.10.11 and mne 0.23.0.
 
     Args:
     ----
         None
+
     Returns:
+    -------
         str: Message indicating the completion of removing ICA components.
     """
     # Store the count of removed ICA components for each participant
     ica_list = []
 
-    for subj in IDlist:
+    for subj in id_list:
         file_path = Path(epochs_for_ica_dir, f"P{subj}_epochs_stim-epo.fif")
 
         # Load the clean epochs (1-Hz filtered)
@@ -199,7 +197,7 @@ def label_iclabel():
         # load ICA solution
         ica_sol = load_pickle(save_dir_ica_sol / f"icas_{subj}.pkl")
 
-        # use ICA label to label components
+        # use the 'iclabel' method to label components
         label_components(epochs_ica, ica_sol, method="iclabel")
 
         # Get indices of non-brain or other labeled components to exclude

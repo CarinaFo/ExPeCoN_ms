@@ -29,7 +29,7 @@ modulepath = Path('D:/expecon_ms/analysis_code/behav')
 sys.path.append(modulepath)
 
 os.chdir(modulepath)
-from python import figure1
+from expecon_ms.behav import figure1
 
 # set font to Arial and font size to 22
 plt.rcParams.update({'font.size': 14, 'font.family': 'sans-serif', 'font.sans-serif': 'Arial'})
@@ -55,8 +55,8 @@ freq_bands = {'alpha': (7, 13), 'beta': (15, 25)}
 def save_band_power_per_trial(time_intervals={'pre': (-0.2, 0)},
                                               channel_name=['CP4']):
 
-    """This function saves the power per trial per frequency band in a csv file. 
-    The power is calculated for the time interval specified and averaged over 
+    """This function saves the power per trial per frequency band in a csv file.
+    The power is calculated for the time interval specified and averaged over
     the specified channel and frequency band.
     Power is calculated for the following frequency bands:
         - alpha (7-13 Hz)
@@ -73,7 +73,7 @@ def save_band_power_per_trial(time_intervals={'pre': (-0.2, 0)},
 
         # load single trial power
         power = mne.time_frequency.read_tfrs(f'{tfr_dir}{Path("/")}{subj}_single_trial_power-tfr.h5')[0]
-        
+
         # get behavioral data
         behav_data = power.metadata
 
@@ -85,7 +85,7 @@ def save_band_power_per_trial(time_intervals={'pre': (-0.2, 0)},
             # now we average over time and channels
             power_crop.data = np.mean(power_crop.data, axis=(1, 3))
 
-            # now we average over the frequency band and time interval 
+            # now we average over the frequency band and time interval
             # and add the column to the behavioral data frame
             behav_data[f'{keys}_alpha'] = np.mean(power_crop.data[:, 4:11], axis=1)  # 7-13 Hz
             behav_data[f'{keys}_beta'] = np.mean(power_crop.data[:, 12:23], axis=1) # 15-25 Hz
@@ -131,10 +131,10 @@ def power_criterion_corr():
 
     # load random effects
     #re = pd.read_csv(f'{Path("D:/expecon_ms/data/behav/mixed_models/brms/random_effects.csv")}')
-    
+
     # load behavioral SDT data
     out = figure1.prepare_for_plotting()
-        
+
     sdt = out[0][0]
     # calculate criterion difference
     c_diff = np.array(sdt.criterion[sdt.cue == 0.25]) - np.array(sdt.criterion[sdt.cue == 0.75])

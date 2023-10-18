@@ -6,12 +6,16 @@
 ***
 ## Open ToDos before:
 - [ ] add readme/note to folder `code/experiment_code`, referring to author(s)
-- [ ] continue refactoring
+- [ ] continue refactoring. Not done yet: `./eeg/sensor/*.py` & `./eeg/source/*.py`
+- [ ] review functionality
 - [ ] ...
 
 ## Description
 
 Scripts for the manuscript Expectation Perception Confidence Neural Correlates (`ExPeCoN`).
+
+The `ExPeCoN` study investigates stimulus probabilities and the influence on perception and confidence in a
+near-threshold somatosensory detection task in two datasets
 
 ## Project structure
 
