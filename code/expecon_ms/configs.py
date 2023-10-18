@@ -134,8 +134,10 @@ def _set_wd(new_dir: str | Path) -> None:
             # Note: This works only for unique folder names
             paths_found = sorted(Path(PROJECT_ROOT).parent.glob(f"**/{new_dir}"), key=lambda x: len(x.parents))
             if len(paths_found) > 1:
-                msg = (f"Found multiple folders with name '{new_dir}' in project '{PROJECT_NAME}'!\n\n"
-                       f"Please specify the absolute path to the desired folder:\n\n{[str(p) for p in paths_found]}")
+                msg = (
+                    f"Found multiple folders with name '{new_dir}' in project '{PROJECT_NAME}'!\n\n"
+                    f"Please specify the absolute path to the desired folder:\n\n{[str(p) for p in paths_found]}"
+                )
                 raise ValueError(msg)
 
             if len(paths_found) == 1:
