@@ -2,11 +2,10 @@
 
     Author(s): Carina Forster et al. (2023)
     Status: Code is not yet reviewed
-    Last update: Oct 18, 2023
+    Last update: Oct 19, 2023
 ***
 ## Open ToDos before:
 - [ ] add readme/note to folder `code/experiment_code`, referring to author(s)
-- [ ] continue refactoring. Not done yet: `./eeg/source/*.py`
 - [ ] review functionality
 - [ ] ...
 
