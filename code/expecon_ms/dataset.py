@@ -20,6 +20,7 @@ pass
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
+
 def get_expecon_data(data_dir: str | Path | None = None):
     """Download study data of the ExPeCoN study from OSF."""
     if data_dir is None:
