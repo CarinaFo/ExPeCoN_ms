@@ -13,9 +13,9 @@ Author: Carina Forster
 Contact: forster@cbs.mpg.de
 Years: 2023
 """
+# %% Import
 from __future__ import annotations
 
-# %% Import
 import subprocess
 from pathlib import Path
 
@@ -25,16 +25,16 @@ import pandas as pd
 import scipy
 from mne.datasets import fetch_fsaverage
 
-from expecon_ms.configs import PROJECT_ROOT, config, path_to
+from expecon_ms.configs import PROJECT_ROOT, config, params, path_to
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # Specify the file path for which you want the last commit date
 __file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/source/source_reco.py")  # == __file__
 
-last_commit_date = subprocess.check_output(
-    ["git", "log", "-1", "--format=%cd", "--follow", __file__path]
-).decode("utf-8").strip()
+last_commit_date = (
+    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
+)
 
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
@@ -65,9 +65,17 @@ epochs = mne.read_epochs(dir_clean_epochs / f"P{subj}_epochs_after_ica_0.1Hzfilt
 
 # check alignment
 if PLOT_ALIGNMENT:
-    mne.viz.plot_alignment(epochs.info, trans_dir, subject=subject, dig=False, src=src,
-                           subjects_dir=subjects_dir, verbose=True, meg=False,
-                           eeg=True)
+    mne.viz.plot_alignment(
+        epochs.info,
+        trans_dir,
+        subject=subject,
+        dig=False,
+        src=src,
+        subjects_dir=subjects_dir,
+        verbose=True,
+        meg=False,
+        eeg=True,
+    )
 
 behav_path = Path(path_to.data.behavior.behavior_df)
 
@@ -82,6 +90,7 @@ id_list = config.participants.ID_list
 
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+
 
 def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: bool = True) -> None:
     """
@@ -98,7 +107,6 @@ def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: 
     .stc files for each hemisphere containing source reconstructions for each participant, shape: vertices-x-timepoints
     """
     for idx, subj in enumerate(id_list):
-
         # print participant ID
         print("Analyzing " + subj)
 
@@ -110,7 +118,6 @@ def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: 
 
         # Check if the participant ID is in the list of IDs to delete
         if pd.unique(epochs.metadata.ID) in ids_to_delete:
-
             # Get the corresponding blocks to delete for the current participant
             participant_blocks_to_delete = [
                 block for id_, block in zip(ids_to_delete, blocks_to_delete) if id_ == pd.unique(epochs.metadata.ID)
@@ -151,7 +158,6 @@ def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: 
         epochs_low = epochs[epochs.metadata.cue == 0.25]
 
         if dics == 1:
-
             # We are interested in the beta band
             freqs = np.arange(15, 25, 1)
 
@@ -172,8 +178,9 @@ def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: 
             csd_b = csd_b.mean()
 
             # Computing DICS spatial filters using the CSD that was computed for all epochs
-            filters = mne.beamformer.make_dics(info, fwd, csd, noise_csd=None,
-                                               pick_ori="max-power", reduce_rank=True, real_filter=True)
+            filters = mne.beamformer.make_dics(
+                info, fwd, csd, noise_csd=None, pick_ori="max-power", reduce_rank=True, real_filter=True
+            )
 
             # Applying DICS spatial filters separately to each condition
             source_power_a, freqs = mne.beamformer.apply_dics_csd(csd_a, filters)
@@ -183,7 +190,6 @@ def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: 
             source_power_b.save(Path(save_path, f"low_beta_{subj}"))
 
         else:
-
             # average epochs for MNE
             evokeds_high = epochs_high.average()
             evokeds_low = epochs_low.average()
@@ -197,9 +203,7 @@ def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: 
             # noise_cov = create_noise_cov(evokeds_high.data.shape, evokeds_high.info)
 
             # all epochs for noise covariance computation
-            noise_cov = mne.compute_covariance(epochs, tmin=-0.4, tmax=0,
-                                   method=["shrunk", "empirical"],
-                                   rank="info")
+            noise_cov = mne.compute_covariance(epochs, tmin=-0.4, tmax=0, method=["shrunk", "empirical"], rank="info")
 
             # save covariance matrix
             mne.write_cov(fname="covariance_prestim.cov", cov=noise_cov)
@@ -209,19 +213,13 @@ def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: 
 
             info = evoked_contrast.info
 
-            inv_op = mne.minimum_norm.make_inverse_operator(
-                info,
-                fwd_fixed,
-                noise_cov,
-                loose=0.2,
-                depth=0.8
-            )
+            inv_op = mne.minimum_norm.make_inverse_operator(info, fwd_fixed, noise_cov, loose=0.2, depth=0.8)
 
             evoked_contrast.set_eeg_reference(projection=True)  # needed for inverse modeling
 
             method = "dSPM"
-            snr = 3.
-            lambda2 = 1. / snr ** 2  # regularization
+            snr = 3.0
+            lambda2 = 1.0 / snr**2  # regularization
 
             stc = mne.minimum_norm.apply_inverse(evoked_contrast, inv_op, lambda2, method=method, pick_ori=None)
 
@@ -245,7 +243,6 @@ def create_source_contrast_array(path_to_source: str | Path = mne_path):
         stc_all = []
 
         for subj in id_list:
-
             stc = mne.read_source_estimate(path_to_source / f"contrast_highlow_{subj}")
 
             stc_all.append(stc.data)
@@ -253,11 +250,9 @@ def create_source_contrast_array(path_to_source: str | Path = mne_path):
         stc_array = np.array(stc_all)
 
     else:
-
         stc_all, stc_high_all, stc_low_all = [], [], []
 
         for subj in id_list:
-
             stc_high = mne.read_source_estimate(path_to_source / f"high_beta_{subj}")
             stc_low = mne.read_source_estimate(path_to_source / f"low_beta_{subj}")
 
@@ -267,8 +262,8 @@ def create_source_contrast_array(path_to_source: str | Path = mne_path):
             stc_low_all.append(stc_low.data)
             stc_all.append(stc_diff)
 
-        stc_low = np.array(stc_low_all)  # TODO(simon): now used, print(...) ?!
-        stc_high = np.array(stc_high_all)  # TODO(simon): now used, print(...) ?!
+        stc_low = np.array(stc_low_all)  # TODO(simon): not used, print(...) ?!
+        stc_high = np.array(stc_high_all)  # TODO(simon): not used, print(...) ?!
         stc_array = np.array(stc_all)
 
     return stc_array
@@ -279,32 +274,33 @@ def extract_time_course_from_label():
     # Get labels for FreeSurfer 'aparc' cortical parcellation with 75 labels/hemi
     labels_parc = mne.read_labels_from_annot("fsaverage", parc="aparc.a2009s", subjects_dir=subjects_dir)
 
-    stc_all, stc_high_all, stc_low_all = [], [], []
+    stc_all, stc_high_all, stc_low_all = [], [], []  # TODO(simon): not used, print(...) ?!
 
     for idx, subj in enumerate(id_list):
-
         stc_high = mne.read_source_estimate(f"{path}high_{subj}")  # TODO(simon): path is not defined
         stc_low = mne.read_source_estimate(f"{path}low_{subj}")
 
         for stc in [stc_high, stc_low]:
-
             # extract activity in from source label
             # S1
-            post_central_gyrus = mne.extract_label_time_course(  # TODO(simon): now used, print(...) ?!
-                [stc], labels_parc[55], src, allow_empty=True)
+            post_central_gyrus = mne.extract_label_time_course(  # TODO(simon): not used, print(...) ?!
+                [stc], labels_parc[55], src, allow_empty=True
+            )
             # S2
-            g_front_inf_opercular_rh = mne.extract_label_time_course(  # TODO(simon): now used, print(...) ?!
-                [stc], labels_parc[25], src, allow_empty=True)
+            g_front_inf_opercular_rh = mne.extract_label_time_course(  # TODO(simon): not used, print(...) ?!
+                [stc], labels_parc[25], src, allow_empty=True
+            )
             # ACC
-            g_cingul_post_dorsal_rh = mne.extract_label_time_course(  # TODO(simon): now used, print(...) ?!
-                [stc], labels_parc[19], src, allow_empty=True)
+            g_cingul_post_dorsal_rh = mne.extract_label_time_course(  # TODO(simon): not used, print(...) ?!
+                [stc], labels_parc[19], src, allow_empty=True
+            )
 
 
 def spatio_temporal_source_test(
-    data: np.ndarray | None = None,  # TODO(simon): now used?!
+    data: np.ndarray | None = None,  # TODO(simon): not used?!
     n_perm: int = 10000,
     jobs: int = -1,
-    save_path_source_figs: str | Path = figs_dics_path
+    save_path_source_figs: str | Path = figs_dics_path,
 ):
     """
     Run a cluster-based permutation test over space and time.
@@ -314,6 +310,7 @@ def spatio_temporal_source_test(
     data: 3D numpy array: participants x space x time
     n_perm: how many permutations for cluster test
     jobs: how many parallel GPUs should be used
+    save_path_source_figs: path to save figures
 
     Returns:
     -------
@@ -334,7 +331,7 @@ def spatio_temporal_source_test(
     x_mean = np.mean(x[:, :, :], axis=1)
 
     # mean over time and permutation test to get sign. vertices
-    t, p, h = mne.stats.permutation_t_test(x_mean)  # TODO(simon): now used, print(...) ?!
+    t, p, h = mne.stats.permutation_t_test(x_mean)  # TODO(simon): not used, print(...) ?!
 
     # mean over time and participants and plot contrast in source space
     x_avg = np.mean(x[:, :, :], axis=(0, 1))
@@ -344,12 +341,7 @@ def spatio_temporal_source_test(
     stc = mne.SourceEstimate(x_avg, tmin=-0.4, tstep=0.0001, vertices=fsave_vertices, subject="fsaverage")
 
     brain = stc.plot(
-        hemi="rh",
-        views="medial",
-        subjects_dir=subjects_dir,
-        subject="fsaverage",
-        time_viewer=True,
-        background="white"
+        hemi="rh", views="medial", subjects_dir=subjects_dir, subject="fsaverage", time_viewer=True, background="white"
     )
 
     brain.save_image(Path(save_path_source_figs, "t_values_high_low_rh_beamformer_dics.png"))
@@ -358,23 +350,18 @@ def spatio_temporal_source_test(
     # We use a two-tailed threshold, the "1 - p_threshold" is needed, because for two-tailed tests
     # we must specify a positive threshold.
 
-    p_threshold = 0.05
+    p_threshold = params.alpha
     t_threshold = scipy.stats.distributions.t.ppf(
-        1 - p_threshold / 2,
-        df=(len(id_list) - 2) - 1  # degrees of freedom for the test
+        1 - p_threshold / 2, df=(len(id_list) - 2) - 1  # degrees of freedom for the test
     )
 
     # Now let's actually do the clustering. This can take a long time...
 
     print("Clustering.")
 
-    T_obs, clusters, cluster_p_values, H0 = clu = mne.stats.spatio_temporal_cluster_1samp_test(
-        x[:, :, :],
-        adjacency=adjacency,
-        threshold=t_threshold,
-        n_jobs=jobs,
-        n_permutations=n_perm
-    )  # TODO(simon): now used, print(...) ?!
+    t_obs, clusters, cluster_p_values, h0 = clu = mne.stats.spatio_temporal_cluster_1samp_test(
+        x[:, :, :], adjacency=adjacency, threshold=t_threshold, n_jobs=jobs, n_permutations=n_perm
+    )  # TODO(simon): not used, print(...) ?!
 
     return clu
 
@@ -392,8 +379,8 @@ def plot_cluster_output(clu=None):
     plot of cluster output
     """
     # Select the clusters that are statistically significant at p < 0.05
-    good_clusters_idx = np.where(clu[2] < 0.05)[0]
-    good_clusters = [clu[1][idx] for idx in good_clusters_idx]  # TODO(simon): now used, print(...) ?!
+    good_clusters_idx = np.where(clu[2] < params.alpha)[0]
+    good_clusters = [clu[1][idx] for idx in good_clusters_idx]  # TODO(simon): not used, print(...) ?!
     print(min(clu[2]))
 
     print("Visualizing clusters.")
@@ -404,10 +391,7 @@ def plot_cluster_output(clu=None):
     fsave_vertices = [s["vertno"] for s in src]
 
     stc_all_cluster_vis = mne.stats.summarize_clusters_stc(
-        clu,
-        vertices=fsave_vertices,
-        subject="fsaverage",
-        p_thresh=0.1
+        clu, vertices=fsave_vertices, subject="fsaverage", p_thresh=0.1
     )
 
     # Let's actually plot the first "time point" in the SourceEstimate, which
@@ -416,10 +400,17 @@ def plot_cluster_output(clu=None):
     # blue blobs are for condition A < condition B, red for A > B
 
     brain = stc_all_cluster_vis.plot(
-        hemi="rh", views="lateral", subjects_dir=subjects_dir,
-        time_label="temporal extent (ms)", size=(800, 800),
-        smoothing_steps=5, time_viewer=False,
-        background="white", transparent=True, colorbar=False)
+        hemi="rh",
+        views="lateral",
+        subjects_dir=subjects_dir,
+        time_label="temporal extent (ms)",
+        size=(800, 800),
+        smoothing_steps=5,
+        time_viewer=False,
+        background="white",
+        transparent=True,
+        colorbar=False,
+    )
 
     brain.save_image(Path("./data/eeg/source/cluster_rh_lateral.png"))  # TODO(simon): move to config.toml
 
