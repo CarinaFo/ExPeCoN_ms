@@ -41,7 +41,7 @@ misses = "./data/eeg/sensor/erps/miss"
 
 [paths.figures.manuscript]
 figure1 = "./figs/manuscript_figures/figure1_expecon1_paradigm_behav"
-figure2 = "./figs/manuscript_figures/Figure2B/"
+figure2 = "./figs/manuscript_figures/unused_figures/"
 figure4 = "./figs/manuscript_figures/figure4_glmermodels"
 figure5 = "./figs/manuscript_figures/figure5_hitmiss_roi"
 figure6 = "./figs/manuscript_figures/figure6_tfr_contrasts"

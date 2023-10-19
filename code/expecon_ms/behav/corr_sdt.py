@@ -40,6 +40,115 @@ plt.rcParams["font.size"] = 14
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
+def correlate_sdt_with_questionnaire(expecon: int = 1):
+    """
+    Correlate the criterion change with the intolerance of uncertainty questionnaire score and plots a regression plot.
+
+    Args:
+    ----
+    expecon: int: expecon = 1: analyze expecon 1 behavioral data | expecon = 2: analyze expecon 2 behavioral data
+    """
+    # Set up data path
+    behavior_path = Path(path_to.data.behavior if expecon == 1 else path_to.expecon2.behavior)
+
+    data = pd.read_csv(behavior_path / "prepro_behav_data.csv")
+
+    # load questionnaire data (uncertainty of intolerance)
+    q_data = pd.read_csv(path_to.questionnaire.q_clean)
+
+    df_sdt = calculate_sdt_dataframe(
+        df=data, signal_col="isyes", response_col="sayyes", subject_col="ID", condition_col="cue"
+    )
+
+    # calculate criterio
+    high_c = list(df_sdt.criterion[df_sdt.cue == 0.75])
+    low_c = list(df_sdt.criterion[df_sdt.cue == 0.25])
+
+    # low - high stimulus probability
+    diff_c = [x - y for x, y in zip(low_c, high_c)]
+
+    # analyze only rows from participants did complete the questionnaire
+    filtered_diff_c = np.array(diff_c)[q_data["iu_sum"] > 0]
+    filtered_iu_sum = q_data["iu_sum"][q_data["iu_sum"] > 0]
+
+    df_q= pd.DataFrame({"y": filtered_diff_c, "X": filtered_iu_sum})
+
+    # Select columns representing questionnaire score and criterion change
+    x = df_q["X"]
+    y = df_q["y"]
+
+    # Drop missing values if necessary
+    df_q = df_q.dropna(subset=["X", "y"])
+
+    # Fit the linear regression model
+    x = sm.add_constant(x)  # Add constant term for intercept
+    regression_model = sm.OLS(y, x)
+    regression_results = regression_model.fit()
+
+    # Extract slope, intercept, and p-value
+    slope = regression_results.params[1]
+    regression_results.params[0]
+    print(regression_results.summary())
+    p_value = regression_results.pvalues[1]
+
+    # Make predictions
+    regression_results.predict(x)
+
+    # Set black or gray colors for the plot
+    data_color = "black"
+    text_color = "black"
+
+    # Plot the regression line using seaborn regplot
+    sns.regplot(data=df_q, x="X", y="y", color=data_color)
+    plt.xlabel(xlabel="Intolerance of Uncertainty score (zscored)", color=text_color)
+    plt.ylabel(ylabel="Criterion Change", color=text_color)
+    plt.annotate(
+        text=f"Slope: {slope:.2f}\n p-value: {p_value:.2f}",
+        xy=(0.05, 0.85),
+        xycoords="axes fraction",
+        color=text_color,
+    )
+
+    for fm in ["png", "svg"]:
+        plt.savefig(Path(path_to.figures.manuscript.figure2) / f"linreg_c_q.{fm}", dpi=300)
+    plt.show()
+
+
+def diff_from_optimal_criterion(expecon: int = 1):
+    """
+    Calculate the difference between the optimal criterion & the criterion for each participant and each condition
+    """
+    
+    # Set up data path
+    behavior_path = Path(path_to.data.behavior if expecon == 1 else path_to.expecon2.behavior)
+
+    data = pd.read_csv(behavior_path / "prepro_behav_data.csv")
+
+    # calculate SDT parameters
+    df_sdt = calculate_sdt_dataframe(
+        df=data, signal_col="isyes", response_col="sayyes", subject_col="ID", condition_col="cue"
+    )
+
+    c_low = calculate_optimal_c(0.25, 0.75, 1, 1)
+    print("Optimal criterion (c) for low stimulus probability:", c_low)
+
+    c_high = calculate_optimal_c(0.75, 0.25, 1, 1)
+    print("Optimal criterion (c) for high stimulus probability:", c_high)
+
+    subop_low = [c - c_low for c in df_sdt.criterion[df_sdt.cue == 0.25]]
+    mean_low = np.mean(subop_low)
+    std_low = np.std(subop_low)
+    print(f"mean difference from optimal criterion for low stimulus probability: {mean_low}")
+    print(f"standard deviation for optimal criterion for low stimulus probability: {std_low}")
+
+    subop_high = [c - c_high for c in df_sdt.criterion[df_sdt.cue == 0.75]]
+    mean_high = np.mean(subop_high)
+    std_high = np.std(subop_high)
+    print(f"mean difference from optimal criterion for high stimulus probability: {mean_high}")
+    print(f"standard deviation for optimal criterion for high stimulus probability: {std_high}")
+
+############################# Helper functions #############################
+
 def calculate_sdt_dataframe(
     df: pd.DataFrame, signal_col: str, response_col: str, subject_col: str, condition_col: str
 ) -> pd.DataFrame:
@@ -68,10 +177,10 @@ def calculate_sdt_dataframe(
         for condition in conditions:
             subset = df[(df[subject_col] == subject) & (df[condition_col] == condition)]
 
-            detect_hits = subset[(subset[signal_col] is True) & (subset[response_col] is True)].shape[0]
-            detect_misses = subset[(subset[signal_col] is True) & (subset[response_col] is False)].shape[0]
-            false_alarms = subset[(subset[signal_col] is False) & (subset[response_col] is True)].shape[0]
-            correct_rejections = subset[(subset[signal_col] is False) & (subset[response_col] is False)].shape[0]
+            detect_hits = subset[(subset[signal_col] == True) & (subset[response_col] == True)].shape[0]
+            detect_misses = subset[(subset[signal_col] == True) & (subset[response_col] == False)].shape[0]
+            false_alarms = subset[(subset[signal_col] == False) & (subset[response_col] == True)].shape[0]
+            correct_rejections = subset[(subset[signal_col] == False) & (subset[response_col] == False)].shape[0]
 
             # log linear correction (Hautus, 1995)
             hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
@@ -86,120 +195,14 @@ def calculate_sdt_dataframe(
     return pd.DataFrame(results, columns=[subject_col, condition_col, "hit_rate", "fa_rate", "dprime", "criterion"])
 
 
-def correlate_sdt_with_questionnaire(expecon: int = 1):
+def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_alarm) -> float:
     """
-    Correlate the criterion change with the intolerance of uncertainty questionnaire score and plots a regression plot.
+    Calculate the optimal criterion (c).
 
-    Args:
-    ----
-    expecon: int: expecon = 1: analyze expecon 1 behavioral data | expecon = 2: analyze expecon 2 behavioral data
+    Do this for a given base rate of signal and catch trials, & cost of hit and false alarm.
     """
-    # Set up data path
-    behavior_path = Path(path_to.data.behavior.behavior_df if expecon == 1 else path_to.expecon2.behavior)
-
-    data = pd.read_csv(behavior_path / "prepro_behav_data.csv")
-
-    # load questionnaire data (uncertainty of intolerance)
-    q_data = pd.read_csv(path_to.questionnaire.q_clean)  # csv table with questionnaire data
-
-    df_sdt = calculate_sdt_dataframe(
-        df=data, signal_col="isyes", response_col="sayyes", subject_col="ID", condition_col="cue"
-    )
-
-    # TODO(simon): consider to drop these values (.75, .25) into config.toml -> [params] ...
-    high_c = list(df_sdt.criterion[df_sdt.cue == 0.75])
-    low_c = list(df_sdt.criterion[df_sdt.cue == 0.25])
-    # TODO(simon): load via from expecon_ms.configs import params -> params.cue_high, params.cue_low, for instance.
-
-    list(df_sdt.dprime[df_sdt.cue == 0.75])
-    list(df_sdt.dprime[df_sdt.cue == 0.25])
-
-    diff_c = [x - y for x, y in zip(low_c, high_c)]
-    # diff_d = [x - y for x, y in zip(low_d, high_d)]  # TODO(simon): unused variable
-
-    # Assuming diff_c and q_data are numpy arrays or pandas Series
-
-    # Filter the arrays based on the condition q_data['iu_sum'] > 0
-    filtered_diff_c = np.array(diff_c)[q_data["iu_sum"] > 0]
-    filtered_iu_sum = q_data["iu_sum"][q_data["iu_sum"] > 0]
-
-    df = pd.DataFrame({"y": filtered_diff_c, "X": filtered_iu_sum})  # TODO(simon): make df more descriptive: df_...
-
-    # Select columns representing questionnaire score and criterion change
-    x = df["X"]
-    y = df["y"]
-
-    # Drop missing values if necessary
-    df = df.dropna(subset=["X", "y"])
-
-    # Fit the linear regression model
-    x = sm.add_constant(x)  # Add constant term for intercept
-    regression_model = sm.OLS(y, x)
-    regression_results = regression_model.fit()
-
-    # Extract slope, intercept, and p-value
-    slope = regression_results.params[1]
-    regression_results.params[0]  # TODO(simon): unused variable: maybe print() it?
-    p_value = regression_results.pvalues[1]
-
-    # Make predictions
-    regression_results.predict(x)
-
-    # Set black or gray colors for the plot
-    data_color = "black"
-    text_color = "black"
-
-    # Plot the regression line using seaborn regplot
-    sns.regplot(data=df, x="X", y="y", color=data_color)
-    plt.xlabel(xlabel="Intolerance of Uncertainty score (zscored)", color=text_color)
-    plt.ylabel(ylabel="Criterion Change", color=text_color)
-    plt.annotate(
-        text=f"Slope: {slope:.2f}\n p-value: {p_value:.2f}",
-        xy=(0.05, 0.85),
-        xycoords="axes fraction",
-        color=text_color,
-    )
-
-    for fm in ["png", "svg"]:
-        plt.savefig(Path(path_to.figures.manuscript.figure2) / f"linreg_c_q.{fm}", dpi=300)
-    plt.show()
-
-
-def diff_from_optimal_criterion() -> None:
-    """
-    Calculate the difference between the optimal criterion & the mean criterion.
-
-    Do this for each participant and cue condition.
-    """
-
-    def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_alarm) -> float:
-        """
-        Calculate the optimal criterion (c).
-
-        Do this for a given base rate of signal and catch trials, & cost of hit and false alarm.
-        """
-        llr = math.log((base_rate_signal / base_rate_catch) * (cost_hit / cost_false_alarm))
-        return -0.5 * llr  # c
-
-    c_low = calculate_optimal_c(0.25, 0.75, 1, 1)
-    print("Optimal criterion (c) for low stimulus probability:", c_low)
-
-    c_high = calculate_optimal_c(0.75, 0.25, 1, 1)
-    print("Optimal criterion (c) for high stimulus probability:", c_high)
-
-    # TODO(simon): df_sdt is not defined
-    subop_low = [c - c_low for c in df_sdt.criterion[df_sdt.cue == 0.25]]
-    mean_low = np.mean(subop_low)
-    std_low = np.std(subop_low)
-    print(mean_low)
-    print(std_low)
-
-    subop_high = [c - c_high for c in df_sdt.criterion[df_sdt.cue == 0.75]]
-    mean_high = np.mean(subop_high)
-    std_high = np.std(subop_high)
-    print(mean_high)
-    print(std_high)
-
+    llr = math.log((base_rate_signal / base_rate_catch) * (cost_hit / cost_false_alarm))
+    return -0.5 * llr  # c
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
