@@ -1,0 +1,81 @@
+# Config file for expecon_ms
+# Drop all relevant paths, parameters, etc. here
+# They can be accessed in the code via:
+#   from expecon_ms.configs import config, path_to, params
+
+PROJECT_NAME = "expecon_ms"
+
+# all paths are relative to the PROJECT_ROOT folder named 'expecon_ms'
+[paths]
+DATA = "./data"
+RESULTS = "./results"
+FIGURES = "./figs"
+
+[paths.data]
+CACHE = "./data/cache"
+BEHAVIOR = "./data/behav"
+EEG = "./data/eeg"
+
+[paths.data.behavior]
+behavior_df = "./data/behav/behav_df"
+
+[paths.data.eeg]
+RAW = "./data/eeg/raw_concatenated"
+
+[paths.data.eeg.preprocessed]
+ICA = "./data/eeg/prepro_ica"
+
+[paths.data.eeg.preprocessed.ica]
+PSD = "./data/eeg/prepro_ica/psd"
+ICA_solution = "./data/eeg/prepro_ica/ica_solution"
+ICA_components = "./data/eeg/prepro_ica/ica_comps"
+clean_epochs = "./data/eeg/prepro_ica/clean_epochs_corr"
+
+[paths.data.eeg.preprocessed.stimulus]
+filter_0_1hz = "./data/eeg/prepro_stim/filter_0.1Hz"
+filter_1hz = "./data/eeg/prepro_stim/filter_1Hz"
+
+[paths.data.eeg.sensor]
+tfr = "./data/eeg/sensor/tfr"
+
+[paths.data.eeg.sensor.erp]
+hits = "./data/eeg/sensor/erps/hits"
+misses = "./data/eeg/sensor/erps/miss"
+
+[paths.figures.manuscript]
+figure1 = "./figs/manuscript_figures/figure1_expecon1_paradigm_behav"
+figure2 = "./figs/manuscript_figures/Figure2B/"
+figure3 = "./figs/manuscript_figures/figure3_glmermodels"
+figure5 = "./figs/manuscript_figures/figure5_hitmiss_roi"
+figure6 = "./figs/manuscript_figures/figure6_tfr_contrasts"
+figure7 = "./figs/manuscript_figures/figure7_brain_behav"
+
+[paths.questionnaire]
+q_clean = "./questionnaire/q_clean.csv"
+
+[paths.expecon2]
+behavior = "../expecon_2/behav"
+figures = "../expecon_2/figures"
+
+[params]
+alpha = 0.05
+
+[participants]
+ID_list = [
+    "007", "008", "009", "010", "011", "012", "013", "014", "015", "016",
+    "017", "018", "019", "020", "021", "022", "023", "024", "025", "026",
+    "027", "028", "029", "030", "031", "032", "033", "034", "035", "036",
+    "037", "038", "039", "040", "041", "042", "043", "044", "045", "046",
+    "047", "048", "049"
+]
+
+# Follwing creates arrays of tables
+# [[tester]]
+# id = 3
+# name = "Nomis"
+#
+# [[tester]]
+# id = 2
+# name = "aniraC"
+
+# Note store private configs in same folder: "./[PRIVATE_PREFIX]_configs.toml"
