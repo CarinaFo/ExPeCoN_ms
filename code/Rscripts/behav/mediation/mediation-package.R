@@ -17,7 +17,7 @@ package_version <- packageVersion("mediation")
 options(scipen=999)
 
 # which dataset to analyze (1 => block design, 2 => trial-by-trial design)
-expecon <- 2
+expecon <- 1
 
 ####################################brain behav#####################################################
 
@@ -26,7 +26,7 @@ if (expecon == 1) {
   # expecon 1
   setwd("D:/expecon_ms")
   
-  brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
+  brain_behav_path <- file.path("data", "behav", "brain_behav_cleanpower.csv")
   
   behav = read.csv(brain_behav_path)
   
@@ -67,7 +67,11 @@ behav <- behav %>%
   mutate(meanBeta = mean(beta),
          highlowbeta = ifelse(beta > meanBeta, 1, 0))
 
-# fit mediator
+#### mediation model using mixed linear models and the mediation package
+# research question: does beta power mediate the effect of stimulus probability on the
+# detection response?
+
+# fit mediator: does stimulus probability predict beta power? (does the IV predict the mediator?)
 # with p-value
 mediatorbeta  <- lmer(alpha ~ -1 + cue + (cue|ID), data = behav)
 summary(mediatorbeta)
@@ -76,10 +80,11 @@ summary(mediatorbeta)
 med.model  <- lme4::lmer(alpha ~ -1 + cue + (cue|ID), data = behav)
 summary(med.model)
 
-med.model  <- lme4::lmer(beta ~ -1 + prevresp + (1|ID), data = behav)
+med.model  <- lme4::lmer(beta ~ -1 + cue + (cue|ID), data = behav)
 summary(med.model)
 
-# fit outcome model
+# fit outcome model: do the mediator (beta) and the IV (stimulus probability cue) predict the
+# detection response? included stimulus at a given trial as covariate
 out.model <- glmer(sayyes ~ isyes + cue + alpha + isyes*cue+
                   (cue+isyes|ID),
                 data = behav,
@@ -90,8 +95,8 @@ out.model <- glmer(sayyes ~ isyes + cue + alpha + isyes*cue+
 summary(out.model)
 
 # outcome model with previous response instead of cue
-out.model <- glmer(sayyes ~ isyes + prevresp + beta + isyes*prevresp+
-                     (prevresp+isyes+isyes*prevresp|ID),
+out.model <- glmer(sayyes ~ isyes + cue + beta + isyes*cue+
+                     (cue+isyes|ID),
                    data = behav,
                    control=glmerControl(optimizer="bobyqa",
                                         optCtrl=list(maxfun=2e5)),
@@ -102,7 +107,8 @@ summary(out.model)
 # save mediation output
 setwd("D:/expecon_ms/data/behav/mediation/")
 
-# now fit mediation model for both datasets for beta power
+# now fit mediation model for both datasets
+# for beta power
 results_beta_expecon1 <- mediate(med.model, out.model, treat='cue', mediator='beta')
 summary(results_beta_expecon1)
 saveRDS(results_beta_expecon1, 'med_cue_beta_block.rds')
@@ -128,7 +134,6 @@ saveRDS(results_prev_expecon2, 'med_prevresp_trial.rds')
 
 # save results in a table
 extract_mediation_summary(results_beta_expecon1)
-
 
 
 # helper functions

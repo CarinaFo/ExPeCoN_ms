@@ -36,7 +36,7 @@ if (expecon == 1) {
   # expecon 1
   setwd("D:/expecon_ms")
   
-  brain_behav_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
+  brain_behav_path <- file.path("data", "behav", "brain_behav_cleanpower.csv")
   
   behav = read.csv(brain_behav_path)
   
@@ -61,6 +61,8 @@ behav$previsyes = as.factor(behav$previsyes) # previous stimulus
 behav$prevconf = as.factor(behav$prevconf) # previous confidence
 behav$correct = as.factor(behav$correct) # performance
 behav$prevcue = as.factor(behav$prevcue) # previous probability
+behav$congruency <- as.integer(as.logical(behav$congruency))
+behav$congruency_stim <- as.integer(as.logical(behav$congruency_stim))
 
 # Remove NaN trials for model comparision (models neeed to have same amount of data)
 behav <- na.omit(behav) 
@@ -77,7 +79,7 @@ summary(lmer(pre_beta ~ cue + (cue|ID),
              data=behav, control=lmerControl(optimizer="bobyqa",
             optCtrl=list(maxfun=2e5))))
 
-summary(lmer(pre_beta ~ isyes, data=behav))
+summary(lmer(pre_beta ~ isyes + (isyes|ID), data=behav))
 
 # alpha power per trial as regressor
 alpha_int_glm <- glmer(sayyes ~ pre_alpha + isyes + prevresp + 
@@ -169,6 +171,24 @@ g = arrangeGrob(cue_signal_int1[[1]], cue_signal_int1[[2]], cue_signal_int2[[1]]
 
 # save figure
 ggsave('model_brain_behav_int.svg', dpi = 300, height = 8, width = 10, plot=g)
+
+
+##########################congruency###############################################################
+
+# does beta power per trial predict congruent responses in both probability conditions?
+
+con_beta = glmer(congruency ~ pre_beta * cue + isyes + (cue|ID), data=behav, 
+                 family=binomial(link='probit'), 
+                 control=glmerControl(optimizer="bobyqa",
+                                      optCtrl=list(maxfun=2e5)))
+summary(con_beta)
+
+# Post hoc tests for behavior interaction
+emm_model <- emmeans(con_beta, "cue", by = "pre_beta")
+con <- contrast(emm_model)
+con
+
+plot_model(con_beta, type='int', mdrt.values = "meansd")
 
 ######################## mediation #############################################################
 
