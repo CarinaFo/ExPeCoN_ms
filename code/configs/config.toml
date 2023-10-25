@@ -15,22 +15,21 @@ FIGURES = "./figs"
 CACHE = "./data/cache"
 behavior = "./data/behav"
 EEG = "./data/eeg"
+templates = "./data/templates"
 
 [paths.data.eeg]
 RAW = "./data/eeg/raw_concatenated"
 
 [paths.data.eeg.preprocessed]
-ICA = "./data/eeg/prepro_ica"
+stimulus = "./data/eeg/prepro_stim"
+cue = "./data/eeg/prepro_cue"
 
 [paths.data.eeg.preprocessed.ica]
 PSD = "./data/eeg/prepro_ica/psd"
 ICA_solution = "./data/eeg/prepro_ica/ica_solution"
 ICA_components = "./data/eeg/prepro_ica/ica_comps"
 clean_epochs = "./data/eeg/prepro_ica/clean_epochs_corr"
-
-[paths.data.eeg.preprocessed.stimulus]
-filter_0_1hz = "./data/eeg/prepro_stim/filter_0.1Hz"
-filter_1hz = "./data/eeg/prepro_stim/filter_1Hz"
+ICA = "./data/eeg/prepro_ica"
 
 [paths.data.eeg.sensor]
 tfr = "./data/eeg/sensor/tfr"
@@ -42,7 +41,8 @@ misses = "./data/eeg/sensor/erps/miss"
 [paths.figures.manuscript]
 figure1 = "./figs/manuscript_figures/figure1_expecon1_paradigm_behav"
 figure2 = "./figs/manuscript_figures/unused_figures/"
-figure4 = "./figs/manuscript_figures/figure4_glmermodels"
+figure3 = "./figs/manuscript_figures/figure3_tfr"
+figure4 = "./figs/manuscript_figures/figure4_supplementarybehav"
 figure5 = "./figs/manuscript_figures/figure5_hitmiss_roi"
 figure6 = "./figs/manuscript_figures/figure6_tfr_contrasts"
 figure7 = "./figs/manuscript_figures/figure7_brain_behav"
@@ -65,6 +65,11 @@ ID_list = [
     "037", "038", "039", "040", "041", "042", "043", "044", "045", "046",
     "047", "048", "049"
 ]
+pilot_counter = 7
+
+[behavioral_cleaning]
+ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
+blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
 
 # Follwing creates arrays of tables
 # [[tester]]

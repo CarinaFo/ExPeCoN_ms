@@ -29,20 +29,26 @@ last_commit_date = (
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # set save paths
+# raw concatenated eeg data
 save_dir_concatenated_raw = Path(path_to.data.eeg.RAW)
-# TODO(simon): adapt Paths to config style (see above and other py-files)
-save_dir_stim = Path("./data/eeg/prepro_stim/filter_0.1Hz/")
-save_dir_cue = Path("./data/eeg/prepro_cue/")
+
+# stimulus locked
+save_dir_stim = Path(path_to.data.eeg.preprocessed.stimulus)
+
+# cue locked
+save_dir_cue = Path(path_to.data.eeg.preprocessed.cue)
 
 # EEG cap layout file
-filename_montage = Path("./data/eeg/prepro_stim/CACS-64_REF.bvef")
+filename_montage = Path(path_to.data.templates)
 
 # raw behavioral data
-behav_path = Path(path_to.data.behavior.behavior_df)
+behav_path = Path(path_to.data.behavior)
 
 # participant IDs
 id_list = config.participants.ID_list
 
+# pilot data counter
+pilot_counter = config.participants.pilot_counter
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -113,7 +119,6 @@ def concatenate():
 
             # check if we have 144 triggers per block (trials)
             # if not I forgot to turn on the EEG recording (or turned it on too late)
-
             trigger_per_block.append([len(events_1), len(events_2), len(events_3), len(events_4), len(events_5)])
 
             raw = mne.concatenate_raws([raw_1, raw_2, raw_3, raw_4, raw_5])
@@ -138,6 +143,7 @@ def remove_trials(filename: str | Path = "raw_behav_data.csv"):
     """
     # load the preprocessed dataframe from R (already removed the training block)
     df_behav = pd.read_csv(behav_path / filename)  # TODO(simon): why is it called "raw_*" if preprocessed
+    # COMMENT: the data is not preprocessed, only the trainings block is removed :)
 
     # remove trials where I started the EEG recording too late
     # (35 trials in total)
@@ -168,7 +174,8 @@ def remove_trials(filename: str | Path = "raw_behav_data.csv"):
     for cond in conditions:
         df_behav = df_behav.drop(
             df_behav.index[
-                (df_behav["ID"] == cond[0]) & (df_behav["block"] == cond[1]) & (df_behav["trial"].isin(cond[2]))
+                (df_behav["ID"] == cond[0]) & (df_behav["block"] == cond[1])
+                & (df_behav["trial"].isin(cond[2]))
             ]
         )
 
@@ -179,8 +186,8 @@ def prepro(
     trigger: str = "stimulus",
     l_freq: float = 0.1,
     h_freq: int = 40,
-    tmin: float = -1.5,
-    tmax: float = 1.5,
+    tmin: float = -1,
+    tmax: float = 1,
     resample_rate: int = 250,
     sf: int = 2500,
     detrend: int = 1,
@@ -201,7 +208,7 @@ def prepro(
     ----
     trigger: lock the data to the "stimulus" or "cue" onset
     IMPORTANT:
-    -data can be epoched to stimulus(0) or cue onset (1)
+    -data can be epoched to stimulus (0) or cue onset (1)
     -autoreject only works on epoched data
     UPDATES:
     - downsample and filter after epoching (downsampling before epoching
@@ -214,21 +221,27 @@ def prepro(
     df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg.csv")
 
     # set eeg channel layout for topo plots
-    montage = mne.channels.read_custom_montage(filename_montage)
+    montage = mne.channels.read_custom_montage(filename_montage / "CACS-64_REF.bvef")
 
     # store how many channels were interpolated per participant
     # and annotations (trigger) information
     ch_interp, annot = [], []
 
+    if trigger == "stimulus":
+        save_dir = save_dir_stim
+    else:
+        save_dir = save_dir_cue
+
     # loop over participants
     for index, subj in enumerate(id_list):
         # if file exists, skip
-        if (save_dir_stim / f"P{subj}_epochs_stim_0.1Hzfilter-epo.fif").exists():
+        if (save_dir / f"P{subj}_epochs_{l_freq}Hz-epo.fif").exists():
             print(f"{subj} already exists")
             continue
 
         # load raw data concatenated for all blocks
-        raw = mne.io.read_raw_fif(fname=save_dir_concatenated_raw / f"P{subj}_concatenated_raw.fif", preload=True)
+        raw = mne.io.read_raw_fif(save_dir_concatenated_raw / f"P{subj}_concatenated_raw.fif",
+                                   preload=True)
 
         # save the annotations (trigger) information
         annot.append(raw.annotations.to_data_frame())
@@ -254,10 +267,7 @@ def prepro(
             cue_events[:, 2] = 2
 
         # add dataframe as metadata to epochs
-        df_sub = df_cleaned[index + 7 == df_cleaned.ID]  # the first six subjects were pilot subjects
-        # TODO(simon): consider [param] usage from config.toml for "7" here. Why +7 if only 6 pilots?
-
-        metadata = df_sub
+        metadata = df_cleaned[index + pilot_counter == df_cleaned.ID]
 
         # lock the data to the specified trigger and create epochs
         if trigger == "cue":
@@ -313,24 +323,23 @@ def prepro(
         # detect bad epochs
         # now feed the clean channels into Autoreject to detect bad trials
         if autoreject:
+
             ar = AutoReject()
 
             epochs, reject_log = ar.fit_transform(epochs)
 
-            reject_log.save(save_dir_stim / "f'P_{subj}_reject_log.npz'")
+            reject_log.save(save_dir / f'P_{subj}_reject_log_{l_freq}.npz')
+        
+        #save epochs to disk
+        epochs.save(save_dir / f'P{subj}_epochs_{l_freq}Hz-epo.fif')
 
-        if trigger == "cue":
-            epochs.save(save_dir_cue / f"P{subj}_epochs_cue-epo.fif")
-
-        else:
-            epochs.save(save_dir_stim / "f'P{subj}_epochs_stim_{l_freq}Hz_filter-epo.fif'")
-
-            print(f"saved epochs for participant {subj}")
+        print(f"saved epochs for participant {subj}")
 
     # for methods part: how many channels were interpolated per participant
     ch_df = pd.DataFrame(ch_interp)
 
-    ch_df.to_csv(save_dir_stim / "interpolated_channels.csv")
+    ch_df.to_csv(save_dir / f"interpolated_channels_{l_freq}.csv", 
+                 index=False)
 
     print("Done with preprocessing and creating clean epochs")
 
@@ -347,8 +356,8 @@ def channels_interp() -> None:
     """
     df_inter_ch = pd.read_csv(f'{save_dir_stim}{Path("/")}interpolated_channels.csv')
 
-    # TODO(simon): Check this out: https://stackoverflow.com/questions/36519086/how-to-get-rid-of-unnamed-0-column-in-a-pandas-dataframe-read-in-from-csv-fil
-    df_inter_ch = df_inter_ch.drop(["Unnamed: 0"], axis=1)
+    # (simon): Check this out: https://stackoverflow.com/questions/36519086/how-to-get-rid-of-unnamed-0-column-in-a-pandas-dataframe-read-in-from-csv-fil
+    # Merci, this is very useful!
     df_inter_ch["count_ch"] = df_inter_ch.count(axis=1)
 
     print(f"mean channels interpolated {df_inter_ch['count_ch'].mean()}")
@@ -358,10 +367,12 @@ def channels_interp() -> None:
 
 
 # Unused functions
-def add_reaction_time_trigger() -> None:
+
+def add_reaction_time_trigger(metadata=None, sf=250, events=None) -> None:
+
     """Add the reaction time as a trigger to the event structure."""
+
     # reset index
-    # TODO(simon): metadata, sf, and events are not defined
     metadata_index = metadata.reset_index()
 
     # get rt per trial
