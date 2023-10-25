@@ -17,8 +17,16 @@ import mne
 import pandas as pd
 from autoreject import AutoReject, Ransac  # Jas et al., 2016
 
+import expecon_ms.configs
 from expecon_ms.configs import PROJECT_ROOT, config, path_to
 
+# if you change the config.toml file instead of reloading the kernel you can 
+# uncomment and execute the following lines of code:
+
+# from importlib import reload
+# reload(expecon_ms)
+# reload(expecon_ms.configs)
+# from expecon_ms.configs import path_to
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 # Specify the file path for which you want the last commit date
 __file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/preprocessing/prepro.py")  # == __file__
