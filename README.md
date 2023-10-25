@@ -34,6 +34,7 @@ git clone https://github.com/CarinaFo/ExPeCoN_ms.git
 ```
 
 Create a conda environment specific to `expecon_ms`:
+Make sure you are in the local folder where you cloned the repository into.
 
 ```shell
 conda env create -f expecon.yml
@@ -65,6 +66,8 @@ Thus, the `-e` flag is recommended to use.
 
 ### Explore data and analysis
 Use jupyter notebooks to explore the data and analysis:
+
+### Open code in your prefered editor but make sure to run the code in the environment
 
 ```shell
 jupyter lab code/notebooks/expecon_ms.ipynb &
