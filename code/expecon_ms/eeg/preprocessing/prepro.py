@@ -346,7 +346,7 @@ def prepro(
     return ch_interp, annot
 
 
-def channels_interp() -> None:
+def channels_interp(trigger: str = "stimulus", l_freq=0.1) -> None:
     """
     Calculate the mean, std, min and max of channels interpolated across participants.
 
@@ -354,7 +354,14 @@ def channels_interp() -> None:
     -------
     None.
     """
-    df_inter_ch = pd.read_csv(f'{save_dir_stim}{Path("/")}interpolated_channels.csv')
+    
+    if trigger == "stimulus":
+        save_dir = save_dir_stim
+    else:
+        save_dir = save_dir_cue
+
+    # load channel interpolation data
+    df_inter_ch = pd.read_csv(f'{save_dir}{Path("/")}interpolated_channels_{l_freq}.csv')
 
     # (simon): Check this out: https://stackoverflow.com/questions/36519086/how-to-get-rid-of-unnamed-0-column-in-a-pandas-dataframe-read-in-from-csv-fil
     # Merci, this is very useful!
