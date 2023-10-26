@@ -74,26 +74,35 @@ def run_ica(infomax: int = 1, save_psd: int = 0):
         None
     """
     for subj in id_list:
-        # Read the epoch data for the current participant (1Hz filtered data for ICA)
-        epochs = mne.read_epochs(epochs_for_ICA / f"P{subj}_epochs_1Hz-epo.fif")
 
-        # Pick EEG channels for ICA
-        picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
+        file_path = save_dir_ica_sol / f"icas_{subj}.pkl"
 
-        if save_psd:
-            # Compute and plot the power spectral density (PSD)
-            epochs.compute_psd(fmin=1, fmax=40, picks=picks).plot(show=False)
-            plt.savefig(Path(path_to.data.eeg.preprocessed.ica.PSD, f"PSD_{subj}.png"))
+        if not Path(file_path).exists():
+            print("The file does not exist.")
 
-        if infomax == 1:
-            # Fit ICA using infomax method with extended parameters
-            ica = mne.preprocessing.ICA(method="infomax", fit_params=dict(extended=True)).fit(epochs, picks=picks)
+            # Read the epoch data for the current participant (1Hz filtered data for ICA)
+            epochs = mne.read_epochs(epochs_for_ICA / f"P{subj}_epochs_1Hz-epo.fif")
+
+            # Pick EEG channels for ICA
+            picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
+
+            if save_psd:
+                # Compute and plot the power spectral density (PSD)
+                epochs.compute_psd(fmin=1, fmax=40, picks=picks).plot(show=False)
+                plt.savefig(Path(path_to.data.eeg.preprocessed.ica.PSD, f"PSD_{subj}.png"))
+
+            if infomax == 1:
+                # Fit ICA using infomax method with extended parameters
+                ica = mne.preprocessing.ICA(method="infomax", 
+                                            fit_params=dict(extended=True)).fit(epochs, picks=picks)
+            else:
+                # Fit ICA using fastica method
+                ica = mne.preprocessing.ICA(method="fastica").fit(epochs, picks=picks)
+            
+            # save ICA solution
+            save_data(path=save_dir_ica_sol, data=ica, identifier=subj)
         else:
-            # Fit ICA using fastica method
-            ica = mne.preprocessing.ICA(method="fastica").fit(epochs, picks=picks)
-        
-        # save ICA solution
-        save_data(path=save_dir_ica_sol, data=ica, identifier=subj)
+            print("The file exists.")
 
     return "Done with ICA"
 
@@ -134,7 +143,8 @@ def label_ica_correction():
 
         # correlate components with ECG and EOG
         eog_inds, _ = ica_sol.find_bads_eog(epochs, ch_name=ch_name_blinks)
-        ecg_inds, _ = ica_sol.find_bads_ecg(epochs, ch_name=ch_name_ecg, method="correlation")
+        ecg_inds, _ = ica_sol.find_bads_ecg(epochs, ch_name=ch_name_ecg,
+                                            method="correlation")
 
         # combine the sources to exclude
         inds_to_exclude = eog_inds + ecg_inds
@@ -167,12 +177,12 @@ def label_ica_correction():
         epochs_filter.set_eeg_reference("average", ch_type="eeg")
 
         # save the cleaned epochs
-        epochs_filter.save(save_dir_epochs_after_ica / f"clean_epochs_corr/P{subj}_epochs_after_ica-epo.fif")
+        epochs_filter.save(save_dir_epochs_after_ica / f"P{subj}_icacorr_0.1Hz-epo.fif")
 
         print(f"Saved ICA cleaned epochs for participant {subj}.")
 
     # save a dataframe with info on how many components were removed
-    pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica / "ica_components_stats.csv")
+    pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica / "ica_components_stats_icacorr.csv")
 
     return comps_removed
 
@@ -195,7 +205,8 @@ def label_iclabel():
     ica_list = []
 
     for subj in id_list:
-        file_path = Path(epochs_for_ica_dir, f"P{subj}_epochs_stim-epo.fif")
+
+        file_path = Path(epochs_for_ICA, f"P{subj}_epochs_1Hz-epo.fif")
 
         # Load the clean epochs (1-Hz filtered)
         epochs_ica = mne.read_epochs(file_path)
@@ -218,11 +229,11 @@ def label_iclabel():
 
         print(f"Excluding these ICA components for participant {subj}: {exclude_idx}")
 
-        # Save the count of excluded components per participant for methods part
+        # Save the count of excluded components per participant for methods
         ica_list.append(len(exclude_idx))
 
         # now load the highpass filtered data
-        filter_path = epochs_for_data_analysis / f"P{subj}_epochs_stim_0.1Hzfilter-epo.fif"
+        filter_path = epochs_for_ICA / f"P{subj}_epochs_0.1Hz-epo.fif"
 
         epochs_filter = mne.read_epochs(filter_path, preload=True)
 
@@ -236,12 +247,12 @@ def label_iclabel():
         epochs_filter.set_eeg_reference("average", ch_type="eeg")
 
         # save the cleaned epochs
-        epochs_filter.save(Path(save_dir_ica, "clean_epochs_iclabel", f"{subj}_epochs_after_ica_0.1Hzfilter-epo.fif"))
+        epochs_filter.save(Path(save_dir_epochs_after_ica, f"{subj}_epochs_iclabel_0.1Hz-epo.fif"))
         print(f"Saved ICA cleaned epochs for participant {subj}")
 
     # save a dataframe with info on how many components were removed
 
-    pd.DataFrame(ica_list).to_csv(Path(save_dir_ica, "clean_epochs_iclabel", "ica_components_0.1Hzfilter.csv"))
+    pd.DataFrame(ica_list).to_csv(Path(save_dir_epochs_after_ica, "ica_components_stats_icalabel.csv"))
 
     return "Done with removing ICA components"
 
