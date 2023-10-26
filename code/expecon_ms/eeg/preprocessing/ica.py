@@ -182,17 +182,18 @@ def label_ica_correction():
         print(f"Saved ICA cleaned epochs for participant {subj}.")
 
     # save a dataframe with info on how many components were removed
-    pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica / "ica_components_stats_icacorr.csv")
+    pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica / "ica_components_stats_icacorr.csv", 
+                                       index=False)
 
     return comps_removed
 
 
 def label_iclabel():
     """
-    Apply automatic labeling of ICA components using the iclabel method.
-
-    This works now with python 3.10.11 and mne 0.23.0.
-
+    Apply automatic labeling of ICA components using the iclabel method:
+    doi:https://doi.org/10.1016/j.neuroimage.2019.05.026.
+    Non-brain related ica components are rejected. The ica cleaned epoch are
+    averaged to a common reference and saved as .fif files.
     Args:
     ----
         None
@@ -247,12 +248,15 @@ def label_iclabel():
         epochs_filter.set_eeg_reference("average", ch_type="eeg")
 
         # save the cleaned epochs
-        epochs_filter.save(Path(save_dir_epochs_after_ica, f"{subj}_epochs_iclabel_0.1Hz-epo.fif"))
+        epochs_filter.save(Path(save_dir_epochs_after_ica, 
+                                f"{subj}_epochs_iclabel_0.1Hz-epo.fif"))
         print(f"Saved ICA cleaned epochs for participant {subj}")
 
     # save a dataframe with info on how many components were removed
 
-    pd.DataFrame(ica_list).to_csv(Path(save_dir_epochs_after_ica, "ica_components_stats_icalabel.csv"))
+    pd.DataFrame(ica_list).to_csv(Path(save_dir_epochs_after_ica, 
+                                       "ica_components_stats_icalabel.csv", 
+                                       index=False))
 
     return "Done with removing ICA components"
 
