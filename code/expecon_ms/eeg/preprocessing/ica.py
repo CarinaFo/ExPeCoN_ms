@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """
-Functions to run ICA and select ICA components semi-automatically.
+Functions to run ICA (extened infomax or fastica) and select ICA components semi-automatically using a correlation approach or
+a fully automated approach using iclabel. Data is re-referenced to the commong average and saved as a .fif file.
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
@@ -255,7 +256,7 @@ def label_iclabel():
     # save a dataframe with info on how many components were removed
 
     pd.DataFrame(ica_list).to_csv(Path(save_dir_epochs_after_ica, 
-                                       "ica_components_stats_icalabel.csv", 
+                                       "ica_components_stats_icalabel.csv",
                                        index=False))
 
     return "Done with removing ICA components"
