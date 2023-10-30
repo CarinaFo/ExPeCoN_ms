@@ -9,6 +9,9 @@ library(lme4) # mixed models
 library(lmerTest)  # for p-values of lmer models
 library(mediation)
 library(dplyr)
+library(bayestestR)
+library(brms)
+library(rstanarm)
 
 # Check the version of a specific package (e.g., "ggplot2")
 package_version <- packageVersion("mediation")
@@ -134,6 +137,19 @@ saveRDS(results_prev_expecon2, 'med_prevresp_trial.rds')
 
 # save results in a table
 extract_mediation_summary(results_beta_expecon1)
+
+#Bayesian mediation model: mediation with brms####################################################
+
+# Fit Bayesian mediation model in brms
+med.model  <- lme4::lmer(beta ~ -1 + cue + (cue|ID), data = behav)
+summary(med.model)
+med.model <- bf(beta ~ -1 + cue + (cue|ID))
+out.model <- bf(sayyes ~ isyes + cue + beta + isyes*cue+
+                  (cue+isyes|ID), family=binomial(link='probit'))
+m2 <- brm(med.model + out.model + set_rescor(FALSE), data = behav, refresh = 0)
+
+# mediation for brms (to have evidence for a null mediation for alpha, see Tilmans comment)
+mediation(m2)
 
 
 # helper functions
