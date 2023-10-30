@@ -193,7 +193,6 @@ def exclude_data(expecon: int = 1):
     remove_fa_rates = fa_rate_abn.reset_index()
 
     # Filter the grouped objects based on the conditions
-    # filtered_groups = hit_rate_per_block[hit_rate_per_block < fa_rate_per_block]  # Hit rate < False alarm rate
     hit_fa = hitrate_per_block[hitrate_per_block - fa_rate_per_block < 0.05]  # Difference < 5 %
     print("Blocks with hit rates < false alarm rates: ", len(hit_fa))
 
