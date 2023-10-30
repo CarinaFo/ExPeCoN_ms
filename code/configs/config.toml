@@ -30,6 +30,7 @@ ICA_solution = "./data/eeg/prepro_ica/ica_solution"
 ICA_components = "./data/eeg/prepro_ica/ica_comps"
 clean_epochs = "./data/eeg/prepro_ica/clean_epochs_corr"
 ICA = "./data/eeg/prepro_ica"
+clean_epochs_expecon2 = "./data/eeg/prepro_ica/clean_epochs_expecon2"
 
 [paths.data.eeg.sensor]
 tfr = "./data/eeg/sensor/tfr"
@@ -58,19 +59,29 @@ figures = "../expecon_2/figures"
 alpha = 0.05
 
 [participants]
-ID_list = [
+ID_list_expecon1 = [
     "007", "008", "009", "010", "011", "012", "013", "014", "015", "016",
     "017", "018", "019", "020", "021", "022", "023", "024", "025", "026",
     "027", "028", "029", "030", "031", "032", "033", "034", "035", "036",
     "037", "038", "039", "040", "041", "042", "043", "044", "045", "046",
     "047", "048", "049"
 ]
+
+ID_list_expecon2 = [
+    "001", "002", "003", "004", "005", "006", "007", "008", "009", "010",
+    "011", "012", "013", "014", "015", "016","017", "018", "019", "020",
+     "021", "022", "023", "024", "025", "026", "027", "028", "029", "030",
+    "031", "032", "033", "034", "035", "036", "037", "038", "039", "040"
+]
 pilot_counter = 7
 
 [behavioral_cleaning]
-ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
-blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
-
+rt_max = 2.5
+rt_min = 0.1
+hitrate_max = 0.9
+hitrate_min = 0.2
+farate_max = 0.4
+hit_fa_diff = 0.05
 # Follwing creates arrays of tables
 # [[tester]]
 # id = 3
