@@ -6,6 +6,7 @@ Moreover, run a cluster test in 2D space (time and frequency)
 
 This script produces figure 6.
 
+
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
 Years: 2023
@@ -13,7 +14,6 @@ Years: 2023
 # %% Import
 from __future__ import annotations
 
-import random
 import subprocess
 from pathlib import Path
 
@@ -22,7 +22,6 @@ import mne
 import numpy as np
 import pandas as pd
 
-from expecon_ms.behav import figure1  # TODO(simon): what is this imported for?
 from expecon_ms.configs import PROJECT_ROOT, config, params, path_to
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -36,35 +35,56 @@ last_commit_date = (
 )
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
-# set font to Arial and font size to 22  # TODO(simon): below is size=14
+# set font to Arial and font size to 14
 plt.rcParams.update({"font.size": 14, "font.family": "sans-serif", "font.sans-serif": "Arial"})
 
 # set paths
+# clean epochs
+dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
+dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
+
+# save tfr solutions
 tfr_path = Path(path_to.data.eeg.sensor.tfr)
 
 # participant IDs
-id_list = config.participants.ID_list
+id_list_expecon1 = config.participants.ID_list_expecon1
+id_list_expecon2 = config.participants.ID_list_expecon2
 
+# pilot data counter
+pilot_counter = config.participants.pilot_counter
+
+# data_cleaning parameters defined in config.toml
+rt_max = config.behavioral_cleaning.rt_max
+rt_min = config.behavioral_cleaning.rt_min
+hitrate_max = config.behavioral_cleaning.hitrate_max
+hitrate_min = config.behavioral_cleaning.hitrate_min
+farate_max = config.behavioral_cleaning.farate_max
+hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
 def compute_tfr(
-    tmin: float = -0.4,
+    study: int = 2,
+    cond: str = "prev_resp",
+    tmin: float = -1,
     tmax: float = 0,
     fmax: float = 35,
     fmin: float = 3,
     laplace: bool = False,
     induced: bool = False,
     mirror_data: bool = False,
-    drop_bads: bool = True,
+    drop_bads: bool = True
 ):
     """
-    Calculate the time-frequency representations per trial (induced power) using multitaper method.
-
-    Data is then saved in a tfr object per subject and stored to disk as a .h5 file.
-
+    Calculate the time-frequency representations per trial (induced power) 
+    using multitaper method.
+    Data is then saved in a tfr object per subject and stored to disk
+    as a .h5 file.
     Args:
     ----
+    study : int, info: which study to analyze: 1 (block, stable environment) or 2 (trial,
+    volatile environment)
+    cond : str, info: which condition to analyze: "probability" or "prev_resp"
     tmin : float
     tmax : float
     fmin: float
@@ -73,7 +93,6 @@ def compute_tfr(
     induced : boolean, info: subtract evoked response from each epoch
     mirror_data : boolean, info: mirror the data on both sides to avoid edge artifacts
     drop_bads : boolean: drop epochs with abnormal strong signal (> 200 micro-volts)
-
     Returns:
     -------
     None
@@ -82,53 +101,65 @@ def compute_tfr(
     freqs = np.arange(fmin, fmax, 1)
     cycles = freqs / 4.0
 
-    # store behavioral data and spectra
+    # store behavioral data
     df_all = []
+
+    if study == 1:
+        id_list = id_list_expecon1
+        # load behavioral data
+        data = pd.read_csv(Path(path_to.data.behavior, "prepro_behav_data.csv"))
+
+    elif study == 2:
+        id_list = id_list_expecon2
+        # load behavioral data
+        data = pd.read_csv(Path(path_to.data.behavior,
+                                "prepro_behav_data_expecon2.csv"))
+    else:
+        raise ValueError("input should be 1 or 2 for the respective study")
+
 
     # now loop over participants
     for idx, subj in enumerate(id_list):
+
         # print participant ID
         print("Analyzing " + subj)
 
-        # load cleaned epochs (after ica component rejection)
+        # load clean epochs (after ica component rejection)
+        if study == 1:
+            epochs = mne.read_epochs(
+                Path(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif"))
+        elif study == 2:
+            # skip ID 13
+            if subj == '013':
+                continue
+            epochs = mne.read_epochs(dir_clean_epochs_expecon2 / f"P{subj}_icacorr_0.1Hz-epo.fif")
+            # rename columns
+            epochs.metadata = epochs.metadata.rename(columns ={"resp1_t": "respt1",
+                                                               "stim_type": "isyes",
+                                                               "resp1": "sayyes"})
+        else:
+            raise ValueError("input should be 1 or 2 for the respective study")
 
-        epochs = mne.read_epochs(
-            Path("./data/eeg/prepro_ica/clean_epochs_corr", f"P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif")
-        )
+        # clean epochs (remove blocks based on hit and false alarm rates, reaction times, etc.)
+        epochs = drop_trials(data=epochs)
 
-        # kick out blocks with too high or low hit-rates and false alarm rates
-        # TODO(simon): consider to move the following to the config.toml
-        ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]
-        blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
-
-        # Check if the participant ID is in the list of IDs to delete
-        if pd.unique(epochs.metadata.ID) in ids_to_delete:
-            # Get the corresponding blocks to delete for the current participant
-            participant_blocks_to_delete = [
-                block for id_, block in zip(ids_to_delete, blocks_to_delete) if id_ == pd.unique(epochs.metadata.ID)
-            ]
-
-            # Drop the rows with the specified blocks from the dataframe
-            epochs = epochs[~epochs.metadata.block.isin(participant_blocks_to_delete)]
-
-        # remove trials with rts >= 2.5 (no response trials) and trials with reaction times < 0.1
-        epochs = epochs[epochs.metadata.respt1 >= 0.1]
-        epochs = epochs[epochs.metadata.respt1 != 2.5]
-
-        # load behavioral data
-        data = pd.read_csv(Path(path_to.data.behavior.behavior_df, "prepro_behav_data.csv"))
-
-        # behavioral data for current participant
-        subj_data = data[idx + 7 == data.ID]
+        # get behavioral data for current participant
+        if study == 1:
+            subj_data = data[idx + pilot_counter == data.ID]
+        elif study == 2:
+            subj_data = data[idx + 1 == data.ID]
+        else:
+            raise ValueError("input should be 1 or 2 for the respective study")
 
         # get drop log from epochs
         drop_log = epochs.drop_log
 
+        # Ignored bad epochs are those defined by the user as bad epochs
         search_string = "IGNORED"
-
+        # remove trials where epochs are labelled as too short
         indices = [index for index, tpl in enumerate(drop_log) if tpl and search_string not in tpl]
 
-        # drop bad epochs (too late recordings)
+        # drop trials without corresponding epoch
         if indices:
             epochs.metadata = subj_data.reset_index().drop(indices)
         else:
@@ -148,9 +179,9 @@ def compute_tfr(
         # avoid leakage and edge artifacts by zero padding the data
         if mirror_data:
             metadata = epochs.metadata
-            # zero pad the data on both sides to avoid leakage and edge artifacts
             data = epochs.get_data()
 
+            # zero pad = False = mirror the data on both ends
             data = zero_pad_or_mirror_data(data, zero_pad=False)
 
             # put back into epochs structure
@@ -163,47 +194,72 @@ def compute_tfr(
         if induced:
             epochs = epochs.subtract_evoked()
 
-        # assign a sequential count for each row within each 'block' and 'subblock' group
-        epochs.metadata["trial_count"] = epochs.metadata.groupby(["block", "subblock"]).cumcount()
-
+        # store behavioral data
         df_all.append(epochs.metadata)
 
-        # create conditions
-        epochs_a = epochs[
-            (epochs.metadata.cue == 0.75)
-        ]  # TODO(simon): consider to drop the values as params in config
-        epochs_b = epochs[(epochs.metadata.cue == 0.25)]
+        if cond == "probability":
+            epochs_a = epochs[
+                (epochs.metadata.cue == 0.75)
+            ]
+            epochs_b = epochs[(epochs.metadata.cue == 0.25)]
+            cond_a = "high"
+            cond_b = "low"
+        elif cond == "prev_resp":
+            epochs_a = epochs[
+                (epochs.metadata.prevresp == 1)
+            ]
+            epochs_b = epochs[(epochs.metadata.prevresp == 0)]
+            cond_a = "prevyesresp"
+            cond_b = "prevnoresp"
+        else:
+            raise ValueError("input should be 'probability' or 'prev_resp'")
 
+        # make sure we have an equal amount of trials in both conditions
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
         # set tfr path
-        if (tfr_path / f"{subj}_high_mirror-tfr.h5").exists():
+        if (tfr_path / f"{subj}_{cond}_{str(study)}-tfr.h5").exists():
             print("TFR already exists")
         else:
             tfr_a = mne.time_frequency.tfr_multitaper(
-                epochs_a, freqs=freqs, n_cycles=cycles, return_itc=False, n_jobs=-1, average=True
+                epochs_a, freqs=freqs, n_cycles=cycles, 
+                return_itc=False, n_jobs=-1, average=True
             )
 
             tfr_b = mne.time_frequency.tfr_multitaper(
-                epochs_b, freqs=freqs, n_cycles=cycles, return_itc=False, n_jobs=-1, average=True
+                epochs_b, freqs=freqs, n_cycles=cycles, 
+                return_itc=False, n_jobs=-1, average=True
             )
+            
+            # save tfr data
+            if cond == "probability":
+                tfr_a.save(fname=tfr_path / f"{subj}_{cond_a}_{str(study)}-tfr.h5")
+                tfr_b.save(fname=tfr_path / f"{subj}_{cond_b}_{str(study)}-tfr.h5")
+            elif cond == "prev_resp":
+                tfr_a.save(fname=tfr_path / f"{subj}_{cond_a}_{str(study)}-tfr.h5")
+                tfr_b.save(fname=tfr_path / f"{subj}_{cond_b}_{str(study)}-tfr.h5")
+            else:
+                raise ValueError("input should be 'probability' or 'prev_resp'")
 
-            tfr_a.save(fname=tfr_path / f"{subj}_high_mirror-tfr.h5", overwrite=True)
-            tfr_b.save(fname=tfr_path / f"{subj}_low_mirror-tfr.h5", overwrite=True)
-
-        if (tfr_path / f"{subj}_single_trial_power-tfr.h5").exists():
+        # calculate tfr for all trials
+        if (tfr_path / f"{subj}_single_trial_power_{str(study)}-tfr.h5").exists():
             print("TFR already exists")
         else:
             tfr = mne.time_frequency.tfr_multitaper(
-                epochs, freqs=freqs, n_cycles=cycles, return_itc=False, n_jobs=-1, average=False, decim=2
+                epochs, freqs=freqs, n_cycles=cycles, return_itc=False, 
+                n_jobs=-1, average=False, decim=2
             )
 
-            tfr.save(fname=tfr_path / f"{subj}_single_trial_power-tfr.h5", overwrite=True)
+            tfr.save(fname=tfr_path / f"{subj}_single_trial_power_{str(study)}-tfr.h5", 
+                     overwrite=True)
 
-    return "Done with tfr/erp computation"
+    return "Done with tfr/erp computation", cond_a, cond_b
 
 
-def load_tfr_conds(cond_a: str = "high", cond_b: str = "low", mirror: bool = True):
+def load_tfr_conds(study: int = 1, 
+                   cond_a: str = "high",
+                   cond_b: str = "low",
+                   mirror: bool = False):
     """
     Load tfr data for the two conditions.
 
@@ -223,11 +279,18 @@ def load_tfr_conds(cond_a: str = "high", cond_b: str = "low", mirror: bool = Tru
     """
     tfr_a_all, tfr_b_all = [], []
 
+    if study == 1:
+        id_list = id_list_expecon1
+    elif study == 2:
+        id_list = id_list_expecon2
+    else:
+        raise ValueError("input should be 1 or 2 for the respective study")
+
     for subj in id_list:
         # load tfr data
         sfx = "_mirror" if mirror else ""
-        tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a}{sfx}-tfr.h5", condition=0)
-        tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b}{sfx}-tfr.h5", condition=0)
+        tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a}_{str(study)}-tfr.h5", condition=0)
+        tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b}_{str(study)}-tfr.h5", condition=0)
         tfr_a_all.append(tfr_a)
         tfr_b_all.append(tfr_b)
 
@@ -235,7 +298,9 @@ def load_tfr_conds(cond_a: str = "high", cond_b: str = "low", mirror: bool = Tru
 
 
 # TODO(simon): dont use mutables as default arguments
-def plot_tfr_cluster_test_output(channel_names=["CP4"], fmin: int = 3, fmax: int = 35):
+def plot_tfr_cluster_test_output(channel_names=["CP4"],
+                                 fmin: int = 3,
+                                 fmax: int = 35):
     """
     Plot cluster permutation test output for tfr data (time and frequency cluster).
 
@@ -253,8 +318,6 @@ def plot_tfr_cluster_test_output(channel_names=["CP4"], fmin: int = 3, fmax: int
     -------
     None
     """
-    # load tfr data
-    tfr_a_all, tfr_b_all = visualize_contrasts()  # TODO(simon): where is this function?
 
     # average over participants
     gra_a = mne.grand_average(tfr_a_all)  # high
@@ -270,7 +333,7 @@ def plot_tfr_cluster_test_output(channel_names=["CP4"], fmin: int = 3, fmax: int
     # which time windows to plot
     time_windows = [(-1, -0.4), (-0.4, 0)]
     # for mirrored data
-    # time_windows = [(-0.4, 0)]
+    #time_windows = [(-0.4, 0)]
 
     # which axes to plot the time windows
     axes_first_row = [(0, 0), (0, 1)]
@@ -284,10 +347,6 @@ def plot_tfr_cluster_test_output(channel_names=["CP4"], fmin: int = 3, fmax: int
             .crop(tmin=t[0], tmax=t[1])
             .plot(picks=channel_names, cmap=plt.cm.bwr, axes=axs[a[0], a[1]], show=False)[0]
         )
-
-    # now plot the cluster permutation output in the second row
-    ch_index = [tfr_a_all[0].ch_names.index(c) for c in channel_names]  # pick channels
-    # TODO(simon): not used?!
 
     for t, a in zip(time_windows, axes_second_row):
         # contrast data
@@ -303,12 +362,12 @@ def plot_tfr_cluster_test_output(channel_names=["CP4"], fmin: int = 3, fmax: int
         x = np.mean(x, axis=1) if len(channel_names) > 1 else np.squeeze(x)
         print(x.shape)  # should be participants x frequencies x timepoints
 
-        threshold_tfce = dict(start=0, step=0.1)
+        threshold_tfce = dict(start=0, step=0.05)
 
         # run cluster test over time and frequencies (no need to define adjacency)
         t_obs, clusters, cluster_p, h0 = mne.stats.permutation_cluster_1samp_test(
-            x, n_jobs=-1, n_permutations=10000, threshold=threshold_tfce, tail=0
-        )
+            x, n_jobs=-1, n_permutations=10000, threshold=threshold_tfce, tail=0,
+        out_type='mask')
 
         if len(cluster_p) > 0:
             print(f"The minimum p-value is {min(cluster_p)}")
@@ -324,7 +383,7 @@ def plot_tfr_cluster_test_output(channel_names=["CP4"], fmin: int = 3, fmax: int
 
         # run function to plot significant cluster in time and frequency space
         plot_cluster_test_output(
-            tobs=t_obs,
+            t_obs=t_obs,
             cluster_p_values=cluster_p,
             clusters=clusters,
             fmin=fmin,
@@ -345,6 +404,32 @@ def plot_tfr_cluster_test_output(channel_names=["CP4"], fmin: int = 3, fmax: int
             format=fm,
         )
 
+def plot_cluster_contours():
+
+    """plot cluster permutation test output
+    cluster is highlighted via a contour around it,
+    code from Magdalena Gimpert"""
+
+    fig = plt.figure()
+    ax = sns.heatmap(t_obs, center=0,
+                    cbar=True)
+    # Draw the cluster outline
+    for i in range(mask.shape[0]):
+        for j in range(mask.shape[1]):
+            if mask[i, j]:
+                if i > 0 and not mask[i - 1, j]:
+                    plt.plot([j - 0.5, j + 0.5], [i, i], color='black', linewidth=1)
+                if i < mask.shape[1] - 1 and not mask[i + 1, j]:
+                    plt.plot([j - 0.5, j + 0.5], [i + 1, i + 1], color='black', linewidth=1)
+                if j > 0 and not mask[i, j - 1]:
+                    plt.plot([j - 0.5, j - 0.5], [i, i + 1], color='black', linewidth=1)
+                if j < mask.shape[2] - 1 and not mask[i, j + 1]:
+                    plt.plot([j + 0.5, j + 0.5], [i, i + 1], color='black', linewidth=1)
+    ax.invert_yaxis()
+    ax.axvline([126], color='black', linestyle='dotted', linewidth=1) # stimulation onset
+    ax.set(xlabel='Time (s)', ylabel='Frequency (Hz)',
+        title=f'TFR contrast including significant cluster, {channel_name}')
+    plt.show()
 
 def plot_cluster_test_output(
     t_obs=None, cluster_p_values=None, clusters=None, fmin=7, fmax=35, data_cond=None, tmin=0, tmax=0.5, ax0=0, ax1=0
@@ -472,3 +557,83 @@ def permutate_trials(n_permutations: int = 500, power_a=None, power_b=None) -> N
     evoked_power_b = mne.time_frequency.AverageTFR(
         power.info, evoked_power_b_perm_arr, power.times, power.freqs, power_b.data.shape[0]
     )
+
+
+#### Helper functions
+
+
+def drop_trials(data=None):
+    """
+    Drop trials based on behavioral data.
+
+    Args:
+    ----
+    data: mne.Epochs, epoched data
+    
+    Returns:
+    -------
+    data: mne.Epochs, epoched data
+    """
+
+    # store number of trials before rt cleaning
+    before_rt_cleaning = len(data.metadata)
+
+    # remove no response trials or super fast responses
+    data = data[data.metadata.respt1 != rt_max]
+    data = data[data.metadata.respt1 > rt_min]
+
+    # print rt trials dropped
+    rt_trials_removed = before_rt_cleaning - len(data.metadata)
+
+    print("Removed trials based on reaction time: ", rt_trials_removed)
+    # Calculate hit rates per participant
+    signal = data[data.metadata.isyes == 1]
+    hitrate_per_subject = signal.metadata.groupby(['ID'])['sayyes'].mean()
+
+    print(f"Mean hit rate: {np.mean(hitrate_per_subject):.2f}")
+
+    # Calculate hit rates by participant and block
+    hitrate_per_block = signal.metadata.groupby(['ID', 'block'])['sayyes'].mean()
+
+    # remove blocks with hitrates > 90 % or < 20 %
+    filtered_groups = hitrate_per_block[(hitrate_per_block > hitrate_max) | (hitrate_per_block < hitrate_min)]
+    print('Blocks with hit rates > 0.9 or < 0.2: ', len(filtered_groups))
+
+    # Extract the ID and block information from the filtered groups
+    remove_hitrates = filtered_groups.reset_index()
+
+    # Calculate false alarm rates by participant and block
+    noise = data[data.metadata.isyes == 0]
+    farate_per_block = noise.metadata.groupby(['ID', 'block'])['sayyes'].mean()
+
+    # remove blocks with false alarm rates > 0.4
+    filtered_groups = farate_per_block[farate_per_block > farate_max]
+    print('Blocks with false alarm rates > 0.4: ', len(filtered_groups))
+
+    # Extract the ID and block information from the filtered groups
+    remove_farates = filtered_groups.reset_index()
+
+    # Hitrate should be > false alarm rate
+    filtered_groups = hitrate_per_block[hitrate_per_block - farate_per_block < hit_fa_diff]
+    print('Blocks with hit rates < false alarm rates: ', len(filtered_groups))
+          
+    # Extract the ID and block information from the filtered groups
+    hitvsfarate = filtered_groups.reset_index()
+
+    # Concatenate the dataframes
+    combined_df = pd.concat([remove_hitrates, remove_farates, hitvsfarate])
+
+    # Remove duplicate rows based on 'ID' and 'block' columns
+    unique_df = combined_df.drop_duplicates(subset=['ID', 'block'])
+
+    # Merge the big dataframe with unique_df to retain only the non-matching rows
+    data.metadata = data.metadata.merge(unique_df, on=['ID', 'block'], how='left',
+                             indicator=True,
+                             suffixes=('', '_y'))
+    
+    data = data[data.metadata['_merge'] == 'left_only']
+
+    # Remove the '_merge' column
+    data.metadata = data.metadata.drop('_merge', axis=1)
+
+    return data
