@@ -18,9 +18,11 @@ import subprocess
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 import mne
 import numpy as np
 import pandas as pd
+import random
 
 from expecon_ms.configs import PROJECT_ROOT, config, params, path_to
 
@@ -256,7 +258,7 @@ def compute_tfr(
     return "Done with tfr/erp computation", cond_a, cond_b
 
 
-def load_tfr_conds(study: int = 1, 
+def load_tfr_conds(
                    cond_a: str = "high",
                    cond_b: str = "low",
                    mirror: bool = False):
@@ -266,52 +268,68 @@ def load_tfr_conds(study: int = 1,
     Args:
     ----
     cond_a : str
-        which condition tfr to load
+        which condition tfr to load: high or low or prevyesresp or prevnoresp
     cond_b : str
-        which condition tfr to load
+        which condition tfr to load: high or low or prevyesresp or prevnoresp
     mirror : boolean
             whether to load mirrored data
-
     Returns:
     -------
     tfr_a_all: list: list of tfr objects for condition a
     tfr_b_all: list: list of tfr objects for condition b
     """
-    tfr_a_all, tfr_b_all = [], []
 
-    if study == 1:
-        id_list = id_list_expecon1
-    elif study == 2:
-        id_list = id_list_expecon2
-    else:
-        raise ValueError("input should be 1 or 2 for the respective study")
+    tfr_a_cond, tfr_b_cond = [], [] # store condition data
 
-    for subj in id_list:
-        # load tfr data
-        sfx = "_mirror" if mirror else ""
-        tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a}_{str(study)}-tfr.h5", condition=0)
-        tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b}_{str(study)}-tfr.h5", condition=0)
-        tfr_a_all.append(tfr_a)
-        tfr_b_all.append(tfr_b)
+    studies = [1, 2]
+
+    for study in studies:
+        tfr_a_all, tfr_b_all = [], [] # store participant data
+
+        # adjust id list
+        if study == 1:
+            id_list = id_list_expecon1
+        elif study == 2:
+            id_list = id_list_expecon2
+        else:
+            raise ValueError("input should be 1 or 2 for the respective study")
+            # now load data for each participant and each condition
+        for subj in id_list:
+            if study == 2:
+                # skip ID 13
+                if subj == '013':
+                    continue
+            # load tfr data
+            sfx = "_mirror" if mirror else ""
+            tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a}_{str(study)}-tfr.h5", condition=0)
+            tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b}_{str(study)}-tfr.h5", condition=0)
+            tfr_a_all.append(tfr_a) # store tfr in a list
+            tfr_b_all.append(tfr_b)
+        tfr_a_cond.append(tfr_a_all)
+        tfr_b_cond.append(tfr_b_all)
 
     return tfr_a_all, tfr_b_all
 
 
 # TODO(simon): dont use mutables as default arguments
-def plot_tfr_cluster_test_output(channel_names=["CP4"],
-                                 fmin: int = 3,
-                                 fmax: int = 35):
+def plot_tfr_cluster_test_output(data_a = tfr_a_cond,
+                                 data_b = tfr_b_cond,
+                                 channel_name=["C4"]):
     """
     Plot cluster permutation test output for tfr data (time and frequency cluster).
 
     Args:
     ----
+    data_a : list of tfr objects
+        tfr data for condition a
+    data_b : list of tfr objects
+        tfr data for condition b
+    cond_a : str
+        condition a
+    cond_b : str
+        condition b
     channel_names : list of char
         channels to analyze
-    fmin : int
-        minimum frequency to plot
-    fmax : int
-        maximum frequency to plot
     ----------
 
     Returns:
@@ -319,164 +337,90 @@ def plot_tfr_cluster_test_output(channel_names=["CP4"],
     None
     """
 
-    # average over participants
-    gra_a = mne.grand_average(tfr_a_all)  # high
-    gra_b = mne.grand_average(tfr_b_all)  # low
-
-    # difference between conditions (2nd level)
-    diff = gra_a - gra_b
-    diff.data = diff.data * 10**11
-
-    # Create a 2x3 grid of plots (2 rows, 3 columns)
-    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(12, 8))
-
     # which time windows to plot
-    time_windows = [(-1, -0.4), (-0.4, 0)]
-    # for mirrored data
-    #time_windows = [(-0.4, 0)]
+    time_windows = [(-0.4, 0), (-0.7, 0)]
 
     # which axes to plot the time windows
     axes_first_row = [(0, 0), (0, 1)]
-    axes_second_row = [(1, 0), (1, 1)]
 
-    # now populate first row with tfr contrasts
-    for t, a in zip(time_windows, axes_first_row):
-        # TODO(simon): not used?!
-        tfr_fig = (
-            diff.copy()
-            .crop(tmin=t[0], tmax=t[1])
-            .plot(picks=channel_names, cmap=plt.cm.bwr, axes=axs[a[0], a[1]], show=False)[0]
-        )
+    # Create a 2x3 grid of plots (2 rows, 3 columns)
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
 
-    for t, a in zip(time_windows, axes_second_row):
+    # loop over time windows and axes
+    for idx, (t, a) in enumerate(zip(time_windows, axes_first_row)):
+
         # contrast data
         x = np.array(
             [
-                h.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names).data
-                - l.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names).data
-                for h, l in zip(tfr_a_all, tfr_b_all)
+                h.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_name).data
+                - l.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_name).data
+                for h, l in zip(data_a[idx], data_b[idx])
             ]
         )
 
-        # pick channel
-        x = np.mean(x, axis=1) if len(channel_names) > 1 else np.squeeze(x)
-        print(x.shape)  # should be participants x frequencies x timepoints
+        # pick channel or average over channels
+        x = np.mean(x, axis=1) if len(channel_name) > 1 else np.squeeze(x)
+        print(f"Shape of array for cluster test should be participants x frequencies x timepoints: {x.shape}")
 
+        # define threshold dictionary for threshold-free cluster enhancement
         threshold_tfce = dict(start=0, step=0.05)
 
         # run cluster test over time and frequencies (no need to define adjacency)
-        t_obs, clusters, cluster_p, h0 = mne.stats.permutation_cluster_1samp_test(
-            x, n_jobs=-1, n_permutations=10000, threshold=threshold_tfce, tail=0,
-        out_type='mask')
+        t_obs, _ , cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
+            x, n_jobs=-1, n_permutations=10000, threshold=threshold_tfce,
+            tail=0)
 
-        if len(cluster_p) > 0:
-            print(f"The minimum p-value is {min(cluster_p)}")
+        print(f'smallest cluster p-value: {min(cluster_p)}')
+        cluster_p = np.around(cluster_p, 2)
 
-            good_cluster_inds = np.where(cluster_p < params.alpha)
+        # set mask for plotting sign. points that belong to the cluster
+        mask = np.array(cluster_p).reshape(t_obs.shape[0], t_obs.shape[1])
+        mask = mask < params.alpha # boolean for masking sign. voxels
 
-            if len(good_cluster_inds[0]) > 0:
-                # Find the index of the overall minimum value
-                min_index = np.unravel_index(np.argmin(t_obs), t_obs.shape)  # TODO(simon): not used?!
+        # get times for x axis
+        times = data_a[idx][0].crop(tmin=t[0], tmax=t[1]).times
 
-                freqs = np.arange(fmin, fmax, 1)  # TODO(simon): not used?!
-                times = tfr_a_all[0].copy().crop(t[0], t[1]).times  # TODO(simon): not used?!
+        # get frequencies for y axis
+        freqs = data_a[idx][0].freqs
 
-        # run function to plot significant cluster in time and frequency space
-        plot_cluster_test_output(
-            t_obs=t_obs,
-            cluster_p_values=cluster_p,
-            clusters=clusters,
-            fmin=fmin,
-            fmax=fmax,
-            data_cond=tfr_a_all,
-            tmin=t[0],
-            tmax=t[1],
-            ax0=a[0],
-            ax1=a[1],
-        )
+        # plot t contrast and sign. cluster contour
+        plot_cluster_contours()
 
     # finally, save the figure
     for fm in ["svg", "png"]:
-        # TODO(simon): cond_a & cond_b are not defined
-        plt.savefig(
-            Path(path_to.figures.manuscript.figure6) / f"fig6_{cond_a}_{cond_b}_tfr_{channel_names[0]}_mirrored.{fm}",
+        fig.savefig(
+            Path(path_to.figures.manuscript.figure3) / f"fig3_{cond_a}_{cond_b}_tfr_{channel_name[0]}.{fm}",
             dpi=300,
             format=fm,
         )
+    plt.show()
+
 
 def plot_cluster_contours():
 
     """plot cluster permutation test output
     cluster is highlighted via a contour around it,
-    code from Magdalena Gimpert"""
+    code adapted Gimpert et al."""
 
-    fig = plt.figure()
-    ax = sns.heatmap(t_obs, center=0,
-                    cbar=True)
+    sns.heatmap(t_obs, center=0,
+                    cbar=True, cmap="viridis", ax=axs[idx])
+
     # Draw the cluster outline
-    for i in range(mask.shape[0]):
-        for j in range(mask.shape[1]):
+    for i in range(mask.shape[0]): # frequencies
+        for j in range(mask.shape[1]): # time
             if mask[i, j]:
                 if i > 0 and not mask[i - 1, j]:
-                    plt.plot([j - 0.5, j + 0.5], [i, i], color='black', linewidth=1)
-                if i < mask.shape[1] - 1 and not mask[i + 1, j]:
-                    plt.plot([j - 0.5, j + 0.5], [i + 1, i + 1], color='black', linewidth=1)
+                    axs[idx].plot([j - 0.5, j + 0.5], [i, i], color='white', linewidth=2)
+                if i < mask.shape[0] - 1 and not mask[i + 1, j]:
+                    axs[idx].plot([j - 0.5, j + 0.5], [i + 1, i + 1], color='white', linewidth=2)
                 if j > 0 and not mask[i, j - 1]:
-                    plt.plot([j - 0.5, j - 0.5], [i, i + 1], color='black', linewidth=1)
-                if j < mask.shape[2] - 1 and not mask[i, j + 1]:
-                    plt.plot([j + 0.5, j + 0.5], [i, i + 1], color='black', linewidth=1)
-    ax.invert_yaxis()
-    ax.axvline([126], color='black', linestyle='dotted', linewidth=1) # stimulation onset
-    ax.set(xlabel='Time (s)', ylabel='Frequency (Hz)',
-        title=f'TFR contrast including significant cluster, {channel_name}')
-    plt.show()
-
-def plot_cluster_test_output(
-    t_obs=None, cluster_p_values=None, clusters=None, fmin=7, fmax=35, data_cond=None, tmin=0, tmax=0.5, ax0=0, ax1=0
-) -> None:
-    """Plot cluster."""
-    freqs = np.arange(fmin, fmax, 1)
-
-    times = 1e3 * data_cond[0].copy().crop(tmin, tmax).times
-
-    t_obs_plot = np.nan * np.ones_like(t_obs)
-    for c, p_val in zip(clusters, cluster_p_values):
-        if p_val <= params.alpha:
-            t_obs_plot[c] = t_obs[c]
-
-    min_v = np.max(np.abs(t_obs))
-
-    vmin = -min_v
-    vmax = min_v
-
-    # TODO(simon): fig1 not used & axs not defined
-    fig1 = axs[ax0, ax1].imshow(
-        t_obs,
-        cmap=plt.cm.bwr,
-        extent=[times[0], times[-1], freqs[0], freqs[-1]],
-        aspect="auto",
-        origin="lower",
-        vmin=vmin,
-        vmax=vmax,
-        alpha=0.5,
-    )
-
-    fig2 = axs[ax0, ax1].imshow(
-        t_obs_plot,
-        cmap=plt.cm.bwr,
-        extent=[times[0], times[-1], freqs[0], freqs[-1]],
-        aspect="auto",
-        origin="lower",
-        vmin=vmin,
-        vmax=vmax,
-    )
-
-    # Add colorbar for each subplot
-    # TODO(simon): fig not defined
-    fig.colorbar(fig2, ax=axs[ax0, ax1])
-
-    axs[ax0, ax1].set_xlabel("Time (ms)")
-    axs[ax0, ax1].set_ylabel("Frequency (Hz)")
+                    axs[idx].plot([j - 0.5, j - 0.5], [i, i + 1], color='white', linewidth=2)
+                if j < mask.shape[1] - 1 and not mask[i, j + 1]:
+                    axs[idx].plot([j + 0.5, j + 0.5], [i, i + 1], color='white', linewidth=2)
+    axs[idx].invert_yaxis()
+    axs[idx].axvline([t_obs.shape[1]], color='white', linestyle='dotted', linewidth=5) # stimulation onset
+    axs[idx].set(xlabel='Time (s)', ylabel='Frequency (Hz)',
+        title=f'TFR contrast {cond_a} - {cond_b} in channel {channel_name[0]}')
 
 
 def zero_pad_or_mirror_data(data, zero_pad: bool = False):
@@ -518,8 +462,20 @@ def zero_pad_or_mirror_data(data, zero_pad: bool = False):
     return np.squeeze(np.array(padded_list))
 
 
-def permutate_trials(n_permutations: int = 500, power_a=None, power_b=None) -> None:
-    """Permutate trials between two conditions and equalize trial counts."""
+def permute_trials(n_permutations: int = 500, power_a=None, power_b=None):
+
+    """Permute trials between two conditions and equalize trial counts.
+    Args:
+    ----
+    n_permutations: int, info: number of permutations
+    power_a: mne.time_frequency.EpochsTFR, info: tfr data for condition a
+    power_b: mne.time_frequency.EpochsTFR, info: tfr data for condition b
+    Returns:
+    -------
+    evoked_power_a: mne.time_frequency.AverageTFR, info: evoked power for condition a
+    evoked_power_b: mne.time_frequency.AverageTFR, info: evoked power for condition b
+    """
+
     # store permutations
     power_a_perm, power_b_perm = [], []
 
@@ -550,17 +506,19 @@ def permutate_trials(n_permutations: int = 500, power_a=None, power_b=None) -> N
     evoked_power_b_perm_arr = np.mean(np.array([p.data for p in power_b_perm]), axis=0)
 
     # put back into the TFR object
-    # TODO(simon): power not defined, evoked_power_a evoked_power_b are not used
     evoked_power_a = mne.time_frequency.AverageTFR(
-        power.info, evoked_power_a_perm_arr, power.times, power.freqs, power_a.data.shape[0]
+        power_a.info, evoked_power_a_perm_arr, power_a.times, power_a.freqs,
+          power_a.data.shape[0]
     )
     evoked_power_b = mne.time_frequency.AverageTFR(
-        power.info, evoked_power_b_perm_arr, power.times, power.freqs, power_b.data.shape[0]
+        power_b.info, evoked_power_b_perm_arr, power_b.times, power_b.freqs,
+          power_b.data.shape[0]
     )
 
+    return evoked_power_a, evoked_power_b
 
-#### Helper functions
 
+# Helper functions
 
 def drop_trials(data=None):
     """
@@ -637,3 +595,4 @@ def drop_trials(data=None):
     data.metadata = data.metadata.drop('_merge', axis=1)
 
     return data
+# %%
