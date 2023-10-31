@@ -219,7 +219,7 @@ def exclude_data(expecon: int = 1):
 
 
 def plot_mean_response_and_confidence(
-    blue="#0571b0", red="#ca0020", savepath=path_to.figures.manuscript.figure4, expecon=1
+    blue="#0571b0", red="#ca0020", savepath=path_to.figures.manuscript.figure1, expecon=1
 ):
     """
     Plot the mean detection response and mean confidence for each cue condition with a boxplot.
