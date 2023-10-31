@@ -259,8 +259,8 @@ def compute_tfr(
 
 
 def load_tfr_conds(
-                   cond_a: str = "high",
-                   cond_b: str = "low",
+                   cond_a: str = "prevyesresp",
+                   cond_b: str = "prevnoresp",
                    mirror: bool = False):
     """
     Load tfr data for the two conditions.
@@ -312,14 +312,16 @@ def load_tfr_conds(
 
 
 # TODO(simon): dont use mutables as default arguments
-def plot_tfr_cluster_test_output(data_a = tfr_a_cond,
+def plot_tfr_cluster_test_output(3d_test=True,
+                                 data_a = tfr_a_cond,
                                  data_b = tfr_b_cond,
-                                 channel_name=["C4"]):
+                                 channel_name=["CP4"]):
     """
     Plot cluster permutation test output for tfr data (time and frequency cluster).
 
     Args:
     ----
+    3d_test: boolean, info: whether to run a 3d cluster test (time, frequency, channels)
     data_a : list of tfr objects
         tfr data for condition a
     data_b : list of tfr objects
@@ -362,8 +364,35 @@ def plot_tfr_cluster_test_output(data_a = tfr_a_cond,
         x = np.mean(x, axis=1) if len(channel_name) > 1 else np.squeeze(x)
         print(f"Shape of array for cluster test should be participants x frequencies x timepoints: {x.shape}")
 
+        if 3d_test:
+            # contrast data
+            x = np.array(
+                [
+                    h.copy().crop(tmin=t[0], tmax=t[1]).data
+                    - l.copy().crop(tmin=t[0], tmax=t[1]).data
+                    for h, l in zip(data_a[idx], data_b[idx])
+                ]
+            )
+            # define adjacency for channels
+            ch_adjacency, _ = mne.channels.find_ch_adjacency(data_a[idx][0].info, ch_type="eeg")
+            
+            # visualize channel adjacency
+            mne.viz.plot_ch_adjacency(data_a[0][0].info, ch_adjacency, data_a[0][0].ch_names)
+            # our data at each observation is of shape frequencies × times × channels
+            tfr_adjacency = mne.stats.combine_adjacency(len(data_a[idx][0].freqs), 
+                                                        len(data_a[idx][0].times),
+                                                         ch_adjacency)
+
+            x = x.reshape(x.shape[0], x.shape[2], x.shape[3], x.shape[1])
+            print(f"Shape of array for cluster test should be participants x frequencies x timepoints x channels: {x.shape}")
+
+            # run cluster test over time, frequencies and channels
+            t_obs, _ , cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
+                x, n_jobs=-1, n_permutations=10000, threshold=None,
+                tail=0, adjacency=tfr_adjacency)
+        
         # define threshold dictionary for threshold-free cluster enhancement
-        threshold_tfce = dict(start=0, step=0.05)
+        threshold_tfce = dict(start=0, step=0.1)
 
         # run cluster test over time and frequencies (no need to define adjacency)
         t_obs, _ , cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
