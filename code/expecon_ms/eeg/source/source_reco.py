@@ -55,13 +55,14 @@ trans_dir = subjects_dir / f"{subject}/bem/{subject}-trans.fif"
 src = mne.read_source_spaces(src_fname)
 fwd = mne.read_forward_solution(fwd_dir)
 
-# data paths
-dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.clean_epochs)
+# clean epochs
+dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
+dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
 
 subj = "008"
 
 # load cleaned epochs (after ica component rejection)
-epochs = mne.read_epochs(dir_clean_epochs / f"P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif")
+epochs = mne.read_epochs(dir_clean_epochs_expecon2 / f"P{subj}_icacorr_0.1Hz-epo.fif")
 
 # check alignment
 if PLOT_ALIGNMENT:
@@ -77,27 +78,46 @@ if PLOT_ALIGNMENT:
         eeg=True,
     )
 
-behav_path = Path(path_to.data.behavior.behavior_df)
+behav_path = Path(path_to.data.behavior)
 
 # save paths for beamforming
 beamformer_path = Path("./data/eeg/source/high_low_pre_beamformer")
 figs_dics_path = Path("./figs/manuscript_figures/figure6_tfr_contrasts/source")
+
 # save paths for mne
 mne_path = Path("./data/eeg/source/high_low_pre_eLORETA")
 save_dir_cluster_output = Path("./figs/eeg/sensor/cluster_permutation_output")
 
-id_list = config.participants.ID_list
+# participant IDs
+id_list_expecon1 = config.participants.ID_list_expecon1
+id_list_expecon2 = config.participants.ID_list_expecon2
 
-
+# data_cleaning parameters defined in config.toml
+rt_max = config.behavioral_cleaning.rt_max
+rt_min = config.behavioral_cleaning.rt_min
+hitrate_max = config.behavioral_cleaning.hitrate_max
+hitrate_min = config.behavioral_cleaning.hitrate_min
+farate_max = config.behavioral_cleaning.farate_max
+hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: bool = True) -> None:
+def run_source_reco(study: int = 1, cond: str = "probability",
+                    dics: int = 0, fmin=15, fmax=25, tmin=-0.2, tmax=0,
+                    save_path: str | Path = mne_path, 
+                    drop_bads: bool = True) -> None:
     """
     Run source reconstruction on epoched EEG data using eLoreta or DICS beamforming for frequency source analysis.
 
     Args:
     ----
+    study : int, info: which study to analyze: 1 (block, stable environment) or 2 (trial,
+    volatile environment)
+    cond : str, info: which condition to analyze: "probability" or "prev_resp"
+    fmin: int, info: lower frequency bound for DICS beamforming
+    fmax: int, info: upper frequency bound for DICS beamforming
+    tmin: int, info: lower time bound for DICS beamforming
+    tmax: int, info: upper time bound for DICS beamforming
     dics: 1 for DICS beamforming, 0 for eLoreta
     save_path: path to save source estimates
     drop_bads: if True, bad epochs are dropped
@@ -106,69 +126,103 @@ def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: 
     -------
     .stc files for each hemisphere containing source reconstructions for each participant, shape: vertices-x-timepoints
     """
+
+    if study == 1:
+        id_list = id_list_expecon1
+        # load behavioral data
+        data = pd.read_csv(Path(path_to.data.behavior, "prepro_behav_data.csv"))
+
+    elif study == 2:
+        id_list = id_list_expecon2
+        # load behavioral data
+        data = pd.read_csv(Path(path_to.data.behavior,
+                                "prepro_behav_data_expecon2.csv"))
+    else:
+        raise ValueError("input should be 1 or 2 for the respective study")
+
+    # now loop over participants
     for idx, subj in enumerate(id_list):
+
         # print participant ID
         print("Analyzing " + subj)
 
-        # load cleaned epochs (after ica component rejection)
-        epochs = mne.read_epochs(dir_clean_epochs / f"P{subj}_epochs_after_ica_0.1Hzfilter-epo.fif")
+        # load clean epochs (after ica component rejection)
+        if study == 1:
+            epochs = mne.read_epochs(
+                Path(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif"))
+        elif study == 2:
+            # skip ID 13
+            if subj == '013':
+                continue
+            epochs = mne.read_epochs(dir_clean_epochs_expecon2 / f"P{subj}_icacorr_0.1Hz-epo.fif")
+            # rename columns
+            epochs.metadata = epochs.metadata.rename(columns ={"resp1_t": "respt1",
+                                                               "stim_type": "isyes",
+                                                               "resp1": "sayyes"})
+        else:
+            raise ValueError("input should be 1 or 2 for the respective study")
 
-        ids_to_delete = [10, 12, 13, 18, 26, 30, 32, 32, 39, 40, 40, 30]  # TODO(simon): move to config.toml ?!
-        blocks_to_delete = [6, 6, 4, 3, 4, 3, 2, 3, 3, 2, 5, 6]
+        # clean epochs (remove blocks based on hit and false alarm rates, reaction times, etc.)
+        epochs = drop_trials(data=epochs)
 
-        # Check if the participant ID is in the list of IDs to delete
-        if pd.unique(epochs.metadata.ID) in ids_to_delete:
-            # Get the corresponding blocks to delete for the current participant
-            participant_blocks_to_delete = [
-                block for id_, block in zip(ids_to_delete, blocks_to_delete) if id_ == pd.unique(epochs.metadata.ID)
-            ]
-
-            # Drop the rows with the specified blocks from the dataframe
-            epochs = epochs[~epochs.metadata.block.isin(participant_blocks_to_delete)]
-
-        # remove trials with rts >= 2.5 (no response trials) and trials with rts < 0.1
-        epochs = epochs[epochs.metadata.respt1 >= 0.1]
-        epochs = epochs[epochs.metadata.respt1 != 2.5]
-
-        # load behavioral data
-        data = pd.read_csv(behav_path / "prepro_behav_data.csv")
-
-        subj_data = data[idx + 7 == data.ID]
+        # get behavioral data for current participant
+        if study == 1:
+            subj_data = data[idx + pilot_counter == data.ID]
+        elif study == 2:
+            subj_data = data[idx + 1 == data.ID]
+        else:
+            raise ValueError("input should be 1 or 2 for the respective study")
 
         # get drop log from epochs
         drop_log = epochs.drop_log
 
+        # Ignored bad epochs are those defined by the user as bad epochs
         search_string = "IGNORED"
-
+        # remove trials where epochs are labelled as too short
         indices = [index for index, tpl in enumerate(drop_log) if tpl and search_string not in tpl]
 
-        # drop bad epochs (too late recordings)
+        # drop trials without corresponding epoch
         if indices:
             epochs.metadata = subj_data.reset_index().drop(indices)
         else:
             epochs.metadata = subj_data
 
-        # drop bad epochs
         if drop_bads:
             # drop epochs with abnormal strong signal (> 200 micro-volts)
             epochs.drop_bad(reject=dict(eeg=200e-6))
 
-        # epochs for high and low probability condition
-        epochs_high = epochs[epochs.metadata.cue == 0.75]
-        epochs_low = epochs[epochs.metadata.cue == 0.25]
+        if cond == "probability":
+            epochs_a = epochs[
+                (epochs.metadata.cue == 0.75)
+            ]
+            epochs_b = epochs[(epochs.metadata.cue == 0.25)]
+            cond_a = "high"
+            cond_b = "low"
+        elif cond == "prev_resp":
+            epochs_a = epochs[
+                (epochs.metadata.prevresp == 1)
+            ]
+            epochs_b = epochs[(epochs.metadata.prevresp == 0)]
+            cond_a = "prevyesresp"
+            cond_b = "prevnoresp"
+        else:
+            raise ValueError("input should be 'probability' or 'prev_resp'")
+
+        # make sure we have an equal amount of trials in both conditions
+        mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
         if dics == 1:
             # We are interested in the beta band
-            freqs = np.arange(15, 25, 1)
+            freqs = np.arange(fmin, fmax, 1)
 
             # Computing the cross-spectral density matrix for the beta frequency band, for
             # different time intervals.
             # csd for all epochs
-            csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=-0.4, tmax=0)
+            csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=tmin, tmax=tmax)
             # csd for high-prob trials only
-            csd_a = mne.time_frequency.csd_morlet(epochs_high, freqs, tmin=-0.4, tmax=0)
+            csd_a = mne.time_frequency.csd_morlet(epochs_a, freqs, tmin=tmin, tmax=tmax)
             # csd for low-prob trials only
-            csd_b = mne.time_frequency.csd_morlet(epochs_low, freqs, tmin=-0.4, tmax=0)
+            csd_b = mne.time_frequency.csd_morlet(epochs_b, freqs, tmin=tmin, tmax=tmax)
 
             info = epochs.info
 
@@ -186,24 +240,24 @@ def run_source_reco(dics: int = 0, save_path: str | Path = mne_path, drop_bads: 
             source_power_a, freqs = mne.beamformer.apply_dics_csd(csd_a, filters)
             source_power_b, freqs = mne.beamformer.apply_dics_csd(csd_b, filters)
 
-            source_power_a.save(Path(save_path, f"high_beta_{subj}"))
-            source_power_b.save(Path(save_path, f"low_beta_{subj}"))
+            source_power_a.save(Path(save_path, f"{cond_a}_{subj}"))
+            source_power_b.save(Path(save_path, f"{cond_b}_{subj}"))
 
         else:
             # average epochs for MNE
-            evokeds_high = epochs_high.average()
-            evokeds_low = epochs_low.average()
+            evokeds_a = epochs_a.average()
+            evokeds_b = epochs_b.average()
 
-            evoked_contrast = mne.combine_evoked(all_evoked=[evokeds_high, evokeds_low], weights=[0.5, -0.5])
+            evoked_contrast = mne.combine_evoked(all_evoked=[evokeds_a, evokeds_b], weights=[0.5, -0.5])
             evoked_contrast.crop(-0.4, tmax=0)
             # filter in beta band
-            evoked_contrast.filter(l_freq=15, h_freq=25)
+            evoked_contrast.filter(l_freq=fmin, h_freq=fmax)
 
             # create noise covariance with a bias of data length
             # noise_cov = create_noise_cov(evokeds_high.data.shape, evokeds_high.info)
 
             # all epochs for noise covariance computation
-            noise_cov = mne.compute_covariance(epochs, tmin=-0.4, tmax=0, method=["shrunk", "empirical"], rank="info")
+            noise_cov = mne.compute_covariance(epochs, tmin=tmin, tmax=tmax, method=["shrunk", "empirical"], rank="info")
 
             # save covariance matrix
             mne.write_cov(fname="covariance_prestim.cov", cov=noise_cov)
@@ -434,7 +488,83 @@ def create_noise_cov(data_size: tuple[int, int], data_info: mne.Info) -> mne.Cov
     raw1 = mne.io.RawArray(data1, data_info)
     return mne.compute_raw_covariance(raw1, tmin=0, tmax=None)
 
+# Helper functions
 
+def drop_trials(data=None):
+    """
+    Drop trials based on behavioral data.
+
+    Args:
+    ----
+    data: mne.Epochs, epoched data
+    
+    Returns:
+    -------
+    data: mne.Epochs, epoched data
+    """
+
+    # store number of trials before rt cleaning
+    before_rt_cleaning = len(data.metadata)
+
+    # remove no response trials or super fast responses
+    data = data[data.metadata.respt1 != rt_max]
+    data = data[data.metadata.respt1 > rt_min]
+
+    # print rt trials dropped
+    rt_trials_removed = before_rt_cleaning - len(data.metadata)
+
+    print("Removed trials based on reaction time: ", rt_trials_removed)
+    # Calculate hit rates per participant
+    signal = data[data.metadata.isyes == 1]
+    hitrate_per_subject = signal.metadata.groupby(['ID'])['sayyes'].mean()
+
+    print(f"Mean hit rate: {np.mean(hitrate_per_subject):.2f}")
+
+    # Calculate hit rates by participant and block
+    hitrate_per_block = signal.metadata.groupby(['ID', 'block'])['sayyes'].mean()
+
+    # remove blocks with hitrates > 90 % or < 20 %
+    filtered_groups = hitrate_per_block[(hitrate_per_block > hitrate_max) | (hitrate_per_block < hitrate_min)]
+    print('Blocks with hit rates > 0.9 or < 0.2: ', len(filtered_groups))
+
+    # Extract the ID and block information from the filtered groups
+    remove_hitrates = filtered_groups.reset_index()
+
+    # Calculate false alarm rates by participant and block
+    noise = data[data.metadata.isyes == 0]
+    farate_per_block = noise.metadata.groupby(['ID', 'block'])['sayyes'].mean()
+
+    # remove blocks with false alarm rates > 0.4
+    filtered_groups = farate_per_block[farate_per_block > farate_max]
+    print('Blocks with false alarm rates > 0.4: ', len(filtered_groups))
+
+    # Extract the ID and block information from the filtered groups
+    remove_farates = filtered_groups.reset_index()
+
+    # Hitrate should be > false alarm rate
+    filtered_groups = hitrate_per_block[hitrate_per_block - farate_per_block < hit_fa_diff]
+    print('Blocks with hit rates < false alarm rates: ', len(filtered_groups))
+          
+    # Extract the ID and block information from the filtered groups
+    hitvsfarate = filtered_groups.reset_index()
+
+    # Concatenate the dataframes
+    combined_df = pd.concat([remove_hitrates, remove_farates, hitvsfarate])
+
+    # Remove duplicate rows based on 'ID' and 'block' columns
+    unique_df = combined_df.drop_duplicates(subset=['ID', 'block'])
+
+    # Merge the big dataframe with unique_df to retain only the non-matching rows
+    data.metadata = data.metadata.merge(unique_df, on=['ID', 'block'], how='left',
+                             indicator=True,
+                             suffixes=('', '_y'))
+    
+    data = data[data.metadata['_merge'] == 'left_only']
+
+    # Remove the '_merge' column
+    data.metadata = data.metadata.drop('_merge', axis=1)
+
+    return data
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 if __name__ == "__main__":
