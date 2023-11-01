@@ -21,7 +21,6 @@ import seaborn as sns
 
 from expecon_ms.behav import figure1
 from expecon_ms.configs import PROJECT_ROOT, config, path_to
-
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # Specify the file path for which you want the last commit date
@@ -54,7 +53,7 @@ freq_bands = {"alpha": (7, 13), "beta": (15, 25)}
 
 # TODO(simon): defaults should not be mutable
 def save_band_power_per_trial(time_intervals={"pre": (-0.2, 0)}, channel_name=["CP4"],
-                              study: int = 2):
+                              study: int = 1):
     """
     Save the power per trial per frequency band in a csv file.
 
@@ -108,19 +107,19 @@ def save_band_power_per_trial(time_intervals={"pre": (-0.2, 0)}, channel_name=["
         brain_behav.append(behav_data)
 
     # concatenate the list of dataframes and save as csv
-    pd.concat(brain_behav).to_csv(behav_dir / "brain_behav_{study}.csv")
+    pd.concat(brain_behav).to_csv(behav_dir / f"brain_behav_{str(study)}.csv")
 
     return brain_behav
 
 
-def power_criterion_corr() -> None:
+def power_criterion_corr(study: int = 1) -> None:
     """
     Correlate the power difference between low and high expectations trials 
     with the difference in sdt parameters for low and high expectations.
     function calculates spearman correlation and plots regression line.
     """
     # load brain behav dataframe
-    df_brain_behav = pd.read_csv(behav_dir / "brain_behav.csv")
+    df_brain_behav = pd.read_csv(behav_dir / "brain_behav_{study}.csv")
 
     freqs = ["pre_alpha", "pre_beta"]
 
