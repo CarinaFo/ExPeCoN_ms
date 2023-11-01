@@ -40,7 +40,6 @@ print("Last Commit Date for", __file__path, ":", last_commit_date)
 # set font to Arial and font size to 14
 plt.rcParams.update({"font.size": 14, "font.family": "sans-serif", "font.sans-serif": "Arial"})
 
-# set paths
 # clean epochs
 dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
 dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
@@ -66,7 +65,7 @@ hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 
 
 def compute_tfr(
-    study: int = 2,
+    study: int = 1,
     cond: str = "prev_resp",
     tmin: float = -1,
     tmax: float = 0,
@@ -200,19 +199,17 @@ def compute_tfr(
         df_all.append(epochs.metadata)
 
         if cond == "probability":
-            epochs_a = epochs[
-                (epochs.metadata.cue == 0.75)
-            ]
+            epochs_a = epochs[(epochs.metadata.cue == 0.75)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-            cond_a = "high"
-            cond_b = "low"
+            cond_a_name = "high"
+            cond_b_name = "low"
         elif cond == "prev_resp":
-            epochs_a = epochs[
-                (epochs.metadata.prevresp == 1)
-            ]
-            epochs_b = epochs[(epochs.metadata.prevresp == 0)]
-            cond_a = "prevyesresp"
-            cond_b = "prevnoresp"
+            epochs_a = epochs[((epochs.metadata.prevresp == 1) &
+                                (epochs.metadata.cue == 0.75))]
+            epochs_b = epochs[((epochs.metadata.prevresp == 0) &
+                                (epochs.metadata.cue == 0.75))]
+            cond_a_name = "prevyesresp_highprob"
+            cond_b_name = "prevnoresp_highprob"
         else:
             raise ValueError("input should be 'probability' or 'prev_resp'")
 
@@ -220,7 +217,7 @@ def compute_tfr(
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
         # set tfr path
-        if (tfr_path / f"{subj}_{cond}_{str(study)}-tfr.h5").exists():
+        if (tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5").exists():
             print("TFR already exists")
         else:
             tfr_a = mne.time_frequency.tfr_multitaper(
@@ -235,11 +232,11 @@ def compute_tfr(
             
             # save tfr data
             if cond == "probability":
-                tfr_a.save(fname=tfr_path / f"{subj}_{cond_a}_{str(study)}-tfr.h5")
-                tfr_b.save(fname=tfr_path / f"{subj}_{cond_b}_{str(study)}-tfr.h5")
+                tfr_a.save(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5")
+                tfr_b.save(fname=tfr_path / f"{subj}_{cond_b_name}_{str(study)}-tfr.h5")
             elif cond == "prev_resp":
-                tfr_a.save(fname=tfr_path / f"{subj}_{cond_a}_{str(study)}-tfr.h5")
-                tfr_b.save(fname=tfr_path / f"{subj}_{cond_b}_{str(study)}-tfr.h5")
+                tfr_a.save(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5")
+                tfr_b.save(fname=tfr_path / f"{subj}_{cond_b_name}_{str(study)}-tfr.h5")
             else:
                 raise ValueError("input should be 'probability' or 'prev_resp'")
 
@@ -255,12 +252,12 @@ def compute_tfr(
             tfr.save(fname=tfr_path / f"{subj}_single_trial_power_{str(study)}-tfr.h5", 
                      overwrite=True)
 
-    return "Done with tfr/erp computation", cond_a, cond_b
+    return "Done with tfr/erp computation", cond_a_name, cond_b_name
 
 
 def load_tfr_conds(
-                   cond_a: str = "prevyesresp",
-                   cond_b: str = "prevnoresp",
+                   cond_a_name: str = "prevyesresp_highprob",
+                   cond_b_name: str = "prevnoresp_highprob",
                    mirror: bool = False):
     """
     Load tfr data for the two conditions.
@@ -301,8 +298,10 @@ def load_tfr_conds(
                     continue
             # load tfr data
             sfx = "_mirror" if mirror else ""
-            tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a}_{str(study)}-tfr.h5", condition=0)
-            tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b}_{str(study)}-tfr.h5", condition=0)
+            tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5",
+                                                  condition=0)
+            tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b_name}_{str(study)}-tfr.h5",
+                                                  condition=0)
             tfr_a_all.append(tfr_a) # store tfr in a list
             tfr_b_all.append(tfr_b)
         tfr_a_cond.append(tfr_a_all)
@@ -312,9 +311,11 @@ def load_tfr_conds(
 
 
 # TODO(simon): dont use mutables as default arguments
-def plot_tfr_cluster_test_output(3d_test=True,
-                                 data_a = tfr_a_cond,
-                                 data_b = tfr_b_cond,
+def plot_tfr_cluster_test_output(threed_test=True,
+                                 tfr_a_cond=None,
+                                 tfr_b_cond=None,
+                                 cond_a_name="prevyesresp_highprob",
+                                 cond_b_name="prevnoresp_highprob",
                                  channel_name=["CP4"]):
     """
     Plot cluster permutation test output for tfr data (time and frequency cluster).
@@ -351,36 +352,24 @@ def plot_tfr_cluster_test_output(3d_test=True,
     # loop over time windows and axes
     for idx, (t, a) in enumerate(zip(time_windows, axes_first_row)):
 
-        # contrast data
-        x = np.array(
-            [
-                h.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_name).data
-                - l.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_name).data
-                for h, l in zip(data_a[idx], data_b[idx])
-            ]
-        )
-
-        # pick channel or average over channels
-        x = np.mean(x, axis=1) if len(channel_name) > 1 else np.squeeze(x)
-        print(f"Shape of array for cluster test should be participants x frequencies x timepoints: {x.shape}")
-
-        if 3d_test:
+        if threed_test:
             # contrast data
             x = np.array(
                 [
                     h.copy().crop(tmin=t[0], tmax=t[1]).data
                     - l.copy().crop(tmin=t[0], tmax=t[1]).data
-                    for h, l in zip(data_a[idx], data_b[idx])
+                    for h, l in zip(tfr_a_cond[idx], tfr_b_cond[idx])
                 ]
             )
             # define adjacency for channels
-            ch_adjacency, _ = mne.channels.find_ch_adjacency(data_a[idx][0].info, ch_type="eeg")
+            ch_adjacency, _ = mne.channels.find_ch_adjacency(tfr_a_cond[idx][0].info, ch_type="eeg")
             
             # visualize channel adjacency
-            mne.viz.plot_ch_adjacency(data_a[0][0].info, ch_adjacency, data_a[0][0].ch_names)
+            mne.viz.plot_ch_adjacency(tfr_a_cond[0][0].info, ch_adjacency, tfr_a_cond[0][0].ch_names)
             # our data at each observation is of shape frequencies × times × channels
-            tfr_adjacency = mne.stats.combine_adjacency(len(data_a[idx][0].freqs), 
-                                                        len(data_a[idx][0].times),
+            tfr_adjacency = mne.stats.combine_adjacency(len(tfr_a_cond[idx][0].freqs), 
+                                                        len(tfr_b_cond[idx][0].
+                                                            crop(tmin=t[0], tmax=t[1]).times),
                                                          ch_adjacency)
 
             x = x.reshape(x.shape[0], x.shape[2], x.shape[3], x.shape[1])
@@ -390,40 +379,54 @@ def plot_tfr_cluster_test_output(3d_test=True,
             t_obs, _ , cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
                 x, n_jobs=-1, n_permutations=10000, threshold=None,
                 tail=0, adjacency=tfr_adjacency)
-        
-        # define threshold dictionary for threshold-free cluster enhancement
-        threshold_tfce = dict(start=0, step=0.1)
+            
+            print(f'smallest cluster p-value: {min(cluster_p)}')
+            cluster_p = np.around(cluster_p, 2)
 
-        # run cluster test over time and frequencies (no need to define adjacency)
-        t_obs, _ , cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
-            x, n_jobs=-1, n_permutations=10000, threshold=threshold_tfce,
-            tail=0)
+        else:
 
-        print(f'smallest cluster p-value: {min(cluster_p)}')
-        cluster_p = np.around(cluster_p, 2)
+            # contrast data
+            x = np.array(
+                [
+                    h.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_name).data
+                    - l.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_name).data
+                    for h, l in zip(tfr_a_cond[idx], tfr_b_cond[idx])
+                ]
+            )
 
-        # set mask for plotting sign. points that belong to the cluster
-        mask = np.array(cluster_p).reshape(t_obs.shape[0], t_obs.shape[1])
-        mask = mask < params.alpha # boolean for masking sign. voxels
+            # pick channel or average over channels
+            x = np.mean(x, axis=1) if len(channel_name) > 1 else np.squeeze(x)
+            print(f"Shape of array for cluster test should be participants x frequencies x timepoints: {x.shape}")
 
-        # get times for x axis
-        times = data_a[idx][0].crop(tmin=t[0], tmax=t[1]).times
+            # define threshold dictionary for threshold-free cluster enhancement
+            threshold_tfce = dict(start=0, step=0.1)
 
-        # get frequencies for y axis
-        freqs = data_a[idx][0].freqs
+            # run cluster test over time and frequencies (no need to define adjacency)
+            t_obs, _ , cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
+                x, n_jobs=-1, n_permutations=10000, threshold=threshold_tfce,
+                tail=0)
 
-        # plot t contrast and sign. cluster contour
-        plot_cluster_contours()
+            print(f'smallest cluster p-value: {min(cluster_p)}')
+            cluster_p = np.around(cluster_p, 2)
 
-    # finally, save the figure
-    for fm in ["svg", "png"]:
-        fig.savefig(
-            Path(path_to.figures.manuscript.figure3) / f"fig3_{cond_a}_{cond_b}_tfr_{channel_name[0]}.{fm}",
-            dpi=300,
-            format=fm,
-        )
-    plt.show()
+            # set mask for plotting sign. points that belong to the cluster
+            mask = np.array(cluster_p).reshape(t_obs.shape[0], t_obs.shape[1])
+            mask = mask < params.alpha # boolean for masking sign. voxels
 
+            # plot t contrast and sign. cluster contour
+            plot_cluster_contours()
+
+        # finally, save the figure
+        for fm in ["svg", "png"]:
+            fig.savefig(
+                Path(path_to.figures.manuscript.figure3) / f"fig3_{cond_a_name}_"
+                f"{cond_b_name}_tfr_{channel_name[0]}.{fm}",
+                dpi=300,
+                format=fm,
+            )
+        plt.show()
+
+    return t_obs, cluster_p
 
 def plot_cluster_contours():
 
