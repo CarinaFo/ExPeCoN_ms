@@ -355,13 +355,14 @@ def spatio_temporal_source_test(
     -------
     cluster output
     """
+
     print("Computing adjacency.")
     # get adjacency matrix for source space
     adjacency = mne.spatial_src_adjacency(src)
 
     # Note that X needs to be a multidimensional array of shape
     # observations (subjects) × time × space, so we permute dimensions
-    x = np.transpose(data, [0, 2, 1])
+    x = np.transpose(stc_array, [0, 2, 1])
 
     # get rid of single-dimensional entries
     x_mean = np.squeeze(x)
@@ -376,7 +377,7 @@ def spatio_temporal_source_test(
 
     # put contrast or p values in source space
     fsave_vertices = [s["vertno"] for s in src]
-    stc = mne.SourceEstimate(x_avg, tmin=-0.4, tstep=0.0001, vertices=fsave_vertices,
+    stc = mne.SourceEstimate(p, tmin=-0.4, tstep=0.0001, vertices=fsave_vertices,
      subject="fsaverage")
     
     # which hemisphere to plot
@@ -385,7 +386,7 @@ def spatio_temporal_source_test(
     # plot average source or t values
     brain = stc.plot(
         hemi=hemisphere, views="lateral", subjects_dir=subjects_dir, subject="fsaverage",
-         time_viewer=True, background="white", colorbar=False
+         time_viewer=True, background="white", colorbar=True
     )
 
     brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_{hemisphere}.png')
@@ -438,10 +439,10 @@ def plot_cluster_output(clu=None, cond: str = "probability",
             time_label="temporal extent (ms)",
             size=(800, 800),
             smoothing_steps=5,
-            time_viewer=False,
+            time_viewer=True,
             background="white",
             transparent=True,
-            colorbar=False,
+            colorbar=True,
         )
 
         brain.save_image(Path(save_path_source_figs / "cluster_{cond}_{freq_band}_{method}.png"))
