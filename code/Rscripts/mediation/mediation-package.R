@@ -23,26 +23,12 @@ options(scipen=999)
 expecon <- 1
 
 ####################################brain behav#####################################################
+setwd("E:/expecon_ms")
 
-if (expecon == 1) {
-  
-  # expecon 1
-  setwd("D:/expecon_ms")
-  
-  brain_behav_path <- file.path("data", "behav", "brain_behav_cleanpower.csv")
-  
-  behav = read.csv(brain_behav_path)
-  
-} else {
-  
-  # expecon 2 behavioral data
-  setwd("D:/expecon_2")
-  
-  brain_behav_path <- file.path("behav", "brain_behav_cleanpower.csv")
-  
-  behav = read.csv(brain_behav_path)
-  
-}
+filename = paste("brain_behav_cleaned_", expecon, ".csv", sep="")
+brain_behav_path <- file.path("data", "behav", filename)
+
+behav = read.csv(brain_behav_path)
 ################################prepare variables for linear mixed modelling #######################
 
 # treatment variable can not be a factor for mediation analysis
@@ -107,36 +93,33 @@ out.model <- glmer(sayyes ~ isyes + cue + beta + isyes*cue+
 
 summary(out.model)
 
-# save mediation output
-setwd("D:/expecon_ms/data/behav/mediation/")
-
 # now fit mediation model for both datasets
 # for beta power
-results_beta_expecon1 <- mediate(med.model, out.model, treat='cue', mediator='beta')
-summary(results_beta_expecon1)
-saveRDS(results_beta_expecon1, 'med_cue_beta_block.rds')
-results_beta_expecon2 <- mediate(med.model, out.model, treat='cue', mediator='beta')
-summary(results_beta_expecon2)
-saveRDS(results_beta_expecon2, 'med_cue_beta_trial.rds')
+results_beta <- mediate(med.model, out.model, treat='cue', mediator='beta')
+summary(results_beta)
+
+# save mediation output
+setwd("E:/expecon_ms/data/behav/mediation/")
+filenname = paste('med_cue_beta_', expecon, '.rds', sep="")
+saveRDS(results_beta, filename)
 
 # and for alpha power
-results_alpha_expecon1 <- mediate(med.model, out.model, treat='cue', mediator='alpha')
-summary(results_alpha_expecon1)
-saveRDS(results_alpha_expecon1, 'med_cue_alpha_block.rds')
-results_alpha_expecon2 <- mediate(med.model, out.model, treat='cue', mediator='alpha')
-summary(results_alpha_expecon2)
-saveRDS(results_alpha_expecon2, 'med_cue_alpha_trial.rds')
+results_alpha <- mediate(med.model, out.model, treat='cue', mediator='alpha')
+summary(results_alpha)
+
+filenname = paste('med_cue_alpha_', expecon, '.rds', sep="")
+saveRDS(results_alpha, filename)
 
 # now fit for previous response
-results_prev_expecon1 <- mediate(med.model, out.model, treat='prevresp', mediator='beta')
-summary(results_prev_expecon1)
-saveRDS(results_prev_expecon1, 'med_prevresp_block.rds')
+results_prev <- mediate(med.model, out.model, treat='prevresp', mediator='beta')
+summary(results_prev)
+
+filenname = paste('med_prevresp_beta_', expecon, '.rds', sep="")
+saveRDS(results_prev_expecon1, filename)
 results_prev_expecon2 <- mediate(med.model, out.model, treat='prevresp', mediator='beta')
-summary(results_prev_expecon2)
-saveRDS(results_prev_expecon2, 'med_prevresp_trial.rds')
 
 # save results in a table
-extract_mediation_summary(results_beta_expecon1)
+extract_mediation_summary(results_beta)
 
 #Bayesian mediation model: mediation with brms####################################################
 
@@ -150,7 +133,6 @@ m2 <- brm(med.model + out.model + set_rescor(FALSE), data = behav, refresh = 0)
 
 # mediation for brms (to have evidence for a null mediation for alpha, see Tilmans comment)
 mediation(m2)
-
 
 # helper functions
 extract_mediation_summary <- function (x) { 
@@ -197,12 +179,3 @@ extract_mediation_summary <- function (x) {
   smat
   
 }
-# moderated mediation (unsed at the moment)
-# https://ademos.people.uic.edu/Chapter15.html
-# include previous response as covariate (covariate has to be in mediation and outcome model)
-results_beta_expecon1_moderated <- mediate(med.model, out.model, treat='cue', mediator='beta', 
-                                 covariates = list(prevresp=1))
-
-# test wether moderation effect is sign., doesn"t work, no idea why
-test.modmed(results_beta_expecon1_moderated, covariates.1 = list(prevresp = 1),   
-            covariates.2 = list(prevresp = 0), sims = 1000)

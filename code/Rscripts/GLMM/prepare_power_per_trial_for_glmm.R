@@ -9,12 +9,10 @@
 
 library(dplyr) # pandas style
 library(tidyr) # spread function
-library(data.table) # for shift function
 library(lme4)
 library(lmerTest) # pvalues for lmer models
 
 # which study do you want to analyze?
-
 expecon <- 2
 
 # check wether the removal of the trend worked?
@@ -22,16 +20,13 @@ expecon <- 2
 check_trend_removal = 1
 
 ####################################################################################################
-
 # set working directory
-# Example 3: if-else if loop
+setwd("E:/expecon_ms")
 
 if (expecon == 1) {
   
-  # load brain behavior dataframe that contains single trial power in spec. frequency bands in sensor space
-  setwd("D:/expecon_ms")
   # Identify the relative path from your current working directory to the file
-  relative_path <- file.path("data", "behav", "behav_df", "brain_behav.csv")
+  relative_path <- file.path("data", "behav", "brain_behav_1.csv")
   # Use the relative path to read the CSV file
   power <- read.csv(relative_path)
   # add prediction error per trial
@@ -41,9 +36,8 @@ if (expecon == 1) {
   
 } else {
   
-  setwd("D:/expecon_2")
   # Identify the relative path from your current working directory to the file
-  relative_path <- file.path("behav", "brain_behav_expecon2.csv")
+  relative_path <- file.path("data", "behav", "brain_behav_2.csv")
   # Use the relative path to read the CSV file
   power <- read.csv(relative_path)
   # add prediction error per trial
@@ -112,16 +106,19 @@ if (expecon == 1 && check_trend_removal == 1) {
   summary(lmer(pre_beta ~ block + (1|ID), data=power, REML=T))
 }
 
+# define filename for cleaned power
+filename_cleaned_power = paste("brain_behav_cleaned_", expecon, ".csv", sep="")
 
 if (expecon == 1) {
   # remove unnecessary variables 
   power <- power[, !(names(power) %in% c("index", "sayyes_y", "X", "Unnamed..0.1",
                                          "Unnamed..0", "sayyes_y", "level_0"))]
-  relative_path <- file.path("data", "behav", "behav_df", "brain_behav_cleanpower.csv")
+  
+  relative_path <- file.path("data", "behav", filename_cleaned_power)
 } else {
   # remove unnecessary variables 
   power <- power[, !(names(power) %in% c("index", "sayyes_y"))]
-  relative_path <- file.path("behav", "brain_behav_cleanpower.csv")
+  relative_path <- file.path("data", "behav", filename_cleaned_power)
 }
 
 write.csv(power, relative_path)
