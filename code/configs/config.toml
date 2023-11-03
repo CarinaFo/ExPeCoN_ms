@@ -43,9 +43,12 @@ mne = "./data/eeg/source/MNE"
 
 [paths.figures.manuscript]
 figure1 = "./figs/manuscript_figures/figure1_expecon1_paradigm_behav"
-figure2 = "./figs/manuscript_figures/unused_behavioral_figures/"
-figure3 = "./figs/manuscript_figures/figure3_tfr"
-figure4 = "./figs/manuscript_figures/figure3_tfr/source"
+figure2 = "./figs/manuscript_figures/figure2_expecon2_paradigm_behav"
+figure2_suppl = "./figs/manuscript_figures/figure2_expecon2_paradigm_behav/supplfig"
+figure3 = "./figs/manuscript_figures/figure3_ssroi"
+figure4 = "./figs/manuscript_figures/figure4_tfr"
+figure5 = "./figs/manuscript_figures/figure5_source"
+figure6 = "./figs/manuscript_figures/brain_behavior"
 
 [paths.questionnaire]
 q_clean = "./questionnaire/q_clean.csv"
