@@ -419,8 +419,8 @@ def plot_tfr_cluster_test_output(threed_test=True,
         # finally, save the figure
         for fm in ["svg", "png"]:
             fig.savefig(
-                Path(path_to.figures.manuscript.figure3) / f"fig3_{cond_a_name}_"
-                f"{cond_b_name}_tfr_{channel_name[0]}.{fm}",
+                Path(path_to.figures.manuscript.figure4) / f"fig4_tfr_{cond_a_name}_"
+                f"{cond_b_name}_{channel_name[0]}.{fm}",
                 dpi=300,
                 format=fm,
             )
