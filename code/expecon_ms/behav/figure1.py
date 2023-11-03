@@ -219,7 +219,9 @@ def exclude_data(expecon: int = 1):
 
 
 def plot_mean_response_and_confidence(
-    blue="#0571b0", red="#ca0020", savepath=path_to.figures.manuscript.figure1, expecon=1
+    blue="#0571b0", red="#ca0020", 
+    no_col="#088281", yes_col="#d01c8b",
+    savepath=path_to.figures.manuscript.figure2_suppl, expecon=1
 ):
     """
     Plot the mean detection response and mean confidence for each cue condition with a boxplot.
@@ -250,18 +252,20 @@ def plot_mean_response_and_confidence(
     # Create boxplots
     plt.figure(figsize=(10, 6))
     sns.boxplot(x="cue", y="sayyes", data=mean_resp_id_cue, palette=[blue, red])
-    sns.stripplot(x="cue", y="sayyes", data=mean_resp_id_cue, color="black", size=4, jitter=True)
-    plt.xlabel("Cue")
-    plt.ylabel("Mean of Say Yes")
+    sns.stripplot(x="cue", y="sayyes", data=mean_resp_id_cue, color="black", 
+                  size=4, jitter=True)
+    plt.xlabel("stimulus probability")
+    plt.ylabel("% yes responses")
     plt.savefig(Path(savepath, f"choice_cue_{expecon}.svg"))
     plt.savefig(Path(savepath, f"choice_cue_{expecon}.png"))
     plt.show()
 
     plt.figure(figsize=(10, 6))
-    sns.boxplot(x="sayyes", y="conf", data=mean_conf_id_resp)
-    sns.stripplot(x="sayyes", y="conf", data=mean_conf_id_resp, color="black", size=4, jitter=True)
+    sns.boxplot(x="sayyes", y="conf", data=mean_conf_id_resp, palette=[no_col, yes_col])
+    sns.stripplot(x="sayyes", y="conf", data=mean_conf_id_resp, color="black", 
+                  size=4, jitter=True)
     plt.xlabel("detection response")
-    plt.ylabel("Mean confidence")
+    plt.ylabel("% high confidence")
     plt.xticks(ticks=[0, 1], labels=["No", "Yes"])  # Set custom tick labels
     plt.savefig(Path(savepath, f"choice_conf_{expecon}.svg"))
     plt.savefig(Path(savepath, f"choice_conf_{expecon}.png"))
