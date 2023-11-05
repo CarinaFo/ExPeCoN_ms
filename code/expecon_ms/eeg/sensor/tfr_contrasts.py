@@ -65,15 +65,15 @@ hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 
 
 def compute_tfr(
-    study: int = 1,
-    cond: str = "prev_resp",
-    tmin: float = -1,
+    study: int = 2,
+    cond: str = "probability",
+    tmin: float = -0.7,
     tmax: float = 0,
     fmax: float = 35,
     fmin: float = 3,
     laplace: bool = False,
     induced: bool = False,
-    mirror_data: bool = False,
+    mirror: bool = True,
     drop_bads: bool = True
 ):
     """
@@ -117,7 +117,6 @@ def compute_tfr(
                                 "prepro_behav_data_expecon2.csv"))
     else:
         raise ValueError("input should be 1 or 2 for the respective study")
-
 
     # now loop over participants
     for idx, subj in enumerate(id_list):
@@ -178,15 +177,16 @@ def compute_tfr(
             epochs = mne.preprocessing.compute_current_source_density(epochs)
 
         # avoid leakage and edge artifacts by zero padding the data
-        if mirror_data:
+        if mirror:
             metadata = epochs.metadata
-            data = epochs.get_data()
+
+            epoch_data = epochs.get_data()
 
             # zero pad = False = mirror the data on both ends
-            data = zero_pad_or_mirror_data(data, zero_pad=False)
+            data_mirror = zero_pad_or_mirror_data(epoch_data, zero_pad=False)
 
             # put back into epochs structure
-            epochs = mne.EpochsArray(data, epochs.info, tmin=tmin * 2)
+            epochs = mne.EpochsArray(data_mirror, epochs.info, tmin=tmin * 2)
 
             # add metadata back
             epochs.metadata = metadata
@@ -201,15 +201,23 @@ def compute_tfr(
         if cond == "probability":
             epochs_a = epochs[(epochs.metadata.cue == 0.75)]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-            cond_a_name = "high"
-            cond_b_name = "low"
+            if mirror:
+                cond_a_name = "high_mirror"
+                cond_b_name = "low_mirror"
+            else:
+                cond_a_name = "high"
+                cond_b_name = "low"
         elif cond == "prev_resp":
             epochs_a = epochs[((epochs.metadata.prevresp == 1) &
                                 (epochs.metadata.cue == 0.75))]
             epochs_b = epochs[((epochs.metadata.prevresp == 0) &
                                 (epochs.metadata.cue == 0.75))]
-            cond_a_name = "prevyesresp_highprob"
-            cond_b_name = "prevnoresp_highprob"
+            if mirror:
+                cond_a_name = "prevyesresp_highprob_mirror"
+                cond_b_name = "prevnoresp_highprob_mirror"
+            else:
+                cond_a_name = "prevyesresp_highprob"
+                cond_b_name = "prevnoresp_highprob"
         else:
             raise ValueError("input should be 'probability' or 'prev_resp'")
 
@@ -255,9 +263,8 @@ def compute_tfr(
     return "Done with tfr/erp computation", cond_a_name, cond_b_name
 
 
-def load_tfr_conds(
-                   cond_a_name: str = "prevyesresp_highprob",
-                   cond_b_name: str = "prevnoresp_highprob",
+def load_tfr_conds(cond_a_name: str = "high",
+                   cond_b_name: str = "low",
                    mirror: bool = False):
     """
     Load tfr data for the two conditions.
@@ -310,12 +317,11 @@ def load_tfr_conds(
     return tfr_a_all, tfr_b_all
 
 
-# TODO(simon): dont use mutables as default arguments
-def plot_tfr_cluster_test_output(threed_test=True,
+def plot_tfr_cluster_test_output(threed_test=False,
                                  tfr_a_cond=None,
                                  tfr_b_cond=None,
-                                 cond_a_name="prevyesresp_highprob",
-                                 cond_b_name="prevnoresp_highprob",
+                                 cond_a_name="high",
+                                 cond_b_name="low",
                                  channel_name=["CP4"]):
     """
     Plot cluster permutation test output for tfr data (time and frequency cluster).
@@ -343,14 +349,14 @@ def plot_tfr_cluster_test_output(threed_test=True,
     # which time windows to plot
     time_windows = [(-0.4, 0), (-0.7, 0)]
 
-    # which axes to plot the time windows
-    axes_first_row = [(0, 0), (0, 1)]
-
     # Create a 2x3 grid of plots (2 rows, 3 columns)
     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
 
+    # Adjust the space between the subplots
+    plt.subplots_adjust(wspace=0.5)
+
     # loop over time windows and axes
-    for idx, (t, a) in enumerate(zip(time_windows, axes_first_row)):
+    for idx, t in enumerate(time_windows):
 
         if threed_test:
             # contrast data
@@ -414,29 +420,64 @@ def plot_tfr_cluster_test_output(threed_test=True,
             mask = mask < params.alpha # boolean for masking sign. voxels
 
             # plot t contrast and sign. cluster contour
-            plot_cluster_contours()
+            plot_cluster_contours(fmin=3, fmax=35)
 
-        # finally, save the figure
-        for fm in ["svg", "png"]:
-            fig.savefig(
-                Path(path_to.figures.manuscript.figure4) / f"fig4_tfr_{cond_a_name}_"
-                f"{cond_b_name}_{channel_name[0]}.{fm}",
-                dpi=300,
-                format=fm,
-            )
-        plt.show()
+    plt.tight_layout()
+    # now save the figure to disk as png and svg
+    for fm in ["svg", "png"]:
+        fig.savefig(
+            Path(path_to.figures.manuscript.figure4) / f"fig4_tfr_{cond_a_name}_"
+            f"{cond_b_name}_{channel_name[0]}.{fm}",
+            dpi=300,
+            format=fm,
+        )
+    plt.show()
 
     return t_obs, cluster_p
 
-def plot_cluster_contours():
+
+def plot_cluster_contours(fmin: float = None, 
+                          fmax: float = None):
 
     """plot cluster permutation test output
     cluster is highlighted via a contour around it,
-    code adapted Gimpert et al."""
+    code adapted Gimpert et al.
+    x and p ticks and labels, as wellas colorbar are not plotted
+    Args:
+    ----
+    fmin: float, info: minimum frequency to plot
+    fmax: float, info: maximum frequency to plot
+    """
 
+    # define timepoints and frequencies
+    times = tfr_a_cond[0][5].copy().crop(tmin=t[0], tmax=t[1]).times
+
+    freqs = np.arange(fmin, fmax, 1)
+
+    # set custom x labels and ticks (timepoints)
+    x_ticks, x_labels = [], []
+
+    # Iterate through the list and select every 3rd entry starting from the first entry
+    for x_idx, x_value in enumerate(times):
+        if x_idx % 25 == 0:
+            x_ticks.append(x_idx)
+            x_labels.append(x_value)
+
+    # set custom y labels and ticks (frequencies)
+    y_ticks, y_labels = [], []
+
+    # Iterate through the list and select every 3rd entry starting from the first entry
+    for y_idx, y_value in enumerate(freqs):
+        if y_idx % 3 == 0:
+            y_ticks.append(y_idx)
+            y_labels.append(y_value)
+
+    # plot tmap as heatmap
     sns.heatmap(t_obs, center=0,
-                    cbar=True, cmap="viridis", ax=axs[idx])
-
+                    cbar=True,
+                    cmap="viridis",
+                    ax=axs[idx])
+    
     # Draw the cluster outline
     for i in range(mask.shape[0]): # frequencies
         for j in range(mask.shape[1]): # time
@@ -449,10 +490,20 @@ def plot_cluster_contours():
                     axs[idx].plot([j - 0.5, j - 0.5], [i, i + 1], color='white', linewidth=2)
                 if j < mask.shape[1] - 1 and not mask[i, j + 1]:
                     axs[idx].plot([j + 0.5, j + 0.5], [i, i + 1], color='white', linewidth=2)
+    
     axs[idx].invert_yaxis()
-    axs[idx].axvline([t_obs.shape[1]], color='white', linestyle='dotted', linewidth=5) # stimulation onset
-    axs[idx].set(xlabel='Time (s)', ylabel='Frequency (Hz)',
-        title=f'TFR contrast {cond_a} - {cond_b} in channel {channel_name[0]}')
+    axs[idx].axvline([t_obs.shape[1]], color='white', 
+                     linestyle='dotted', linewidth=5) # stimulation onset
+    axs[idx].set(xlabel='Time (s)', ylabel='Frequency (Hz)')
+    # Set the font size for xlabel and ylabel
+    axs[idx].xaxis.label.set_fontsize(20)  # Adjust the font size for the xlabel
+    axs[idx].yaxis.label.set_fontsize(20)  # Adjust the font size for the ylabel
+
+    # Set custom the x and y axis ticks and labels
+    axs[idx].set_xticks(x_ticks)
+    axs[idx].set_xticklabels(x_labels, fontsize=20)
+    axs[idx].set_yticks(y_ticks)
+    axs[idx].set_yticklabels(y_labels, fontsize=20)
 
 
 def zero_pad_or_mirror_data(data, zero_pad: bool = False):
