@@ -21,7 +21,7 @@ package_version <- packageVersion("mediation")
 options(scipen=999)
 
 # which dataset to analyze (1 => block design, 2 => trial-by-trial design)
-expecon <- 1
+expecon <- 2
 
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
@@ -153,15 +153,55 @@ extract_mediation_summary(mediation_cue_alpha)
 detectCores()
 
 # Fit Bayesian mediation model in brms
+# probability cue models
+# alpha
+med.model <- bf(alpha ~ -1 + cue + (cue|ID))
+out.model <- bf(sayyes ~ isyes + cue + alpha + isyes*cue+
+                  (cue+isyes|ID), family=bernoulli(link='probit'))
+
+med_cue_alpha <- brm(med.model + out.model + set_rescor(FALSE), 
+                     data = behav, refresh = 1, 
+                     cores=10)
+
+# beta
 med.model <- bf(beta ~ -1 + cue + (cue|ID))
 out.model <- bf(sayyes ~ isyes + cue + beta + isyes*cue+
-                  (cue+isyes|ID), family=binomial(link='probit'))
+                  (cue+isyes|ID), family=bernoulli(link='probit'))
 
-m2 <- brm(med.model + out.model + set_rescor(FALSE), data = behav, refresh = 0, cores=10)
+med_cue_beta <- brm(med.model + out.model + set_rescor(FALSE), 
+                    data = behav, refresh = 1, 
+                    cores=10)
 
-# mediation for brms (to have evidence against mediation for alpha, see Tilamns comment on manuscript
-# draft)
-mediation(m2)
+# previous choice model
+# alpha
+med.model <- bf(alpha ~ -1 + prevresp + (prevresp|ID))
+out.model <- bf(sayyes ~ isyes + prevresp + alpha + isyes*cue+
+                  (prevresp+isyes|ID), family=bernoulli(link='probit'))
+
+med_prevresp_alpha <- brm(med.model + out.model + set_rescor(FALSE), 
+                         data = behav, refresh = 1, 
+                         cores=10)
+# beta
+med.model <- bf(beta ~ -1 + prevresp + (prevresp|ID))
+out.model <- bf(sayyes ~ isyes + prevresp + beta + isyes*cue+
+                  (prevresp+isyes|ID), family=bernoulli(link='probit'))
+
+med_prevresp_beta <- brm(med.model + out.model + set_rescor(FALSE), 
+                    data = behav, refresh = 1, 
+                    cores=10)
+
+# save model
+filename = paste('med_cue_beta_', expecon, '.rds', sep="")
+saveRDS(med_cue_beta, filename)
+# alpha cue model
+filename = paste('med_cue_alpha_', expecon, '.rds', sep="")
+saveRDS(med_cue_alpha, filename)
+
+
+# mediation for brms (to have evidence against mediation for alpha, 
+# see Tilamns comment on manuscript draft)
+bayes_med_output_beta_cue = mediation(med_cue_beta)
+bayes_med_output_alpha_cue = mediation(med_cue_alpha)
 ################################ helper functions ##################################################
 extract_mediation_summary <- function (x) { 
   
