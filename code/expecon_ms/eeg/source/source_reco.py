@@ -22,7 +22,6 @@ from pathlib import Path
 import mne
 import numpy as np
 import pandas as pd
-import scipy
 from mne.datasets import fetch_fsaverage
 import random
 
