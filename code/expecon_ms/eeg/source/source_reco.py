@@ -86,10 +86,10 @@ pilot_counter = config.participants.pilot_counter
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-def run_source_reco(study: int = 1, cond: str = "probability",
+def run_source_reco(study: int = 1, cond: str = "prev_resp",
                     dics: int = 1, fmin: int = 15, fmax: int = 25,
                     tmin: int = -0.2, tmax: int = 0,
-                    save_path: str | Path = mne, 
+                    save_path: str | Path = mne,
                     drop_bads: bool = True,
                     plot_alignment: bool = False) -> None:
     """
@@ -187,15 +187,15 @@ def run_source_reco(study: int = 1, cond: str = "probability",
                 (epochs.metadata.cue == 0.75)
             ]
             epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-            cond_a = "high"
-            cond_b = "low"
+            cond_a_name = "high"
+            cond_b_name = "low"
         elif cond == "prev_resp":
-            epochs_a = epochs[
-                (epochs.metadata.prevresp == 1)
-            ]
-            epochs_b = epochs[(epochs.metadata.prevresp == 0)]
-            cond_a = "prevyesresp"
-            cond_b = "prevnoresp"
+            epochs_a = epochs[((epochs.metadata.prevresp == 1) &
+                                (epochs.metadata.cue == 0.75))]
+            epochs_b = epochs[((epochs.metadata.prevresp == 0) &
+                                (epochs.metadata.cue == 0.75))]
+            cond_a_name = "prevyesresp_highprob"
+            cond_b_name = "prevnoresp_highprob"
         else:
             raise ValueError("input should be 'probability' or 'prev_resp'")
 
@@ -236,8 +236,8 @@ def run_source_reco(study: int = 1, cond: str = "probability",
             source_power_a, freqs = mne.beamformer.apply_dics_csd(csd_a, filters)
             source_power_b, freqs = mne.beamformer.apply_dics_csd(csd_b, filters)
 
-            source_power_a.save(Path(save_path, f"{cond_a}_{subj}_{study}"))
-            source_power_b.save(Path(save_path, f"{cond_b}_{subj}_{study}"))
+            source_power_a.save(Path(save_path, f"{cond_a_name}_{subj}_{study}"))
+            source_power_b.save(Path(save_path, f"{cond_b_name}_{subj}_{study}"))
 
         else:
 
