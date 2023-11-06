@@ -66,7 +66,7 @@ hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 
 def compute_tfr(
     study: int = 2,
-    cond: str = "probability",
+    cond: str = "prev_resp",
     tmin: float = -0.7,
     tmax: float = 0,
     fmax: float = 35,
@@ -187,6 +187,19 @@ def compute_tfr(
 
             # put back into epochs structure
             epochs = mne.EpochsArray(data_mirror, epochs.info, tmin=tmin * 2)
+            
+            if plot_mirrored_data:
+                # select channel CP4
+                sens_channel = epochs.ch_names.index('CP4')
+                # we pick a random  epoch to plot the data and channel CP4
+                plt.plot(data_mirror[433, sens_channel, :])
+                plt.axvspan(0, 176, color='green', alpha=0.5)
+                plt.axvspan(352, 528, color='green', alpha=0.5)
+                plt.xlabel('Timepoints')
+                plt.ylabel('Amplitude in mV')
+                plt.savefig(Path(path_to.figures.manuscript.figure4) / 'mirrored_data_CP4.png', 
+                            dpi=300)
+                plt.show()
 
             # add metadata back
             epochs.metadata = metadata
@@ -263,9 +276,8 @@ def compute_tfr(
     return "Done with tfr/erp computation", cond_a_name, cond_b_name
 
 
-def load_tfr_conds(cond_a_name: str = "high",
-                   cond_b_name: str = "low",
-                   mirror: bool = False):
+def load_tfr_conds(cond_a_name: str = "prevyesresp_highprob_mirror",
+                   cond_b_name: str = "prevnoresp_highprob_mirror"):
     """
     Load tfr data for the two conditions.
 
@@ -275,8 +287,6 @@ def load_tfr_conds(cond_a_name: str = "high",
         which condition tfr to load: high or low or prevyesresp or prevnoresp
     cond_b : str
         which condition tfr to load: high or low or prevyesresp or prevnoresp
-    mirror : boolean
-            whether to load mirrored data
     Returns:
     -------
     tfr_a_all: list: list of tfr objects for condition a
@@ -304,7 +314,6 @@ def load_tfr_conds(cond_a_name: str = "high",
                 if subj == '013':
                     continue
             # load tfr data
-            sfx = "_mirror" if mirror else ""
             tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5",
                                                   condition=0)
             tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b_name}_{str(study)}-tfr.h5",
@@ -320,8 +329,8 @@ def load_tfr_conds(cond_a_name: str = "high",
 def plot_tfr_cluster_test_output(threed_test=False,
                                  tfr_a_cond=None,
                                  tfr_b_cond=None,
-                                 cond_a_name="high",
-                                 cond_b_name="low",
+                                 cond_a_name="prevyesresp_highprob_mirror",
+                                 cond_b_name="prevnoresp_highprob_mirror",
                                  channel_name=["CP4"]):
     """
     Plot cluster permutation test output for tfr data (time and frequency cluster).
