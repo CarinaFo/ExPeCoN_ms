@@ -21,7 +21,7 @@ package_version <- packageVersion("mediation")
 options(scipen=999)
 
 # which dataset to analyze (1 => block design, 2 => trial-by-trial design)
-expecon <- 2
+expecon <- 1
 
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
@@ -191,17 +191,32 @@ med_prevresp_beta <- brm(med.model + out.model + set_rescor(FALSE),
                     cores=10)
 
 # save model
-filename = paste('med_cue_beta_', expecon, '.rds', sep="")
-saveRDS(med_cue_beta, filename)
-# alpha cue model
+# probability cue
+# alpha
 filename = paste('med_cue_alpha_', expecon, '.rds', sep="")
 saveRDS(med_cue_alpha, filename)
+# beta
+filename = paste('med_cue_beta_', expecon, '.rds', sep="")
+saveRDS(med_cue_beta, filename)
 
+
+# previous response
+# alpha
+filename = paste('med_prevresp_alpha_', expecon, '.rds', sep="")
+saveRDS(med_prevresp_alpha, filename)
+# beta
+filename = paste('med_prevresp_beta_', expecon, '.rds', sep="")
+saveRDS(med_prevresp_beta, filename)
 
 # mediation for brms (to have evidence against mediation for alpha, 
 # see Tilamns comment on manuscript draft)
-bayes_med_output_beta_cue = mediation(med_cue_beta)
-bayes_med_output_alpha_cue = mediation(med_cue_alpha)
+mediation(med_cue_alpha)
+mediation(med_cue_beta)
+
+# previous choice
+mediation(med_prevresp_alpha)
+mediation(med_prevresp_beta)
+
 ################################ helper functions ##################################################
 extract_mediation_summary <- function (x) { 
   
