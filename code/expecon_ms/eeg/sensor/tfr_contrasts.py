@@ -187,19 +187,6 @@ def compute_tfr(
 
             # put back into epochs structure
             epochs = mne.EpochsArray(data_mirror, epochs.info, tmin=tmin * 2)
-            
-            if plot_mirrored_data:
-                # select channel CP4
-                sens_channel = epochs.ch_names.index('CP4')
-                # we pick a random  epoch to plot the data and channel CP4
-                plt.plot(data_mirror[433, sens_channel, :])
-                plt.axvspan(0, 176, color='green', alpha=0.5)
-                plt.axvspan(352, 528, color='green', alpha=0.5)
-                plt.xlabel('Timepoints')
-                plt.ylabel('Amplitude in mV')
-                plt.savefig(Path(path_to.figures.manuscript.figure4) / 'mirrored_data_CP4.png', 
-                            dpi=300)
-                plt.show()
 
             # add metadata back
             epochs.metadata = metadata
@@ -611,6 +598,43 @@ def permute_trials(n_permutations: int = 500, power_a=None, power_b=None):
 
 
 # Helper functions
+
+def plot_mirrored_data(subj='015'):
+
+    # load epochs for a single participant
+    epochs = mne.read_epochs(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif")
+    
+    # crop the data in prestimulus window
+    epochs.crop(tmin=-0.4, tmax=0)
+
+    # get length of timeseries after cropping the data
+    len_timeseries = epochs.get_data().shape[2]
+
+    # how many epochs?
+    len_epochs = epochs.get_data().shape[0]
+
+    # select random epoch to plot
+    random_epoch = random.randint(0, len_epochs)
+
+    # get data as an numpy array
+    epoch_data = epochs.get_data()
+
+    # zero pad = False = mirror the data on both ends
+    data_mirror = zero_pad_or_mirror_data(epoch_data, zero_pad=False)
+
+    # select channel CP4
+    sens_channel = epochs.ch_names.index('CP4')
+    # we pick a random  epoch to plot the data and channel CP4
+    plt.plot(data_mirror[random_epoch, sens_channel, :])
+    plt.axvspan(0, len_timeseries, color='green', alpha=0.5)
+    plt.axvspan(len_timeseries*2, len_timeseries*3, 
+                color='green', alpha=0.5)
+    plt.xlabel('Timepoints', fontsize=20)
+    plt.ylabel('Amplitude in mV', fontsize=20)
+    plt.savefig(Path(path_to.figures.manuscript.figure4) / 'mirrored_data_CP4.svg', 
+                dpi=300)
+    plt.show()
+
 
 def drop_trials(data=None):
     """
