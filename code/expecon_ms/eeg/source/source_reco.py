@@ -67,7 +67,7 @@ beamformer_path = Path(path_to.data.eeg.source.beamformer)
 mne_path = Path(path_to.data.eeg.source.mne)
 
 # save source space figures
-save_path_source_figs = Path(path_to.figures.manuscript.figure4)
+save_path_source_figs = Path(path_to.figures.manuscript.figure4_source)
 
 # participant IDs
 id_list_expecon1 = config.participants.ID_list_expecon1
@@ -86,7 +86,7 @@ pilot_counter = config.participants.pilot_counter
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-def run_source_reco(study: int = 1, cond: str = "prev_resp",
+def run_source_reco(study: int = 2, cond: str = "prev_resp",
                     dics: int = 1, fmin: int = 15, fmax: int = 25,
                     tmin: int = -0.2, tmax: int = 0,
                     save_path: str | Path = mne,
@@ -285,8 +285,9 @@ def run_source_reco(study: int = 1, cond: str = "prev_resp",
             stc.save(Path(save_path, f"contrast_{cond}_{subj}_{study}"))
 
 
-def create_source_contrast_array(study: int = 2, cond: str = "probability",
-                                 cond_a: str = "high", cond_b: str = "low",
+def create_source_contrast_array(study: int = 2, cond: str = "prev_resp",
+                                 cond_a: str = "prevyesresp_highprob", 
+                                 cond_b: str = "prevnoresp_highprob",
                                  path_to_source: str | Path = beamformer_path):
     """
     Load source estimates per participant and contrasts them, before storing the 
@@ -376,22 +377,25 @@ def spatio_temporal_source_test(
 
     # put contrast or p values in source space
     fsave_vertices = [s["vertno"] for s in src]
-    stc = mne.SourceEstimate(p, tmin=-0.4, tstep=0.0001, vertices=fsave_vertices,
+    stc = mne.SourceEstimate(x_avg, tmin=-0.4, tstep=0.0001, vertices=fsave_vertices,
      subject="fsaverage")
     
     # which hemisphere to plot
     hemisphere = "rh"
 
+    view = 'lateral'
+
     # plot average source or t values
     brain = stc.plot(
-        hemi=hemisphere, views="lateral", subjects_dir=subjects_dir, subject="fsaverage",
-         time_viewer=True, background="white", colorbar=True
+        hemi=hemisphere, views=view, subjects_dir=subjects_dir, subject="fsaverage",
+         time_viewer=True, background="white", colorbar=False
     )
 
-    brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_{hemisphere}.png')
+    brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_' +
+                     f'_{view}_{hemisphere}.png')
 
     # spatio-temporal cluster permutation test
-    t_obs, clusters, cluster_p_values, h0 = clu = mne.stats.spatio_temporal_cluster_1samp_test(
+    clu = mne.stats.spatio_temporal_cluster_1samp_test(
         x, adjacency=adjacency, n_jobs=jobs, n_permutations=n_perm)
 
     return clu
