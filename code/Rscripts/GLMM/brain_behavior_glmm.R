@@ -51,77 +51,134 @@ behav$congruency_stim <- as.integer(as.logical(behav$congruency_stim))
 # Remove NaN trials for model comparision (models neeed to have same amount of data)
 behav <- na.omit(behav) 
 
+#rename alpha and beta power variables
+behav$alpha <- behav$prestim__alpha
+behav$beta <- behav$prestim__beta
 ########################### Brain behavior GLMMs ###################################################
 
 # replace stimulus probability regressor with beta or alpha power per trial (neural correlate of stimulus probability)
 
-summary(lmer(pre_alpha ~ cue + (cue|ID), data=behav, 
+summary(lmer(alpha ~ cue + (cue|ID), data=behav, 
              control=lmerControl(optimizer="bobyqa",
             optCtrl=list(maxfun=2e5))))
 
-summary(lmer(pre_beta ~ cue + (cue|ID), 
+summary(lmer(beta ~ cue + (cue|ID), 
              data=behav, control=lmerControl(optimizer="bobyqa",
             optCtrl=list(maxfun=2e5))))
 
-summary(lmer(pre_beta ~ isyes + (isyes|ID), data=behav))
-
-# the cue sign. predicts beta but not alpha
+# the cue sign. predicts beta in both environments, alpha only in the stable env.
 
 ### does prestimulus power predict detection, while controlling for previous choice
-alpha_glm <- glmer(sayyes ~ pre_alpha + isyes + prevresp + 
-                         pre_alpha*isyes +
-                         (isyes + prevresp + pre_alpha|ID),
+
+alpha_base_glm <- glmer(sayyes ~ alpha + isyes + 
+                          alpha*isyes +
+                          (isyes + alpha + alpha*isyes |ID),
+                        data = behav, family=binomial(link='probit'), 
+                        control=glmerControl(optimizer="bobyqa",
+                                             optCtrl=list(maxfun=2e5)))
+
+# check model performance
+check_collinearity(alpha_base_glm) # VIF should be < 3
+check_convergence(alpha_base_glm)
+
+summary(alpha_base_glm)
+
+beta_base_glm <- glmer(sayyes ~ beta + isyes + 
+                    beta*isyes +
+                    (isyes|ID),
+                  data = behav, family=binomial(link='probit'), 
+                  control=glmerControl(optimizer="bobyqa",
+                                       optCtrl=list(maxfun=2e5)))
+
+# singularity with beta and beta*stimulus interaction
+# check model performance
+check_collinearity(beta_base_glm) # VIF should be < 3
+check_convergence(beta_base_glm)
+
+summary(beta_base_glm)
+
+# save models to disk
+filename = paste("alpha_base_glm_", expecon, ".rda", sep="")
+cue_model_path = file.path("data", "behav", "mixed_models", filename)
+saveRDS(alpha_base_glm, cue_model_path)
+alpha_base_glm <- readRDS(cue_model_path)
+
+
+filename = paste("beta_base_glm_", expecon, ".rda", sep="")
+cue_model_path = file.path("data", "behav", "mixed_models", filename)
+saveRDS(beta_base_glm, cue_model_path)
+beta_base_glm <- readRDS(cue_model_path)
+
+# add previous response
+alpha_prev_glm <- glmer(sayyes ~ alpha + isyes + prevresp + 
+                         alpha*isyes +
+                         (isyes + prevresp + alpha | ID),
                        data = behav, family=binomial(link='probit'), 
                        control=glmerControl(optimizer="bobyqa",
                                             optCtrl=list(maxfun=2e5)))
-summary(alpha_glm)
+# did not converge with interaction term
+# check model performance
+check_collinearity(alpha_prev_glm) # VIF should be < 3
+check_convergence(alpha_prev_glm)
 
-beta_glm <- glmer(sayyes ~ pre_beta + isyes + prevresp + 
-                     pre_beta*isyes +
-                     (isyes + prevresp|ID),
+summary(alpha_prev_glm)
+
+beta_prev_glm <- glmer(sayyes ~ beta + isyes + prevresp + 
+                     beta*isyes +
+                     (isyes + prevresp + beta + beta*isyes|ID),
                    data = behav, family=binomial(link='probit'), 
                    control=glmerControl(optimizer="bobyqa",
                                         optCtrl=list(maxfun=2e5)))
-summary(beta_glm)
 
+check_collinearity(beta_prev_glm) # VIF should be < 3
+check_convergence(beta_prev_glm)
+
+summary(beta_prev_glm)
 
 # save models to disk
-filename = paste("alpha_glm_", expecon, ".rda", sep="")
+filename = paste("alpha_prev_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
-saveRDS(alpha_glm, cue_model_path)
-cue_prev_model <- readRDS(cue_model_path)
+saveRDS(alpha_prev_glm, cue_model_path)
+alpha_prev_glm <- readRDS(cue_model_path)
 
 
-filename = paste("beta_glm_", expecon, ".rda", sep="")
+filename = paste("beta_prev_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
-saveRDS(beta_glm, cue_model_path)
-cue_prev_model <- readRDS(cue_model_path)
+saveRDS(beta_prev_glm, cue_model_path)
+beta_prev_glm <- readRDS(cue_model_path)
 
 ##### no we fit the interaction between prestimulus power and previous choice
 
 # alpha interaction
-alpha_int_glm <- glmer(sayyes ~ pre_alpha + isyes + prevresp + 
-                                pre_alpha*isyes +
-                                pre_alpha*prevresp + 
-                                (isyes + prevresp + pre_alpha|ID),
+alpha_int_glm <- glmer(sayyes ~ alpha + isyes + prevresp + 
+                                alpha*isyes +
+                                alpha*prevresp + 
+                                (isyes + prevresp + alpha*isyes|ID),
                                 data = behav, family=binomial(link='probit'), 
                                 control=glmerControl(optimizer="bobyqa",
                                                      optCtrl=list(maxfun=2e5)))
+
+check_collinearity(alpha_int_glm) # VIF should be < 3
+check_convergence(alpha_int_glm)
+
 summary(alpha_int_glm)
 
 # beta interaction
-beta_int_glm <- glmer(sayyes ~ pre_beta + isyes + prevresp + 
-                        pre_beta*isyes + 
-                        pre_beta*prevresp + 
-                        (isyes + prevresp| ID),
+beta_int_glm <- glmer(sayyes ~ beta + isyes + prevresp + 
+                        beta*isyes + 
+                        beta*prevresp + 
+                        (isyes + prevresp + beta| ID),
                       data = behav, family=binomial(link='probit'), 
                       control=glmerControl(optimizer="bobyqa",
                                            optCtrl=list(maxfun=2e5)))
 
+check_collinearity(beta_int_glm) # VIF should be < 3
+check_convergence(beta_int_glm)
+
 summary(beta_int_glm)
 
 # Post hoc tests for behavior interaction
-emm_model <- emmeans(beta_int_glm, "prevresp", by = "pre_beta")
+emm_model <- emmeans(beta_int_glm, "prevresp", by = "beta")
 con <- contrast(emm_model)
 con
 
@@ -129,26 +186,26 @@ con
 filename = paste("alpha_int_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
 saveRDS(alpha_int_glm, cue_model_path)
-cue_prev_model <- readRDS(cue_model_path)
+alpha_int_glm <- readRDS(cue_model_path)
 
 
 filename = paste("beta_int_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
 saveRDS(beta_int_glm, cue_model_path)
-cue_prev_model <- readRDS(cue_model_path)
+beta_int_glm <- readRDS(cue_model_path)
 
 ##########################congruency###############################################################
 
 # does beta power per trial predict congruent responses in both probability conditions?
 
-con_beta = glmer(congruency ~ pre_beta * cue + isyes + (cue|ID), data=behav, 
+con_beta = glmer(congruency ~ beta * cue + isyes + (cue|ID), data=behav, 
                  family=binomial(link='probit'), 
                  control=glmerControl(optimizer="bobyqa",
                                       optCtrl=list(maxfun=2e5)))
 summary(con_beta)
 
 # Post hoc tests for behavior interaction
-emm_model <- emmeans(con_beta, "cue", by = "pre_beta")
+emm_model <- emmeans(con_beta, "cue", by = "beta")
 con <- contrast(emm_model)
 con
 
