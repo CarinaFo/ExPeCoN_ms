@@ -15,6 +15,8 @@ library(htmlTable)
 library(emmeans)
 library(performance)
 library(brms)
+library(sjPlot)
+library(ggplot2)
 
 # don't forget to give credit to the amazing authors of those packages
 #citation("emmeans")
@@ -24,7 +26,7 @@ par(family = "Arial", cex = 1.2)
 
 # which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
 
-expecon <- 1
+expecon <- 2
 
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
@@ -72,11 +74,12 @@ summary(lmer(beta ~ cue + (cue|ID),
 
 alpha_base_glm <- glmer(sayyes ~ alpha + isyes + 
                           alpha*isyes +
-                          (isyes + alpha + alpha*isyes |ID),
+                          (isyes + alpha|ID),
                         data = behav, family=binomial(link='probit'), 
                         control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e5)))
 
+# interaction term doesn't fit for volatile env.
 # check model performance
 check_collinearity(alpha_base_glm) # VIF should be < 3
 check_convergence(alpha_base_glm)
@@ -85,12 +88,13 @@ summary(alpha_base_glm)
 
 beta_base_glm <- glmer(sayyes ~ beta + isyes + 
                     beta*isyes +
-                    (isyes|ID),
+                    (isyes+beta|ID),
                   data = behav, family=binomial(link='probit'), 
                   control=glmerControl(optimizer="bobyqa",
                                        optCtrl=list(maxfun=2e5)))
 
 # singularity with beta and beta*stimulus interaction
+# fits beta for volatile env.
 # check model performance
 check_collinearity(beta_base_glm) # VIF should be < 3
 check_convergence(beta_base_glm)
@@ -153,7 +157,7 @@ beta_prev_glm <- readRDS(cue_model_path)
 alpha_int_glm <- glmer(sayyes ~ alpha + isyes + prevresp + 
                                 alpha*isyes +
                                 alpha*prevresp + 
-                                (isyes + prevresp + alpha*isyes|ID),
+                                (isyes + prevresp + alpha|ID),
                                 data = behav, family=binomial(link='probit'), 
                                 control=glmerControl(optimizer="bobyqa",
                                                      optCtrl=list(maxfun=2e5)))
@@ -210,4 +214,7 @@ con <- contrast(emm_model)
 con
 
 con_plot = plot_model(con_beta, type='int', mdrt.values = "meansd")
-ggsave('congruency_model_1.svg', dpi = 300, height = 8, width = 10, plot=con_plot)
+# save congruency plot
+filename = paste("congruency_beta_", expecon, ".svg", sep="")
+savepath_fig5 = file.path("figs", "manuscript_figures", "figure5_brain_behavior", filename)
+ggsave(savepath_fig5, dpi = 300, height = 8, width = 10, plot=con_plot)
