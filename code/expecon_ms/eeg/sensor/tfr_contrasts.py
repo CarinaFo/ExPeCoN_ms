@@ -6,7 +6,6 @@ Moreover, run a cluster test in 2D space (time and frequency)
 
 This script produces figure 4.
 
-
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
 Years: 2023
@@ -65,16 +64,16 @@ hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 
 
 def compute_tfr(
-    study: int = 2,
-    cond: str = "prev_resp",
-    tmin: float = -0.7,
-    tmax: float = 0,
-    fmax: float = 35,
-    fmin: float = 3,
-    laplace: bool = False,
-    induced: bool = False,
-    mirror: bool = True,
-    drop_bads: bool = True
+    study: int,
+    cond: str,
+    tmin: float,
+    tmax: float,
+    fmax: float,
+    fmin: float,
+    laplace: bool,
+    induced: bool,
+    mirror: bool,
+    drop_bads: bool
 ):
     """
     Calculate the time-frequency representations per trial (induced power) 
@@ -86,10 +85,10 @@ def compute_tfr(
     study : int, info: which study to analyze: 1 (block, stable environment) or 2 (trial,
     volatile environment)
     cond : str, info: which condition to analyze: "probability" or "prev_resp"
-    tmin : float
-    tmax : float
-    fmin: float
-    fmax: float
+    tmin : float: start time of the time window
+    tmax : float: end time of the time window
+    fmin: float:  start frequency of the frequency window
+    fmax: float:  end frequency of the frequency window
     laplace: boolean, info: apply current source density transform
     induced : boolean, info: subtract evoked response from each epoch
     mirror_data : boolean, info: mirror the data on both sides to avoid edge artifacts
@@ -263,8 +262,8 @@ def compute_tfr(
     return "Done with tfr/erp computation", cond_a_name, cond_b_name
 
 
-def load_tfr_conds(cond_a_name: str = "prevyesresp_highprob_mirror",
-                   cond_b_name: str = "prevnoresp_highprob_mirror"):
+def load_tfr_conds(cond_a_name: str,
+                   cond_b_name: str):
     """
     Load tfr data for the two conditions.
 
@@ -313,22 +312,22 @@ def load_tfr_conds(cond_a_name: str = "prevyesresp_highprob_mirror",
     return tfr_a_all, tfr_b_all
 
 
-def plot_tfr_cluster_test_output(threed_test=False,
-                                 tfr_a_cond=None,
-                                 tfr_b_cond=None,
-                                 cond_a_name="prevyesresp_highprob_mirror",
-                                 cond_b_name="prevnoresp_highprob_mirror",
-                                 channel_name=["CP4"]):
+def plot_tfr_cluster_test_output(tfr_a_cond: list,
+                                 tfr_b_cond: list,
+                                 threed_test: bool,
+                                 cond_a_name: str,
+                                 cond_b_name: str,
+                                 channel_name: list):
     """
     Plot cluster permutation test output for tfr data (time and frequency cluster).
 
     Args:
     ----
-    3d_test: boolean, info: whether to run a 3d cluster test (time, frequency, channels)
-    data_a : list of tfr objects
+   data_a : list of tfr objects
         tfr data for condition a
     data_b : list of tfr objects
         tfr data for condition b
+    3d_test: boolean, info: whether to run a 3d cluster test (time, frequency, channels)
     cond_a : str
         condition a
     cond_b : str
@@ -432,13 +431,13 @@ def plot_tfr_cluster_test_output(threed_test=False,
     return t_obs, cluster_p
 
 
-def plot_cluster_contours(fmin: float = None, 
-                          fmax: float = None):
+def plot_cluster_contours(fmin: float,
+                          fmax: float):
 
     """plot cluster permutation test output
     cluster is highlighted via a contour around it,
     code adapted Gimpert et al.
-    x and p ticks and labels, as wellas colorbar are not plotted
+    x and p ticks and labels, as well as colorbar are not plotted
     Args:
     ----
     fmin: float, info: minimum frequency to plot
@@ -502,14 +501,14 @@ def plot_cluster_contours(fmin: float = None,
     axs[idx].set_yticklabels(y_labels, fontsize=20)
 
 
-def zero_pad_or_mirror_data(data, zero_pad: bool = False):
+def zero_pad_or_mirror_data(data, zero_pad: bool):
     """
     Zero-pad or mirror data on both sides to avoid edge artifacts.
 
     Args:
     ----
     data: data array with the structure epochs x channels x time
-
+    zero_pad: boolean, info: whether to zero pad or mirror the data
     Returns:
     -------
     array with mirrored data on both ends = data.shape[2]
@@ -541,7 +540,7 @@ def zero_pad_or_mirror_data(data, zero_pad: bool = False):
     return np.squeeze(np.array(padded_list))
 
 
-def permute_trials(n_permutations: int = 500, power_a=None, power_b=None):
+def permute_trials(n_permutations: float, power_a: None, power_b: None):
 
     """Permute trials between two conditions and equalize trial counts.
     Args:
@@ -599,7 +598,16 @@ def permute_trials(n_permutations: int = 500, power_a=None, power_b=None):
 
 # Helper functions
 
-def plot_mirrored_data(subj='015'):
+def plot_mirrored_data(subj: str):
+
+    """Plot mirrored data on both ends
+    Args:
+    ----
+    subj: str, info: participant ID
+    Returns:
+    -------
+    None
+    """
 
     # load epochs for a single participant
     epochs = mne.read_epochs(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif")
@@ -637,6 +645,7 @@ def plot_mirrored_data(subj='015'):
 
 
 def drop_trials(data=None):
+
     """
     Drop trials based on behavioral data.
 
