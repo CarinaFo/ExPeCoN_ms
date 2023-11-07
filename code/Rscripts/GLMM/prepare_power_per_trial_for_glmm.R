@@ -13,7 +13,7 @@ library(lme4)
 library(lmerTest) # pvalues for lmer models
 
 # which study do you want to analyze?
-expecon <- 2
+expecon <- 1
 
 # check wether the removal of the trend worked?
 
@@ -32,7 +32,7 @@ if (expecon == 1) {
   # add prediction error per trial
   power$PE_abs = abs(power$isyes - power$cue)
   # Columns to process
-  columns_to_process <- c("pre_alpha", "pre_beta")
+  columns_to_process <- c("prestim__alpha", "prestim__beta")
   
 } else {
   
@@ -43,7 +43,7 @@ if (expecon == 1) {
   # add prediction error per trial
   power$PE_abs = abs(power$isyes - power$cue)
   # expecon 2
-  columns_to_process <- c("pre_alpha", "pre_beta")
+  columns_to_process <- c("prestim__alpha", "prestim__beta")
 }
 
 # https://philippmasur.de/2018/05/23/how-to-center-in-multilevel-models/
@@ -101,9 +101,9 @@ for (col in columns_to_process) {
 # check whether trend removal has worked (remove trend for trials within block and trend over blocks)
 
 if (expecon == 1 && check_trend_removal == 1) {
-  summary(lmer(pre_alpha ~ trial + (1|ID), data=power, REML=T))
+  summary(lmer(prestim__alpha ~ trial + (1|ID), data=power, REML=T))
 } else if (expecon == 2 && check_trend_removal == 1) {
-  summary(lmer(pre_beta ~ block + (1|ID), data=power, REML=T))
+  summary(lmer(prestim__beta ~ block + (1|ID), data=power, REML=T))
 }
 
 # define filename for cleaned power
