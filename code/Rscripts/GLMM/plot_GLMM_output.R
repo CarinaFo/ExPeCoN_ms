@@ -52,13 +52,21 @@ cue_prev_int_2 <- readRDS(cue_model_path)
 # brain behavior models
 
 expecon = 1
-filename = paste("alpha_glm_", expecon, ".rda", sep="")
+filename = paste("alpha_base_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
-alpha_glm_1 <- readRDS(cue_model_path)
+alpha_base_glm_1 <- readRDS(cue_model_path)
 
-filename = paste("beta_glm_", expecon, ".rda", sep="")
+filename = paste("beta_base_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
 beta_glm_1 <- readRDS(cue_model_path)
+
+filename = paste("alpha_prev_glm_", expecon, ".rda", sep="")
+cue_model_path = file.path("data", "behav", "mixed_models", filename)
+alpha_prev_glm_1 <- readRDS(cue_model_path)
+
+filename = paste("beta_prev_glm_", expecon, ".rda", sep="")
+cue_model_path = file.path("data", "behav", "mixed_models", filename)
+beta_prev_glm_1 <- readRDS(cue_model_path)
 
 filename = paste("beta_int_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
@@ -70,13 +78,21 @@ alpha_int_glm_1 <- readRDS(cue_model_path)
 
 expecon = 2
 
-filename = paste("alpha_glm_", expecon, ".rda", sep="")
+filename = paste("alpha_base_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
-alpha_glm_2 <- readRDS(cue_model_path)
+alpha_base_glm_2 <- readRDS(cue_model_path)
 
-filename = paste("beta_glm_", expecon, ".rda", sep="")
+filename = paste("beta_base_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
-beta_glm_2 <- readRDS(cue_model_path)
+beta_base_glm_2 <- readRDS(cue_model_path)
+
+filename = paste("alpha_prev_glm_", expecon, ".rda", sep="")
+cue_model_path = file.path("data", "behav", "mixed_models", filename)
+alpha_prev_glm_2 <- readRDS(cue_model_path)
+
+filename = paste("beta_prev_glm_", expecon, ".rda", sep="")
+cue_model_path = file.path("data", "behav", "mixed_models", filename)
+beta_prev_glm_2 <- readRDS(cue_model_path)
 
 filename = paste("beta_int_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
@@ -87,7 +103,7 @@ cue_model_path = file.path("data", "behav", "mixed_models", filename)
 alpha_int_glm_2 <- readRDS(cue_model_path)
 
 # where to save the figure
-save_path_figs = file.path("figs", "manuscript_figures", "fig5_brain_behav")
+save_path_figs = file.path("figs", "manuscript_figures", "figure5_brain_behavior")
 setwd(save_path_figs)
 
 # plot estimates for behavior only
@@ -158,22 +174,21 @@ est_beta_expecon2 = plot_model(beta_int_glm_2, type='est',
 intg = arrangeGrob(est_alpha_expecon1, est_alpha_expecon2, est_beta_expecon1, est_beta_expecon2, 
                    nrow=2)
 
-ggsave('model_brain_behavior.svg', dpi = 300, height = 8, width = 10, plot=intg)
-
+ggsave('model_brain_behavior_new.svg', dpi = 300, height = 8, width = 10, plot=intg)
 
 ################################# plot interactions ################################################
 
 # change the order of predictors (x and label)
-beta_1 = plot_model(beta_int_glm_1, type='pred',terms = c("pre_beta", 'isyes'))
-beta_2 = plot_model(beta_int_glm_2, type='pred', terms = c("pre_beta", "isyes"))
-beta_int_1 = plot_model(beta_int_glm_1, type='pred',terms = c("pre_beta", 'prevresp'))
-beta_int_2 = plot_model(beta_int_glm_2, type='pred', terms = c("pre_beta", "prevresp"))
+beta_1 = plot_model(beta_int_glm_1, type='pred',terms = c("beta", 'isyes'))
+beta_2 = plot_model(beta_int_glm_2, type='pred', terms = c("beta", "isyes"))
+beta_int_1 = plot_model(beta_int_glm_1, type='pred',terms = c("beta", 'prevresp'))
+beta_int_2 = plot_model(beta_int_glm_2, type='pred', terms = c("beta", "prevresp"))
 
 
-alpha_1 = plot_model(alpha_int_glm_1, type='pred',terms = c("pre_alpha", 'isyes'))
-alpha_2 = plot_model(alpha_int_glm_2, type='pred', terms = c("pre_alpha", "isyes"))
-alpha_int_1 = plot_model(alpha_int_glm_1, type='pred',terms = c("pre_alpha", 'prevresp'))
-alpha_int_2 = plot_model(alpha_int_glm_2, type='pred', terms = c("pre_alpha", "prevresp"))
+alpha_1 = plot_model(alpha_int_glm_1, type='pred',terms = c("alpha", 'isyes'))
+alpha_2 = plot_model(alpha_int_glm_2, type='pred', terms = c("alpha", "isyes"))
+alpha_int_1 = plot_model(alpha_int_glm_1, type='pred',terms = c("alpha", 'prevresp'))
+alpha_int_2 = plot_model(alpha_int_glm_2, type='pred', terms = c("alpha", "prevresp"))
 
 # arange plots in a grid:beta
 g = arrangeGrob(beta_1, beta_2, beta_int_1, beta_int_2, 
@@ -182,5 +197,5 @@ g = arrangeGrob(beta_1, beta_2, beta_int_1, beta_int_2,
 g_alpha = arrangeGrob(alpha_1, alpha_2, alpha_int_1, alpha_int_2, 
                 nrow = 2)
 # save figure
-ggsave('brain_behavior_model_interactions.svg', dpi = 300, height = 8, width = 10, plot=g)
-ggsave('brain_behavior_model_interactions_alpha.svg', dpi = 300, height = 8, width = 10, plot=g_alpha)
+ggsave('brain_behavior_model_interactions_new.svg', dpi = 300, height = 8, width = 10, plot=g)
+ggsave('brain_behavior_model_interactions_alpha_new.svg', dpi = 300, height = 8, width = 10, plot=g_alpha)
