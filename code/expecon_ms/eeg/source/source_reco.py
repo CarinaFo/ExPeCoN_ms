@@ -86,12 +86,16 @@ pilot_counter = config.participants.pilot_counter
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-def run_source_reco(study: int = 2, cond: str = "prev_resp",
-                    dics: int = 1, fmin: int = 15, fmax: int = 25,
-                    tmin: int = -0.2, tmax: int = 0,
-                    save_path: str | Path = mne,
-                    drop_bads: bool = True,
-                    plot_alignment: bool = False) -> None:
+def run_source_reco(study: int, 
+                    cond: str,
+                    dics: int, 
+                    fmin: int, 
+                    fmax: int,
+                    tmin: int, 
+                    tmax: int, 
+                    save_path: str,
+                    drop_bads: bool,
+                    plot_alignment: bool) -> None:
     """
     Run source reconstruction on epoched EEG data using 
     eLoreta or DICS beamforming for oscillatory source analysis.
@@ -285,10 +289,10 @@ def run_source_reco(study: int = 2, cond: str = "prev_resp",
             stc.save(Path(save_path, f"contrast_{cond}_{subj}_{study}"))
 
 
-def create_source_contrast_array(study: int = 2, cond: str = "prev_resp",
-                                 cond_a: str = "prevyesresp_highprob", 
-                                 cond_b: str = "prevnoresp_highprob",
-                                 path_to_source: str | Path = beamformer_path):
+def create_source_contrast_array(study: int, cond: str,
+                                 cond_a: str,
+                                 cond_b: str,
+                                 path_to_source: str):
     """
     Load source estimates per participant and contrasts them, before storing the 
     contrast in a numpy array.
@@ -298,7 +302,7 @@ def create_source_contrast_array(study: int = 2, cond: str = "prev_resp",
     cond: str, info: which condition to analyze: "probability" or "prev_resp"
     cond_a: str, info: name of condition a
     cond_b: str, info: name of condition b
-    path_to_source: path to source estimates
+    path_to_source: path to source estimates: e.g. | Path = beamformer_path
 
     Returns:
     -------
@@ -334,12 +338,12 @@ def create_source_contrast_array(study: int = 2, cond: str = "prev_resp",
 
 def spatio_temporal_source_test(
     stc_array: np.ndarray | None = None,
-    n_perm: int = 10000,
-    jobs: int = -1,
-    save_path_source_figs: str | Path = beamformer_path,
-    cond: str = "probability",
-    method: str = "beamformer",
-    study: int = 1
+    n_perm: int,
+    jobs: int,
+    save_path_source_figs: str,
+    cond: str,
+    method: str,
+    study: int
 ):
     """
     Run a cluster-based permutation test over space and time.
@@ -349,7 +353,10 @@ def spatio_temporal_source_test(
     stc_array: 3D numpy source array: participants x space x time
     n_perm: how many permutations for cluster test
     jobs: how many parallel GPUs should be used
-    save_path_source_figs: path to save figures
+    save_path_source_figs: path to save figures, e.g. | Path = beamformer_path
+    cond: str, info: which condition to analyze: "probability" or "prev_resp"
+    method: str, info: which method to analyze: "beamformer" or "mne"
+    study: int, info: which study to analyze: 1 (block, stable environment) or 2 (trial)
 
     Returns:
     -------
@@ -401,14 +408,15 @@ def spatio_temporal_source_test(
     return clu
 
 
-def plot_cluster_output(clu=None, cond: str = "probability", 
-                        freq_band: str = "beta", 
-                        method: str = "beamformer"):
+def plot_cluster_output(clu: list, 
+                        cond: str, 
+                        freq_band: str, 
+                        method: str):
     """
     Plot significant clusters of a spatio-temporal cluster permutation test.
     Args:
     ----
-    clu: cluster output
+    clu: list, output of spatio-temporal cluster permutation test
     cond: str, info: which condition to analyze: "probability" or "prev_resp"
     freq_band: str, info: which frequency band to analyze: "alpha" or "beta"
     method: str, info: which method to analyze: "beamformer" or "mne"
