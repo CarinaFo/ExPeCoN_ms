@@ -8,6 +8,7 @@ Author: Carina Forster
 Contact: forster@cbs.mpg.de
 Years: 2023
 """
+
 # %% Import
 import pickle
 import subprocess
@@ -63,11 +64,11 @@ hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-def create_contrast(study: int = 1,
-                    drop_bads: bool = True,
-                    laplace: bool = False,
-                    subtract_evoked: bool = False,
-                    save_data_to_disk: bool = False):
+def create_contrast(study: int,
+                    drop_bads: bool,
+                    laplace: bool,
+                    subtract_evoked: bool,
+                    save_data_to_disk: bool):
     """
     Load cleaned epoched data and create contrasts.
 
@@ -196,20 +197,22 @@ def create_contrast(study: int = 1,
 
 
 def plot_roi(data = None,
-             tmin: float = -0.2, 
-             tmax: float = 0.5,
-             tmin_base: float = -0.1,
-             tmax_base: float = 0.,
-             study: int = 2):
+             tmin: float, 
+             tmax: float,
+             tmin_base: float,
+             tmax_base: float,
+             study: int):
     """
     Plot topography of P50 for the contrast of signal - noise trials 
     and the contrast over time for the channel with the strongest effect.
     
     ----
-    tmin: start time of time window
-    tmax: end time of time window
-    tmin_base: start time of baseline window
-    tmax_base: end time of baseline window
+    data: list of evoked objects
+    tmin: float: start time of time window
+    tmax: float: end time of time window
+    tmin_base: float: start time of baseline window
+    tmax_base: float: end time of baseline window
+    study: int: study number (1 or 2), 1 == expecon1, 2 == expecon2
 
     Returns:
     -------
@@ -247,8 +250,10 @@ def plot_roi(data = None,
     plt.show()
 
 
-def get_significant_channel(tmin=.04, tmax=0.06, 
-                            tmin_base=-0.1, tmax_base=0):
+def get_significant_channel(tmin: float, 
+                            tmax: float, 
+                            tmin_base: float, 
+                            tmax_base: float):
 
     conds = create_contrast()
 
@@ -289,11 +294,23 @@ def get_significant_channel(tmin=.04, tmax=0.06,
 
     return good_cluster_inds, t_obs, clusters, h0, cluster_p_values
 
-def plot_cluster_output_2D(tmin=0, tmax=0.3, 
-                           tmin_base=-0.1, tmax_base=0,
-                           good_cluster_inds=None,
-                           t_obs=None, 
-                           clusters=None):
+def plot_cluster_output_2D(tmin: float, tmax: float, 
+                           tmin_base: float, tmax_base: float,
+                           good_cluster_inds: int,
+                           t_obs: int, 
+                           clusters: int):
+    """
+    Plot cluster output of 2D cluster permutation test.
+    
+    ----
+    tmin: float: start time of time window
+    tmax: float: end time of time window
+    tmin_base: float: start time of baseline window
+    tmax_base: float: end time of baseline window
+    good_cluster_inds: int: indices of significant clusters
+    t_obs: int: t-values
+    clusters: int: cluster information
+    """
 
     # extract data
     signal = [s.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for s in conds[2]]
