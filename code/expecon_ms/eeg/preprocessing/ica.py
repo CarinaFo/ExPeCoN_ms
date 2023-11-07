@@ -61,7 +61,7 @@ id_list = config.participants.ID_list
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-def run_ica(infomax: int = 1, save_psd: int = 0):
+def run_ica(infomax: int, save_psd: int):
     """
     Run ICA on epoched data and save the ICA solution.
 
