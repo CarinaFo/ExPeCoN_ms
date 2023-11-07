@@ -40,7 +40,7 @@ plt.rcParams["font.size"] = 14
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-def correlate_sdt_with_questionnaire(expecon: int = 1):
+def correlate_sdt_with_questionnaire(expecon: int):
     """
     Correlate the criterion change with the intolerance of uncertainty questionnaire score and plots a regression plot.
 
@@ -114,9 +114,14 @@ def correlate_sdt_with_questionnaire(expecon: int = 1):
     plt.show()
 
 
-def diff_from_optimal_criterion(expecon: int = 1):
+def diff_from_optimal_criterion(expecon: int):
     """
     Calculate the difference between the optimal criterion & the criterion for each participant and each condition
+    
+    Args:
+    ----
+    expecon: int: expecon = 1: analyze expecon 1 behavioral data | expecon = 2: analyze expecon 2 behavioral data
+    
     """
     
     # Set up data path
