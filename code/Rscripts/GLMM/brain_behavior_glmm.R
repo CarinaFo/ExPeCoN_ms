@@ -26,7 +26,7 @@ par(family = "Arial", cex = 1.2)
 
 # which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
 
-expecon <- 2
+expecon <- 1
 
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
@@ -57,6 +57,16 @@ behav <- na.omit(behav)
 behav$alpha <- behav$prestim__alpha
 behav$beta <- behav$prestim__beta
 ########################### Brain behavior GLMMs ###################################################
+
+# does beta or alpha predict the stimulus? control analysis:
+
+alpha_stim <- glm(isyes ~ -1 + alpha,
+                        data = behav, family=binomial(link='probit'))
+summary(alpha_stim)
+
+beta_stim <- glm(isyes ~ -1 + beta,
+                  data = behav, family=binomial(link='probit'))
+summary(beta_stim)
 
 # replace stimulus probability regressor with beta or alpha power per trial (neural correlate of stimulus probability)
 
