@@ -49,7 +49,7 @@ save_path_fig1 = Path(path_to.figures.manuscript.figure1)
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-def prepro_behavioral_data(expecon: int = 1):
+def prepro_behavioral_data(expecon: int):
     """
     Preprocess the behavioral data.
 
@@ -58,7 +58,7 @@ def prepro_behavioral_data(expecon: int = 1):
 
     Args:
     ----
-        expecon: which dataset: expecon 1 or expecon 2
+        expecon: int: which dataset: expecon 1 or expecon 2
 
     Returns:
     -------
@@ -143,13 +143,13 @@ def prepro_behavioral_data(expecon: int = 1):
     return data
 
 
-def exclude_data(expecon: int = 1):
+def exclude_data(expecon: int):
     """
     Exclude experimental blocks from the data based on the exclusion criteria (hit rates, fa rates).
 
     Args:
     ----
-    expecon: which dataset to use: expecon 1 or expecon 2
+    expecon: int: which dataset to use: expecon 1 or expecon 2
 
     Returns:
     -------
@@ -221,7 +221,7 @@ def exclude_data(expecon: int = 1):
 def plot_mean_response_and_confidence(
     blue="#0571b0", red="#ca0020", 
     no_col="#088281", yes_col="#d01c8b",
-    savepath=path_to.figures.manuscript.figure2_suppl, expecon=1
+    savepath=path_to.figures.manuscript.figure2_suppl, expecon: int
 ):
     """
     Plot the mean detection response and mean confidence for each cue condition with a boxplot.
@@ -233,8 +233,10 @@ def plot_mean_response_and_confidence(
     ----
     blue: color for low cue condition
     red: color for high cue condition
+    no_col: color for no response
+    yes_col: color for yes response
     savepath: path to save the figure to
-    expecon: which dataset to use: expecon 1 or expecon 2
+    expecon: int: which dataset to use: expecon 1 or expecon 2
 
     Returns:
     -------
@@ -288,14 +290,14 @@ def plot_mean_response_and_confidence(
     return "saved figures"
 
 
-def prepare_for_plotting(exclude_high_fa: bool = False, expecon: int = 1):
+def prepare_for_plotting(exclude_high_fa: bool, expecon: int):
     """
     Prepare the data for plotting.
 
     Args:
     ----
-    exclude_high_fa: Boolean indicating whether to exclude participants with high false alarm rates
-    expecon: which dataset: expecon 1 or expecon 2
+    exclude_high_fa: Boolean: indicating whether to exclude participants with high false alarm rates
+    expecon: which dataset: int: expecon 1 or expecon 2
 
     Returns:
     -------
@@ -335,13 +337,14 @@ def prepare_for_plotting(exclude_high_fa: bool = False, expecon: int = 1):
     return conditions, exclude_high_fa
 
 
-def plot_figure1_grid(expecon: int = 2, exclude_high_fa: bool = True):
+def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
     """
     Plot the figure 1 grid and the behavioral data for the EXPECON study.
 
     Args:
     ----
     expecon: int : which study to analyze
+    exclude_high_fa: bool: whether to exclude participants with high false alarm rates
 
     Return:
     ------
@@ -645,8 +648,14 @@ def plot_figure1_grid(expecon: int = 2, exclude_high_fa: bool = True):
     return "saved figure 1"
 
 
-def calc_stats(expecon=1):
-    """Calculate statistics and effect sizes for the behavioral data."""
+def calc_stats(expecon: int):
+
+    """Calculate statistics and effect sizes for the behavioral data.
+    
+    Args:
+    ----
+    expecon: int : which study to analyze
+    """
     conditions, _ = prepare_for_plotting(expecon=expecon, exclude_high_fa=False)
 
     # only for dprime, crit, hit-rate, fa-rate and confidence congruency
@@ -742,7 +751,7 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     return ci_lower, ci_upper
 
 
-def supplementary_plots(expecon: int = 1):
+def supplementary_plots(expecon: int):
     """
     Create supplementary plots for the behavioral data.
 
