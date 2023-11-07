@@ -51,9 +51,9 @@ freq_bands = {"alpha": (7, 13), "beta": (15, 25)}
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-# TODO(simon): defaults should not be mutable
-def save_band_power_per_trial(time_intervals={"pre": (-0.2, 0)}, channel_name=["CP4"],
-                              study: int = 1):
+def save_band_power_per_trial(time_intervals: dict,
+                              channel_name: list,
+                              study: int):
     """
     Save the power per trial per frequency band in a csv file.
 
@@ -65,7 +65,8 @@ def save_band_power_per_trial(time_intervals={"pre": (-0.2, 0)}, channel_name=["
 
     Args:
     ----
-    time_intervals: dict: Dictionary with time intervals of interest.
+    time_intervals: dict: Dictionary with column names as keys and values
+        as tuples with the time interval of interest.
     channel_name: list: List with channel names of interest.
     study: int: Study number: 1 = block design, 2 = trial design
     Return:
@@ -112,16 +113,16 @@ def save_band_power_per_trial(time_intervals={"pre": (-0.2, 0)}, channel_name=["
     return brain_behav
 
 
-def power_criterion_corr(study: int = 1) -> None:
+def power_criterion_corr(study: int) -> None:
     """
     Correlate the power difference between low and high expectations trials 
     with the difference in sdt parameters for low and high expectations.
     function calculates spearman correlation and plots regression line.
     """
     # load brain behav dataframe
-    df_brain_behav = pd.read_csv(behav_dir / "brain_behav_{study}.csv")
+    df_brain_behav = pd.read_csv(behav_dir / f"brain_behav_{study}.csv")
 
-    freqs = ["pre_alpha", "pre_beta"]
+    freqs = ["prestim_alpha", "prestim_beta"]
 
     diff_p_list = []
 
