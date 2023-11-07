@@ -59,39 +59,57 @@ pilot_counter = config.participants.pilot_counter
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
+
 def prepro(
-    trigger: str = "stimulus",
-    l_freq: float = 0.1,
-    h_freq: int = 40,
-    tmin: float = -1,
-    tmax: float = 1,
-    resample_rate: int = 250,
-    sf: int = 2500,
-    detrend: int = 1,
-    ransac: int = 1,
-    autoreject: int = 0,
+    trigger: str,
+    l_freq: float,
+    h_freq: int,
+    tmin: float,
+    tmax: float,
+    resample_rate: float,
+    sf: int,
+    detrend: int,
+    ransac: int,
+    autoreject: int,
 ):
     """
     Bandpass-filter the data using a finite response filter.
-
-    As implemented in MNE, add channel locations according to the 10/10 system, load a
-    specified behavioral data file (.csv) and add events as metadata to each epoch,
-    inspect data for bad channels and bad epochs using RANSAC from the autoreject package.
-    To ensure the same amount of channels for all subjects, we interpolate bad
-    channels, after interpolating the bad channels, the data is epoched
-    to the stimulus or cue trigger events and saved as an -epo.fif file.
+    As implemented in MNE, add channel locations according to the 10/10 system,
+    load a specified behavioral data file (.csv) and add events as metadata to 
+    each epoch, inspect data for bad channels and bad epochs using RANSAC from the 
+    autoreject package. To ensure the same amount of channels for all subjects,
+    we interpolate bad channels, after interpolating the bad channels, the data is 
+    epoched to the stimulus or cue trigger events and saved as an -epo.fif file.
 
     Args:
     ----
-    trigger: lock the data to the "stimulus" or "cue" onset
-    IMPORTANT:
-    -data can be epoched to stimulus (0) or cue onset (1)
-    -autoreject only works on epoched data
-    UPDATES:
-    - downsample and filter after epoching (downsampling before epoching
-      might create trigger jitter)
-
-    # TODO(simon): add other args to docstring
+   
+    trigger: str
+        Specify whether to epoch the data to the stimulus or cue trigger.
+        Options: "stimulus" or "cue"
+    l_freq: float
+        Low cut-off frequency in Hz.
+    h_freq: int
+        High cut-off frequency in Hz.
+    tmin: float
+        Start time before event in seconds.
+    tmax: float
+        End time after event in seconds.
+    resample_rate: float
+        New sampling frequency in Hz.
+    sf: int
+        Sampling frequency of the raw data in Hz.
+    detrend: int
+        If 1, the data is detrended (linear detrending)
+    ransac: int
+        If 1, RANSAC is used to detect bad channels.
+    autoreject: int
+    Returns:
+    -------
+    ch_interp: list
+        List with the number of interpolated channels per participant.
+    annot: list
+        List with the annotations (trigger) information.
     """
     # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
     # no matching trigger in the EEG recording)
@@ -223,10 +241,17 @@ def prepro(
     return ch_interp, annot
 
 
-def channels_interp(trigger: str = "stimulus", l_freq=0.1) -> None:
+def channels_interp(trigger: str, l_freq: float) -> None:
     """
     Calculate the mean, std, min and max of channels interpolated across participants.
 
+    Parameters
+    ----------
+    trigger : str
+        Specify whether to epoch the data to the stimulus or cue trigger.
+        Options: "stimulus" or "cue"
+    l_freq : float
+        Low cut-off frequency in Hz.
     Returns
     -------
     None.
@@ -252,9 +277,22 @@ def channels_interp(trigger: str = "stimulus", l_freq=0.1) -> None:
 
 # Unused functions
 
-def add_reaction_time_trigger(metadata=None, sf=250, events=None) -> None:
+def add_reaction_time_trigger(metadata=None, sf: int, events=None) -> None:
 
-    """Add the reaction time as a trigger to the event structure."""
+    """Add the reaction time as a trigger to the event structure.
+    
+    Parameters
+    ----------
+    metadata : pd.DataFrame
+        Dataframe with behavioral data.
+    sf : int
+        Sampling frequency of the raw data in Hz.
+    events : np.array
+        Array with the event structure.
+    Returns
+    -------
+    None.
+    """
 
     # reset index
     metadata_index = metadata.reset_index()
