@@ -289,7 +289,7 @@ def run_source_reco(study: int,
             stc.save(Path(save_path, f"contrast_{cond}_{subj}_{study}"))
 
 
-def create_source_contrast_array(study: int, cond: str,
+def create_source_contrast_array(study: int,
                                  cond_a: str,
                                  cond_b: str,
                                  path_to_source: str):
@@ -337,7 +337,7 @@ def create_source_contrast_array(study: int, cond: str,
 
 
 def spatio_temporal_source_test(
-    stc_array: np.ndarray | None = None,
+    stc_array: np.ndarray,
     n_perm: int,
     jobs: int,
     save_path_source_figs: str,
