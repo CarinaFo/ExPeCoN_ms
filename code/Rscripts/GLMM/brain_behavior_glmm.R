@@ -26,7 +26,7 @@ par(family = "Arial", cex = 1.2)
 
 # which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
 
-expecon <- 1
+expecon <- 2
 
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
@@ -218,13 +218,20 @@ con_beta = glmer(congruency ~ beta * cue + isyes + (cue|ID), data=behav,
                                       optCtrl=list(maxfun=2e5)))
 summary(con_beta)
 
+con_alpha = glmer(congruency ~ alpha * cue + isyes + (cue|ID), data=behav, 
+                 family=binomial(link='probit'), 
+                 control=glmerControl(optimizer="bobyqa",
+                                      optCtrl=list(maxfun=2e5)))
+summary(con_alpha)
+
 # Post hoc tests for behavior interaction
 emm_model <- emmeans(con_beta, "cue", by = "beta")
 con <- contrast(emm_model)
 con
 
-con_plot = plot_model(con_beta, type='int', mdrt.values = "meansd")
+con_plot_beta = plot_model(con_beta, type='int', mdrt.values = "meansd")
+con_plot_alpha = plot_model(con_alpha, type='int', mdrt.values = "meansd")
 # save congruency plot
-filename = paste("congruency_beta_", expecon, ".svg", sep="")
+filename = paste("congruency_alpha_", expecon, ".svg", sep="")
 savepath_fig5 = file.path("figs", "manuscript_figures", "figure5_brain_behavior", filename)
-ggsave(savepath_fig5, dpi = 300, height = 8, width = 10, plot=con_plot)
+ggsave(savepath_fig5, dpi = 300, height = 8, width = 10, plot=con_plot_alpha)
