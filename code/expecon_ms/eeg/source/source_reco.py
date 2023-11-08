@@ -38,24 +38,36 @@ last_commit_date = (
 
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
-# load source space files
-fs_dir = Path(fetch_fsaverage(verbose=True))
-subjects_dir = fs_dir.parent
-subject = "fsaverage"
+#
+save_dir_fsaverage_source_files = Path("E:/expecon_ms/data/templates")
 
-_oct = "6"
+# fetch fsaverage files and save path
+subjects_dir = fetch_fsaverage()
 
-fwd_dir = subjects_dir / f"{subject}/bem/{subject}-oct{_oct}-fwd.fif"
-src_fname = subjects_dir / f"{subject}/bem/{subject}-oct{_oct}-src.fif"
-trans_dir = subjects_dir / f"{subject}/bem/{subject}-trans.fif"
+# set root path to fsaverag files
+fs_average_root_path = f'{subjects_dir}{Path("/")}bem{Path("/")}'
 
-# Read the source space and the forward solution
+# load bem solution, source space and transformation matrix
+bem = f'{fs_average_root_path}fsaverage-5120-5120-5120-bem-sol.fif'
+src_fname = f'{fs_average_root_path}fsaverage-ico-5-src.fif'
+trans_dir = f'{fs_average_root_path}fsaverage-trans.fif'
+
+# Read the source space
 src = mne.read_source_spaces(src_fname)
-fwd = mne.read_forward_solution(fwd_dir)
 
-# clean epochs
+# clean epochs path
 dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
 dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
+
+# load example epoch
+epochs = mne.read_epochs(Path(dir_clean_epochs / f"P015_icacorr_0.1Hz-epo.fif"))
+
+# set up forward solution
+fwd = mne.make_forward_solution(
+    epochs.info, trans=trans_dir, src=src, bem=bem, eeg=True, 
+    mindist=5.0,
+    n_jobs=None
+)
 
 # behavioral data
 behav_path = Path(path_to.data.behavior)
