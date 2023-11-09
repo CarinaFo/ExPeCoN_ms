@@ -21,7 +21,7 @@ package_version <- packageVersion("mediation")
 options(scipen=999)
 
 # which dataset to analyze (1 => block design, 2 => trial-by-trial design)
-expecon <- 1
+expecon <- 2
 
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
@@ -44,8 +44,8 @@ behav <- na.omit(behav)
 # https://towardsdatascience.com/doing-and-reporting-your-first-mediation-analysis-in-r-2fe423b92171
 
 # rename
-behav$beta <- behav$pre_beta
-behav$alpha <- behav$pre_alpha
+behav$beta <- behav$prestim__beta
+behav$alpha <- behav$prestim__alpha
 
 # dummy recode
 behav$cue <- ifelse(behav$cue == 0.25, 0, 1) 
@@ -190,6 +190,8 @@ med_prevresp_beta <- brm(med.model + out.model + set_rescor(FALSE),
                     data = behav, refresh = 1, 
                     cores=10)
 
+# save mediation output: probability cue
+setwd("E:/expecon_ms/data/behav/mediation/brms/")
 # save model
 # probability cue
 # alpha
@@ -216,7 +218,6 @@ mediation(med_cue_beta)
 # previous choice
 mediation(med_prevresp_alpha)
 mediation(med_prevresp_beta)
-
 ################################ helper functions ##################################################
 extract_mediation_summary <- function (x) { 
   
