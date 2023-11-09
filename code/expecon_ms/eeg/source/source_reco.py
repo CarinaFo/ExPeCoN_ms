@@ -38,47 +38,60 @@ last_commit_date = (
 
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
-#
+# where to store source files for forward solution
 save_dir_fsaverage_source_files = Path("E:/expecon_ms/data/templates")
 
-# fetch fsaverage files and save path
-subjects_dir = fetch_fsaverage()
 
-# set root path to fsaverag files
-fs_average_root_path = f'{subjects_dir}{Path("/")}bem{Path("/")}'
+def make_new_forward_solution(setup_source_space: bool):
 
-create_new_source_space = False
+    """ Create a new forward solution for source reconstruction.
 
-# create source space
-if create_new_source_space:
+    Args:
+    ----
+    setup_source_space: bool, info: if True, create new source space
 
-    src = mne.setup_source_space(
-        'fsaverage', spacing="oct6", add_dist="patch", subjects_dir=subjects_dir
+    Returns:
+    -------
+    .fif file containing the forward solution
+    """
+
+    # fetch fsaverage files and save path
+    subjects_dir = fetch_fsaverage()
+
+    # set root path to fsaverag files
+    fs_average_root_path = f'{subjects_dir}{Path("/")}bem{Path("/")}'
+
+    # you can create your own source space with the desired spacing
+    if setup_source_space:
+        src = mne.setup_source_space(
+            'fsaverage', spacing="oct6", add_dist="patch", subjects_dir=subjects_dir
+        )
+
+        mne.write_source_spaces(f'{fs_average_root_path}fsaverage-oct6-src.fif', src) 
+
+    # load bem solution, source space and transformation matrix
+    bem = f'{fs_average_root_path}fsaverage-5120-5120-5120-bem-sol.fif'
+    src_fname = f'{fs_average_root_path}fsaverage-oct6-src.fif' # 5mm between sources
+    trans_dir = f'{fs_average_root_path}fsaverage-trans.fif'
+
+    # Read the source space
+    src = mne.read_source_spaces(src_fname)
+
+    # clean epochs path
+    dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
+    dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
+
+    # load example epoch
+    epochs = mne.read_epochs(Path(dir_clean_epochs / f"P015_icacorr_0.1Hz-epo.fif"))
+
+    # set up forward solution
+    fwd = mne.make_forward_solution(
+        epochs.info, trans=trans_dir, src=src, bem=bem, eeg=True,
+        mindist=5.0,
+        n_jobs=None
     )
 
-    mne.write_source_spaces(f'{fs_average_root_path}fsaverage-oct6-src.fif', src) 
-
-# load bem solution, source space and transformation matrix
-bem = f'{fs_average_root_path}fsaverage-5120-5120-5120-bem-sol.fif'
-src_fname = f'{fs_average_root_path}fsaverage-oct6-src.fif' # 5mm between sources
-trans_dir = f'{fs_average_root_path}fsaverage-trans.fif'
-
-# Read the source space
-src = mne.read_source_spaces(src_fname)
-
-# clean epochs path
-dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
-dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
-
-# load example epoch
-epochs = mne.read_epochs(Path(dir_clean_epochs / f"P015_icacorr_0.1Hz-epo.fif"))
-
-# set up forward solution
-fwd = mne.make_forward_solution(
-    epochs.info, trans=trans_dir, src=src, bem=bem, eeg=True,
-    mindist=5.0,
-    n_jobs=None
-)
+    mne.write_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}fwd_5120.fif', fwd)
 
 # behavioral data
 behav_path = Path(path_to.data.behavior)
@@ -153,6 +166,9 @@ def run_source_reco(study: int,
     .stc files for each hemisphere containing source reconstructions for each participant, shape: vertices-x-timepoints
     """
 
+    # read forward solution
+    fwd = mne.read_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}fwd_5120.fif')
+    
     if study == 1:
         id_list = id_list_expecon1
         # load behavioral data
@@ -440,7 +456,7 @@ def spatio_temporal_source_test(
     brain = stc.plot(
         hemi=hemisphere, views=view, subjects_dir=subjects_dir, 
         subject="fsaverage",
-        time_viewer=True, background="white", colorbar=False
+        time_viewer=True, background="white", colorbar=True
     )
 
     brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_' +
