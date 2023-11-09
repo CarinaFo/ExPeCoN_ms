@@ -91,7 +91,7 @@ def make_new_forward_solution(setup_source_space: bool):
         n_jobs=None
     )
 
-    mne.write_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}fwd_5120.fif', fwd)
+    mne.write_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}5120-fwd.fif', fwd)
 
 # behavioral data
 behav_path = Path(path_to.data.behavior)
@@ -167,7 +167,7 @@ def run_source_reco(study: int,
     """
 
     # read forward solution
-    fwd = mne.read_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}fwd_5120.fif')
+    fwd = mne.read_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}5120-fwd.fif')
     
     if study == 1:
         id_list = id_list_expecon1
