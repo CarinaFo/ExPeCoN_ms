@@ -42,6 +42,38 @@ print("Last Commit Date for", __file__path, ":", last_commit_date)
 save_dir_fsaverage_source_files = Path("E:/expecon_ms/data/templates")
 
 
+# clean epochs path
+dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
+dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
+
+# behavioral data
+behav_path = Path(path_to.data.behavior)
+
+# save paths for beamforming
+beamformer_path = Path(path_to.data.eeg.source.beamformer)
+
+# save paths for mne
+mne_path = Path(path_to.data.eeg.source.mne)
+
+# save source space figures
+save_path_source_figs = Path(path_to.figures.manuscript.figure4_source)
+
+# participant IDs
+id_list_expecon1 = config.participants.ID_list_expecon1
+id_list_expecon2 = config.participants.ID_list_expecon2
+
+# data_cleaning parameters defined in config.toml
+rt_max = config.behavioral_cleaning.rt_max
+rt_min = config.behavioral_cleaning.rt_min
+hitrate_max = config.behavioral_cleaning.hitrate_max
+hitrate_min = config.behavioral_cleaning.hitrate_min
+farate_max = config.behavioral_cleaning.farate_max
+hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
+
+# pilot data counter for expecon 1
+pilot_counter = config.participants.pilot_counter
+
+
 def make_new_forward_solution(setup_source_space: bool):
 
     """ Create a new forward solution for source reconstruction.
@@ -77,10 +109,6 @@ def make_new_forward_solution(setup_source_space: bool):
     # Read the source space
     src = mne.read_source_spaces(src_fname)
 
-    # clean epochs path
-    dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
-    dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
-
     # load example epoch
     epochs = mne.read_epochs(Path(dir_clean_epochs / f"P015_icacorr_0.1Hz-epo.fif"))
 
@@ -93,32 +121,6 @@ def make_new_forward_solution(setup_source_space: bool):
 
     mne.write_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}5120-fwd.fif', fwd)
 
-# behavioral data
-behav_path = Path(path_to.data.behavior)
-
-# save paths for beamforming
-beamformer_path = Path(path_to.data.eeg.source.beamformer)
-
-# save paths for mne
-mne_path = Path(path_to.data.eeg.source.mne)
-
-# save source space figures
-save_path_source_figs = Path(path_to.figures.manuscript.figure4_source)
-
-# participant IDs
-id_list_expecon1 = config.participants.ID_list_expecon1
-id_list_expecon2 = config.participants.ID_list_expecon2
-
-# data_cleaning parameters defined in config.toml
-rt_max = config.behavioral_cleaning.rt_max
-rt_min = config.behavioral_cleaning.rt_min
-hitrate_max = config.behavioral_cleaning.hitrate_max
-hitrate_min = config.behavioral_cleaning.hitrate_min
-farate_max = config.behavioral_cleaning.farate_max
-hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
-
-# pilot data counter for expecon 1
-pilot_counter = config.participants.pilot_counter
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # run source reco function:
@@ -167,7 +169,7 @@ def run_source_reco(study: int,
     """
 
     # read forward solution
-    fwd = mne.read_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}5120-fwd.fif')
+    fwd = mne.read_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}fsaverage-6oct-fwd.fif')
     
     if study == 1:
         id_list = id_list_expecon1
@@ -182,14 +184,16 @@ def run_source_reco(study: int,
     else:
         raise ValueError("input should be 1 or 2 for the respective study")
 
-    if plot_alignment:
-        plot_source_space_electrodes_alignment()
-
     # now loop over participants
     for idx, subj in enumerate(id_list):
 
         # print participant ID
         print("Analyzing " + subj)
+
+        # plot alignment of electrodes with source space for one participant
+        if idx == 0:
+            if plot_alignment:
+                plot_source_space_electrodes_alignment()
 
         if cond == "probability":
             cond_a_name = "high"
