@@ -22,6 +22,7 @@ import mne
 import numpy as np
 import pandas as pd
 import random
+import scipy.stats as stats
 
 from expecon_ms.configs import PROJECT_ROOT, config, params, path_to
 
@@ -309,7 +310,7 @@ def load_tfr_conds(cond_a_name: str,
         tfr_a_cond.append(tfr_a_all)
         tfr_b_cond.append(tfr_b_all)
 
-    return tfr_a_all, tfr_b_all
+    return tfr_a_cond, tfr_b_cond
 
 
 def plot_tfr_cluster_test_output(tfr_a_cond: list,
@@ -342,7 +343,7 @@ def plot_tfr_cluster_test_output(tfr_a_cond: list,
     """
 
     # which time windows to plot
-    time_windows = [(-0.4, 0), (-0.7, 0)]
+    time_windows = [(-0.4, 0), (-0.4, 0)]
 
     # Create a 2x3 grid of plots (2 rows, 3 columns)
     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
@@ -415,13 +416,13 @@ def plot_tfr_cluster_test_output(tfr_a_cond: list,
             mask = mask < params.alpha # boolean for masking sign. voxels
 
             # plot t contrast and sign. cluster contour
-            plot_cluster_contours(fmin=3, fmax=35)
+            plot_cluster_contours(data=x, fmin=3, fmax=35)
 
     plt.tight_layout()
     # now save the figure to disk as png and svg
     for fm in ["svg", "png"]:
         fig.savefig(
-            Path(path_to.figures.manuscript.figure4) / f"fig4_tfr_{cond_a_name}_"
+            Path(path_to.figures.manuscript.figure4) / f"fig4_tfr_tvals_{cond_a_name}_"
             f"{cond_b_name}_{channel_name[0]}.{fm}",
             dpi=300,
             format=fm,
@@ -431,7 +432,7 @@ def plot_tfr_cluster_test_output(tfr_a_cond: list,
     return t_obs, cluster_p
 
 
-def plot_cluster_contours(fmin: float,
+def plot_cluster_contours(data: np.ndarray, fmin: float,
                           fmax: float):
 
     """plot cluster permutation test output
@@ -440,6 +441,7 @@ def plot_cluster_contours(fmin: float,
     x and p ticks and labels, as well as colorbar are not plotted
     Args:
     ----
+    data: array, info: data to plot in heatmap
     fmin: float, info: minimum frequency to plot
     fmax: float, info: maximum frequency to plot
     """
@@ -467,12 +469,16 @@ def plot_cluster_contours(fmin: float,
             y_ticks.append(y_idx)
             y_labels.append(y_value)
 
+    res = stats.ttest_1samp(data, popmean=0)
+
+    t_val = np.squeeze(res[0])
+
     # plot tmap as heatmap
-    sns.heatmap(t_obs, center=0,
-                    cbar=True,
-                    cmap="viridis",
-                    ax=axs[idx])
-    
+    sns.heatmap(t_val, 
+                        cbar=True,
+                        cmap="viridis",
+                        ax=axs[idx])
+
     # Draw the cluster outline
     for i in range(mask.shape[0]): # frequencies
         for j in range(mask.shape[1]): # time
