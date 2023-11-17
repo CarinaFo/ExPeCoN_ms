@@ -219,9 +219,10 @@ def exclude_data(expecon: int):
 
 
 def plot_mean_response_and_confidence(
-    blue="#0571b0", red="#ca0020", 
+    expecon: int,
+    blue="#0571b0", red="#ca0020",
     no_col="#088281", yes_col="#d01c8b",
-    savepath=path_to.figures.manuscript.figure2_suppl, expecon: int
+    savepath=path_to.figures.manuscript.figure2_suppl
 ):
     """
     Plot the mean detection response and mean confidence for each cue condition with a boxplot.
@@ -248,10 +249,14 @@ def plot_mean_response_and_confidence(
     # Calculate mean response per ID and cue
     mean_resp_id_cue = data.groupby(["cue", "ID"])["sayyes"].mean().reset_index()
 
+    # Calculate mean response per ID and cue
+    mean_prevresp_id_cue = data.groupby(["cue", "ID"])["prevresp"].mean().reset_index()
+
     # Calculate mean confidence per ID and response
     mean_conf_id_resp = data.groupby(["sayyes", "ID"])["conf"].mean().reset_index()
 
     # Create boxplots
+    # response distribution
     plt.figure(figsize=(10, 6))
     sns.boxplot(x="cue", y="sayyes", data=mean_resp_id_cue, palette=[blue, red])
     sns.stripplot(x="cue", y="sayyes", data=mean_resp_id_cue, color="black", 
@@ -262,6 +267,34 @@ def plot_mean_response_and_confidence(
     plt.savefig(Path(savepath, f"choice_cue_{expecon}.png"))
     plt.show()
 
+    # Perform the Wilcoxon signed-rank test
+    wilcoxon_statistic, p_value = stats.wilcoxon(
+        mean_resp_id_cue[mean_resp_id_cue.cue == 0.25].sayyes,
+        mean_resp_id_cue[mean_resp_id_cue.cue == 0.75].sayyes
+    )
+    print(f"Wilcoxon statistic: {wilcoxon_statistic}")
+    print(f"p-value: {p_value}")
+
+    # previous response distribution
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x="cue", y="prevresp", data=mean_prevresp_id_cue, palette=[blue, red])
+    sns.stripplot(x="cue", y="prevresp", data=mean_prevresp_id_cue, color="black",
+                  size=4, jitter=True)
+    plt.xlabel("stimulus probability")
+    plt.ylabel("% previous yes responses")
+    plt.savefig(Path(savepath, f"prevchoice_cue_{expecon}.svg"))
+    plt.savefig(Path(savepath, f"prevchoice_cue_{expecon}.png"))
+    plt.show()
+
+    # Perform the Wilcoxon signed-rank test
+    wilcoxon_statistic, p_value = stats.wilcoxon(
+        mean_prevresp_id_cue[mean_prevresp_id_cue.cue == 0.25].prevresp,
+        mean_prevresp_id_cue[mean_prevresp_id_cue.cue == 0.75].prevresp
+    )
+    print(f"Wilcoxon statistic: {wilcoxon_statistic}")
+    print(f"p-value: {p_value}")
+
+    # confidence distribution
     plt.figure(figsize=(10, 6))
     sns.boxplot(x="sayyes", y="conf", data=mean_conf_id_resp, palette=[no_col, yes_col])
     sns.stripplot(x="sayyes", y="conf", data=mean_conf_id_resp, color="black", 
@@ -273,16 +306,9 @@ def plot_mean_response_and_confidence(
     plt.savefig(Path(savepath, f"choice_conf_{expecon}.png"))
     plt.show()
 
-    # Perform the Wilcoxon signed-rank test
     wilcoxon_statistic, p_value = stats.wilcoxon(
-        mean_resp_id_cue[mean_resp_id_cue.cue == 0.25].sayyes, mean_resp_id_cue[mean_resp_id_cue.cue == 0.75].sayyes
-    )
-    print(f"Wilcoxon statistic: {wilcoxon_statistic}")
-    print(f"p-value: {p_value}")
-
-    # Perform the Wilcoxon signed-rank test
-    wilcoxon_statistic, p_value = stats.wilcoxon(
-        mean_conf_id_resp[mean_conf_id_resp.sayyes == 1].conf, mean_conf_id_resp[mean_conf_id_resp.sayyes == 0].conf
+    mean_conf_id_resp[mean_conf_id_resp.sayyes == 1].conf,
+    mean_conf_id_resp[mean_conf_id_resp.sayyes == 0].conf
     )
     print(f"Wilcoxon statistic: {wilcoxon_statistic}")
     print(f"p-value: {p_value}")
