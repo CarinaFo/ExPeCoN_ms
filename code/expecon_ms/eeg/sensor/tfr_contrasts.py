@@ -63,14 +63,16 @@ farate_max = config.behavioral_cleaning.farate_max
 hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
+#compute_tfr(study=1, cond='probability', tmin=-0.4, tmax=0, fmax=35,
+#fmin=3, laplace=False, induced=False, mirror=False, drop_bads=True)
 
 def compute_tfr(
     study: int,
     cond: str,
     tmin: float,
     tmax: float,
-    fmax: float,
     fmin: float,
+    fmax: float,
     laplace: bool,
     induced: bool,
     mirror: bool,
@@ -199,25 +201,30 @@ def compute_tfr(
         df_all.append(epochs.metadata)
 
         if cond == "probability":
-            epochs_a = epochs[(epochs.metadata.cue == 0.75)]
-            epochs_b = epochs[(epochs.metadata.cue == 0.25)]
+            epochs_a = epochs[((epochs.metadata.cue == 0.75) &
+                              (epochs.metadata.prevresp == 1) &
+                              epochs.metadata.isyes == 1)]
+            epochs_b = epochs[((epochs.metadata.cue == 0.25) &
+                              (epochs.metadata.prevresp == 1))]
+            cond_a_name = "high_prevyes"
+            cond_b_name = "low_prevyes"
+
             if mirror:
-                cond_a_name = "high_mirror"
-                cond_b_name = "low_mirror"
-            else:
-                cond_a_name = "high"
-                cond_b_name = "low"
+                cond_a_name = f'{cond_a_name}_mirror'
+                cond_b_name = f'{cond_b_name}_mirror'
+
         elif cond == "prev_resp":
             epochs_a = epochs[((epochs.metadata.prevresp == 1) &
                                 (epochs.metadata.cue == 0.75))]
             epochs_b = epochs[((epochs.metadata.prevresp == 0) &
                                 (epochs.metadata.cue == 0.75))]
+            cond_a_name = "prevyesresp_highprob"
+            cond_b_name = "prevnoresp_highprob"
+
             if mirror:
-                cond_a_name = "prevyesresp_highprob_mirror"
-                cond_b_name = "prevnoresp_highprob_mirror"
-            else:
-                cond_a_name = "prevyesresp_highprob"
-                cond_b_name = "prevnoresp_highprob"
+                cond_a_name = f'{cond_a_name}_mirror'
+                cond_b_name = f'{cond_b_name}_mirror'
+
         else:
             raise ValueError("input should be 'probability' or 'prev_resp'")
 
@@ -237,7 +244,7 @@ def compute_tfr(
                 epochs_b, freqs=freqs, n_cycles=cycles, 
                 return_itc=False, n_jobs=-1, average=True
             )
-            
+
             # save tfr data
             if cond == "probability":
                 tfr_a.save(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5")
