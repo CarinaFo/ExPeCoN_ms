@@ -60,6 +60,9 @@ id_list = config.participants.ID_list
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
+# add this line to jupyter script
+# run_ica(infomax=1, save_psd=1)
+# label_ica_correlation()
 
 def run_ica(infomax: int, save_psd: int):
     """
@@ -108,7 +111,7 @@ def run_ica(infomax: int, save_psd: int):
     return "Done with ICA"
 
 
-def label_ica_correction():
+def label_ica_correlation():
     """
     Perform template matching for blink and cardiac artifact detection.
 

@@ -59,6 +59,10 @@ pilot_counter = config.participants.pilot_counter
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
+# add this line to jupyter script
+# prepro(trigger='stimulus', l_freq=1, h_freq=40, tmin=-0.2, tmax=0.8, resample_rate=250, 
+# sf=2500, detrend=1, ransac=1, autoreject=0)
+# n_channels_interpolated(trigger='stimulus', l_freq=1)
 
 def prepro(
     trigger: str,
@@ -241,7 +245,7 @@ def prepro(
     return ch_interp, annot
 
 
-def channels_interp(trigger: str, l_freq: float) -> None:
+def n_channels_interpolated(trigger: str, l_freq: float) -> None:
     """
     Calculate the mean, std, min and max of channels interpolated across participants.
 
