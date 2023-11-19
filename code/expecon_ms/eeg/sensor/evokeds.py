@@ -63,6 +63,9 @@ farate_max = config.behavioral_cleaning.farate_max
 hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
+# run in jupyter script
+# create_contrast(study=2, drop_bads=True, laplace=True, subtract_evoked=True, save_data_to_disk=True)
+# plot_roi(tmin=0.04, tmax=0.06, tmin_base=-0.2, tmax_base=-0.1, study=2)
 
 def create_contrast(study: int,
                     drop_bads: bool,
@@ -196,23 +199,23 @@ def create_contrast(study: int,
     return [evokeds_signal_all, evokeds_noise_all, evokeds_hit_all, evokeds_miss_all]
 
 
-def plot_roi(data = None,
-             tmin: float, 
+def plot_roi(study: int,
+             data: np.ndarray,
+             tmin: float,
              tmax: float,
              tmin_base: float,
-             tmax_base: float,
-             study: int):
+             tmax_base: float
+             ):
     """
-    Plot topography of P50 for the contrast of signal - noise trials 
-    and the contrast over time for the channel with the strongest effect.
+    Plot topography of P50 for the contrast of signal - noise trials.
     
     ----
+    study: int: study number (1 or 2), 1 == expecon1, 2 == expecon2
     data: list of evoked objects
     tmin: float: start time of time window
     tmax: float: end time of time window
     tmin_base: float: start time of baseline window
     tmax_base: float: end time of baseline window
-    study: int: study number (1 or 2), 1 == expecon1, 2 == expecon2
 
     Returns:
     -------
