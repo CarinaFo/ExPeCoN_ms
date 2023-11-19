@@ -63,8 +63,12 @@ farate_max = config.behavioral_cleaning.farate_max
 hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-#compute_tfr(study=1, cond='probability', tmin=-0.4, tmax=0, fmax=35,
-#fmin=3, laplace=False, induced=False, mirror=False, drop_bads=True)
+# add this to jupyter script
+# compute_tfr(study=1, cond='probability', tmin=-0.4, tmax=0, fmax=35,
+# fmin=3, laplace=False, induced=False, mirror=False, drop_bads=True)
+# load_tfr_conds(cond_a_name='high', cond_b_name='low')
+# plot_tfr_cluster_test_output(tfr_a_cond=tfr_a_cond, tfr_b_cond=tfr_b_cond,  
+# threed_test=False, cond_a_name='high', cond_b_name='low', channel_name=['CP4'])
 
 def compute_tfr(
     study: int,
@@ -201,13 +205,10 @@ def compute_tfr(
         df_all.append(epochs.metadata)
 
         if cond == "probability":
-            epochs_a = epochs[((epochs.metadata.cue == 0.75) &
-                              (epochs.metadata.prevresp == 1) &
-                              epochs.metadata.isyes == 1)]
-            epochs_b = epochs[((epochs.metadata.cue == 0.25) &
-                              (epochs.metadata.prevresp == 1))]
-            cond_a_name = "high_prevyes"
-            cond_b_name = "low_prevyes"
+            epochs_a = epochs[epochs.metadata.cue == 0.75]
+            epochs_b = epochs[epochs.metadata.cue == 0.25]
+            cond_a_name = "high"
+            cond_b_name = "low"
 
             if mirror:
                 cond_a_name = f'{cond_a_name}_mirror'
@@ -256,16 +257,18 @@ def compute_tfr(
                 raise ValueError("input should be 'probability' or 'prev_resp'")
 
         # calculate tfr for all trials
-        if (tfr_path / f"{subj}_single_trial_power_{str(study)}-tfr.h5").exists():
+        if (tfr_path / f"{subj}_single_trial_power_mirror_{str(study)}-tfr.h5").exists():
             print("TFR already exists")
         else:
             tfr = mne.time_frequency.tfr_multitaper(
                 epochs, freqs=freqs, n_cycles=cycles, return_itc=False, 
                 n_jobs=-1, average=False, decim=2
             )
-
-            tfr.save(fname=tfr_path / f"{subj}_single_trial_power_{str(study)}-tfr.h5", 
-                     overwrite=True)
+            if mirror:
+                tfr.save(fname=tfr_path / f"{subj}_single_trial_power_mirror_{str(study)}-tfr.h5")
+            else:
+                tfr.save(fname=tfr_path / f"{subj}_single_trial_power_{str(study)}-tfr.h5", 
+                        overwrite=True)
 
     return "Done with tfr/erp computation", cond_a_name, cond_b_name
 
