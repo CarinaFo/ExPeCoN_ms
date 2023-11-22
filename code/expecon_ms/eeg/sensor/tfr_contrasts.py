@@ -67,10 +67,16 @@ hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # compute_tfr(study=1, cond='probability', tmin=-0.4, tmax=0, fmax=35,
 # fmin=3, laplace=False, induced=False, mirror=False, drop_bads=True)
 
-# tfr_a_cond, tfr_b_cond = load_tfr_conds(cond_a_name='high_mirror', cond_b_name='low_mirror',
+# tfr_a_cond, tfr_b_cond = load_tfr_conds(cond='probability',
+# cond_a_name='high_mirror', cond_b_name='low_mirror',
 # cond_a_names=['high_prevhit_mirror', "high_prevmiss_mirror", "high_cr_mirror",
 # "high_prevfa_mirror"], cond_b_names=['low_prevhit_mirror', "low_prevmiss_mirror", "low_cr_mirror",
 # "low_prevfa_mirror"])
+
+# tfr_a_cond, tfr_b_cond = load_tfr_conds(cond='prev_resp',
+# cond_a_name='prevyesresp_highprob_stim_mirror',
+# cond_b_name='prevnoresp_highprob_stim_mirror',
+# cond_a_names=None, cond_b_names=None)
 
 # plot_tfr_cluster_test_output(tfr_a_cond=tfr_a_cond, tfr_b_cond=tfr_b_cond,  
 # threed_test=False, cond_a_name='high', cond_b_name='low', channel_name=['CP4'])
@@ -323,8 +329,7 @@ def load_tfr_conds(cond: str,
         if cond == 'probability':
             if study == 1:
                 for subj in id_list:
-                    tfr_a_all_conds = [] # store the conditions
-                    tfr_b_all_conds = []
+                    tfr_a_all_conds, tfr_b_all_conds = [], [] # store the conditions
                     for c_a, c_b in zip(cond_a_names, cond_b_names):
                         # load tfr data
                         tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{c_a}_{str(study)}-tfr.h5",
@@ -346,9 +351,7 @@ def load_tfr_conds(cond: str,
                                                         condition=0)
                     tfr_a_all.append(tfr_a)
                     tfr_b_all.append(tfr_b)
-    
-            tfr_a_cond.append(tfr_a_all)
-            tfr_b_cond.append(tfr_b_all)
+
         elif cond == 'prev_resp':
             for subj in id_list:
                 if study == 2 and subj == '013':
@@ -525,7 +528,6 @@ def plot_cluster_contours(data: np.ndarray, fmin: float,
     fmin: float, info: minimum frequency to plot
     fmax: float, info: maximum frequency to plot
     """
-
     # define timepoints and frequencies
     times = tfr_a_cond[1][5].copy().crop(tmin=t[0], tmax=t[1]).times
 
