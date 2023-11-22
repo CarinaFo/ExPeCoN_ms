@@ -73,6 +73,10 @@ hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # pilot data counter for expecon 1
 pilot_counter = config.participants.pilot_counter
 
+# add to jupyter file
+# run_source_reco(study=1, cond="probability", dics=True, fmin=15, fmax=25,
+# tmin = -0.4, tmax = 0, save_path = beamformer_path, drop_bads = True, plot_alignment=False)
+# spatio_tempo
 
 def make_new_forward_solution(setup_source_space: bool):
 
@@ -135,13 +139,14 @@ def make_new_forward_solution(setup_source_space: bool):
    #                                      path_to_source=beamformer_path)
 
 
-def run_source_reco(study: int, 
+def run_source_reco(study: int,
                     cond: str,
-                    dics: int, 
-                    fmin: int, 
+                    mirror: bool,
+                    dics: int,
+                    fmin: int,
                     fmax: int,
-                    tmin: int, 
-                    tmax: int, 
+                    tmin: int,
+                    tmax: int,
                     save_path: str,
                     drop_bads: bool,
                     plot_alignment: bool) -> None:
@@ -154,6 +159,7 @@ def run_source_reco(study: int,
     study : int, info: which study to analyze: 1 (block, stable environment) or 2 (trial,
     volatile environment)
     cond : str, info: which condition to analyze: "probability" or "prev_resp"
+    mirror: bool, info: if True, avoid leakage and edge artifacts by zero padding or mirroring the data
     fmin: int, info: lower frequency bound for DICS beamforming
     fmax: int, info: upper frequency bound for DICS beamforming
     tmin: int, info: lower time bound for DICS beamforming
@@ -169,8 +175,8 @@ def run_source_reco(study: int,
     """
 
     # read forward solution
-    fwd = mne.read_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}fsaverage-6oct-fwd.fif')
-    
+    fwd = mne.read_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}5120-fwd.fif')
+
     if study == 1:
         id_list = id_list_expecon1
         # load behavioral data
@@ -191,15 +197,28 @@ def run_source_reco(study: int,
         print("Analyzing " + subj)
 
         # plot alignment of electrodes with source space for one participant
-        if idx == 0:
-            if plot_alignment:
-                plot_source_space_electrodes_alignment()
+        if ((idx == 0) & (plot_alignment)):
+            plot_source_space_electrodes_alignment()
 
         if cond == "probability":
+            # set condition names
             cond_a_name = "high"
             cond_b_name = "low"
+            # add mirror to filename if data is mirrored
+            if mirror:
+                cond_a_name = f'{cond_a_name}_mirror'
+                cond_b_name = f'{cond_b_name}_mirror'
+
             source_files = Path(save_path, f"{cond_a_name}_{subj}_{study}-lh.stc")
         elif cond == "prev_resp":
+            # set condition names
+            cond_a_name = "prevyesresp_highprob_stim"
+            cond_b_name = "prevnoresp_highprob_stim"
+            # add mirror to filename if data is mirrored
+            if mirror:
+                cond_a_name = f'{cond_a_name}_mirror'
+                cond_b_name = f'{cond_b_name}_mirror'
+
             source_files = Path(save_path, f"contrast_{cond}_{subj}_{study}-lh.stc")
 
         if source_files.exists():
@@ -217,7 +236,7 @@ def run_source_reco(study: int,
                     continue
                 epochs = mne.read_epochs(dir_clean_epochs_expecon2 / f"P{subj}_icacorr_0.1Hz-epo.fif")
                 # rename columns
-                epochs.metadata = epochs.metadata.rename(columns ={"resp1_t": "respt1",
+                epochs.metadata = epochs.metadata.rename(columns={"resp1_t": "respt1",
                                                                 "stim_type": "isyes",
                                                                 "resp1": "sayyes"})
             else:
@@ -252,18 +271,43 @@ def run_source_reco(study: int,
                 # drop epochs with abnormal strong signal (> 200 micro-volts)
                 epochs.drop_bad(reject=dict(eeg=200e-6))
 
+            # avoid leakage and edge artifacts by zero padding or mirroring the data
+            # on both ends
+            if mirror:
+                metadata = epochs.metadata
+
+                epoch_data = epochs.get_data()
+
+                # zero pad = False = mirror the data on both ends
+                data_mirror = zero_pad_or_mirror_data(epoch_data, zero_pad=False)
+
+                # put back into epochs structure
+                epochs = mne.EpochsArray(data_mirror, epochs.info, tmin=tmin * 2)
+
+                # add metadata back
+                epochs.metadata = metadata
+
             if cond == "probability":
-                epochs_a = epochs[
-                    (epochs.metadata.cue == 0.75)
-                ]
+                epochs_a = epochs[(epochs.metadata.cue == 0.75)]
                 epochs_b = epochs[(epochs.metadata.cue == 0.25)]
+                cond_a_name = "high"
+                cond_b_name = "low"
+                if mirror:
+                    cond_a_name = f'{cond_a_name}_mirror'
+                    cond_b_name = f'{cond_b_name}_mirror'
+
             elif cond == "prev_resp":
                 epochs_a = epochs[((epochs.metadata.prevresp == 1) &
-                                    (epochs.metadata.cue == 0.75))]
+                                (epochs.metadata.previsyes == 1) &
+                                (epochs.metadata.cue == 0.75))]
                 epochs_b = epochs[((epochs.metadata.prevresp == 0) &
+                                (epochs.metadata.previsyes == 1) &
                                     (epochs.metadata.cue == 0.75))]
-                cond_a_name = "prevyesresp_highprob"
-                cond_b_name = "prevnoresp_highprob"
+                cond_a_name = "prevyesresp_highprob_stim"
+                cond_b_name = "prevnoresp_highprob_stim"
+                if mirror:
+                    cond_a_name = f'{cond_a_name}_mirror'
+                    cond_b_name = f'{cond_b_name}_mirror'
             else:
                 raise ValueError("input should be 'probability' or 'prev_resp'")
 
@@ -271,21 +315,27 @@ def run_source_reco(study: int,
             mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
             if dics == 1:
-                
+
                 # save path for source estimates
                 save_path = beamformer_path
 
-                # We are interested in the beta band
+                # define the frequency band of interest
                 freqs = np.arange(fmin, fmax, 1)
+
+                # set the cycles for the Morlet wavelet
+                n_cycles = freqs / 4.0
 
                 # Computing the cross-spectral density matrix for the beta frequency band, for
                 # different time intervals.
                 # csd for all epochs
-                csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=tmin, tmax=tmax)
+                csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=tmin,
+                                                    tmax=tmax, n_cycles=n_cycles)
                 # csd for high-prob trials only
-                csd_a = mne.time_frequency.csd_morlet(epochs_a, freqs, tmin=tmin, tmax=tmax)
+                csd_a = mne.time_frequency.csd_morlet(epochs_a, freqs, tmin=tmin,
+                                                       tmax=tmax, n_cycles=n_cycles)
                 # csd for low-prob trials only
-                csd_b = mne.time_frequency.csd_morlet(epochs_b, freqs, tmin=tmin, tmax=tmax)
+                csd_b = mne.time_frequency.csd_morlet(epochs_b, freqs, tmin=tmin,
+                                                       tmax=tmax, n_cycles=n_cycles)
 
                 info = epochs.info
 
@@ -400,83 +450,98 @@ def create_source_contrast_array(study: int,
     return stc_array
 
 
-def spatio_temporal_source_test(
-    stc_array: np.ndarray,
-    n_perm: int,
-    jobs: int,
-    save_path_source_figs: str,
+def plot_grand_average_source_contrast(
+    study: int,
     cond: str,
-    method: str,
-    study: int
+    method: str
 ):
     """
     Run a cluster-based permutation test over space and time.
 
     Args:
     ----
-    stc_array: 3D numpy source array: participants x space x time
-    n_perm: how many permutations for cluster test
-    jobs: how many parallel GPUs should be used
-    save_path_source_figs: path to save figures, e.g. | Path = beamformer_path
+    study: int, info: which study to analyze: 1 (block, stable environment) or 2 (trial)
     cond: str, info: which condition to analyze: "probability" or "prev_resp"
     method: str, info: which method to analyze: "beamformer" or "mne"
-    study: int, info: which study to analyze: 1 (block, stable environment) or 2 (trial)
 
     Returns:
     -------
     cluster output
     """
+    if (study == 1) & (cond == "probability"):
+        stc_array_hit = create_source_contrast_array(study=study,
+                                             cond_a='high_prevhit_mirror',
+                                             cond_b='low_prevhit_mirror',
+                                             path_to_source=beamformer_path)
+        stc_array_miss = create_source_contrast_array(study=study,
+                                             cond_a='high_prevmiss_mirror',
+                                             cond_b='low_prevmiss_mirror',
+                                             path_to_source=beamformer_path)
+        stc_array_cr = create_source_contrast_array(study=study, 
+                                             cond_a='high_prevcr_mirror',
+                                             cond_b='low_prevcr_mirror',
+                                             path_to_source=beamformer_path)
+        stc_array_conds = np.array([stc_array_hit, stc_array_miss, stc_array_cr])
+        # mean over conditions (previous hit, previous miss, previous cr)
+        stc_array = np.mean(stc_array_conds, axis=0)
+    elif (study == 2) & (cond == "probability"):
+        stc_array = create_source_contrast_array(study=study,
+                                             cond_a='high_mirror',
+                                             cond_b='low_mirror',
+                                             path_to_source=beamformer_path)
+    elif cond == "prev_resp":
+        stc_array = create_source_contrast_array(study=study,
+                                             cond_a='prevyesresp_highprob_stim_mirror',
+                                             cond_b='prevnoresp_highprob_stim_mirror',
+                                             path_to_source=beamformer_path)
 
-    print("Computing adjacency.")
-    # get adjacency matrix for source space
-    adjacency = mne.spatial_src_adjacency(src)
-
-    # Note that X needs to be a multidimensional array of shape
-    # observations (subjects) × time × space, so we permute dimensions
-    x = np.transpose(stc_array, [0, 2, 1])
-
-    # get rid of single-dimensional entries
-    x_mean = np.squeeze(x)
+    # get rid of zero dimension
+    stc_array = np.squeeze(stc_array)
 
     # permutation test to get sign. vertices
-    t, p, h = mne.stats.permutation_t_test(x_mean)
-
+    t, p, h = mne.stats.permutation_t_test(stc_array)
     print(f"% of significant vertices: {np.sum(p < params.alpha) / len(p)}")
 
     # mean over participants
-    x_avg = np.squeeze(np.mean(x, axis=0))
+    x_avg = np.mean(stc_array, axis=0)
+
+    # Read the source space
+    # set root path to fsaverag files
+    # fetch fsaverage files and save path
+    subjects_dir = fetch_fsaverage()
+    fs_average_root_path = f'{subjects_dir}{Path("/")}bem{Path("/")}'
+    src_fname = f'{fs_average_root_path}fsaverage-oct6-src.fif'
+    src = mne.read_source_spaces(src_fname)
 
     # put contrast or p values in source space
     fsave_vertices = [s["vertno"] for s in src]
     stc = mne.SourceEstimate(x_avg, tmin=-0.4, tstep=0.0001, vertices=fsave_vertices,
      subject="fsaverage")
-    
-    # which hemisphere to plot
-    hemisphere = "rh"
 
-    view = 'lateral'
+    hemispheres = ["rh", "lh"]
+    views = ['lateral', 'medial']
+    colorbar_conds = [True, False]
 
-    # plot average source or t values
-    brain = stc.plot(
-        hemi=hemisphere, views=view, subjects_dir=subjects_dir, 
-        subject="fsaverage",
-        time_viewer=True, background="white", colorbar=True
-    )
+    # save source plot with colorbar and without for both hemispheres and views
+    for hemi in hemispheres:
+        for view in views:
+            for colbar in colorbar_conds:
+                # plot average source or t values
+                brain = stc.plot(
+                    hemi=hemi, views=view, subjects_dir=subjects_dir, 
+                    subject="fsaverage",
+                    time_viewer=True, background="white", colorbar=colbar
+                )
 
-    brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_' +
-                     f'_{view}_{hemisphere}.png')
+                brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_' +
+                                f'_{view}_{hemi}_{colbar}.png')
 
-    # spatio-temporal cluster permutation test
-    clu = mne.stats.spatio_temporal_cluster_1samp_test(
-        x, adjacency=adjacency, n_jobs=jobs, n_permutations=n_perm)
-
-    return clu
+    return None
 
 
-def plot_cluster_output(clu: list, 
-                        cond: str, 
-                        freq_band: str, 
-                        method: str):
+def run_and_plot_cluster_test(study=1,
+                              jobs=-1,
+                              n_perm=10000):
     """
     Plot significant clusters of a spatio-temporal cluster permutation test.
     Args:
@@ -490,38 +555,56 @@ def plot_cluster_output(clu: list,
     -------
     plot of cluster output
     """
+
+    stc_array = create_source_contrast_array(study=study, 
+                                             cond_a='high',
+                                             cond_b='low', 
+                                             path_to_source=beamformer_path)
+
+    print("Computing adjacency.")
+
+    # get adjacency matrix for source space
+    adjacency = mne.spatial_src_adjacency(src)
+
+    # Note that X needs to be a multidimensional array of shape
+    # observations (subjects) × time × space, so we permute dimensions
+    x = np.transpose(stc_array, [0, 2, 1])
+
+    # spatio-temporal cluster permutation test
+    clu = mne.stats.spatio_temporal_cluster_1samp_test(
+        x, adjacency=adjacency, n_jobs=jobs, n_permutations=n_perm)
+
     # Select the clusters that are statistically significant at p < 0.05
     good_clusters_idx = np.where(clu[2] < params.alpha)[0]
 
     # check if there are sign. cluster to plot, otherwise break function
     if len(good_clusters_idx) == 0:
         return "No significant clusters."
-    else:
 
-        fsave_vertices = [s["vertno"] for s in src]
+    fsave_vertices = [s["vertno"] for s in src]
 
-        # summarize cluster perm test output and prepare for visualization
-        stc_all_cluster_vis = mne.stats.summarize_clusters_stc(
-            clu, vertices=fsave_vertices, subject="fsaverage", p_thresh=params.alpha
-        )
+    # summarize cluster perm test output and prepare for visualization
+    stc_all_cluster_vis = mne.stats.summarize_clusters_stc(
+        clu, vertices=fsave_vertices, subject="fsaverage", p_thresh=params.alpha
+    )
 
-        # Let's actually plot the first "time point" in the SourceEstimate, which
-        # shows all the clusters, weighted by duration.
-        # blue blobs are for condition A < condition B, red for A > B
-        brain = stc_all_cluster_vis.plot(
-            hemi="rh",
-            views="lateral",
-            subjects_dir=subjects_dir,
-            time_label="temporal extent (ms)",
-            size=(800, 800),
-            smoothing_steps=5,
-            time_viewer=True,
-            background="white",
-            transparent=True,
-            colorbar=True,
-        )
+    # Let's actually plot the first "time point" in the SourceEstimate, which
+    # shows all the clusters, weighted by duration.
+    # blue blobs are for condition A < condition B, red for A > B
+    brain = stc_all_cluster_vis.plot(
+        hemi="rh",
+        views="lateral",
+        subjects_dir=subjects_dir,
+        time_label="temporal extent (ms)",
+        size=(800, 800),
+        smoothing_steps=5,
+        time_viewer=True,
+        background="white",
+        transparent=True,
+        colorbar=True,
+    )
 
-        brain.save_image(Path(save_path_source_figs / "cluster_{cond}_{freq_band}_{method}.png"))
+    brain.save_image(Path(save_path_source_figs / "cluster_{cond}_{freq_band}_{method}.png"))
 
 
 def create_noise_cov(data_size: tuple[int, int], data_info: mne.Info) -> mne.Covariance:
@@ -688,6 +771,46 @@ def extract_time_course_from_label(data=None):
     )
 
     return post_central_gyrus, g_front_inf_opercular_rh, g_cingul_post_dorsal_rh
+
+
+# Helper functions ToDo: move to utils.py
+def zero_pad_or_mirror_data(data, zero_pad: bool):
+    """
+    Zero-pad or mirror data on both sides to avoid edge artifacts.
+
+    Args:
+    ----
+    data: data array with the structure epochs x channels x time
+    zero_pad: boolean, info: whether to zero pad or mirror the data
+    Returns:
+    -------
+    array with mirrored data on both ends = data.shape[2]
+    """
+    if zero_pad:
+        padded_list = []
+
+        zero_pad = np.zeros(data.shape[2])
+        # loop over epochs
+        for epoch in range(data.shape[0]):
+            ch_list = []
+            # loop over channels
+            for ch in range(data.shape[1]):
+                # zero padded data at beginning and end
+                ch_list.append(np.concatenate([zero_pad, data[epoch][ch], zero_pad]))
+            padded_list.append(list(ch_list))
+    else:
+        padded_list = []
+
+        # loop over epochs
+        for epoch in range(data.shape[0]):
+            ch_list = []
+            # loop over channels
+            for ch in range(data.shape[1]):
+                # mirror data at beginning and end
+                ch_list.append(np.concatenate([data[epoch][ch][::-1], data[epoch][ch], data[epoch][ch][::-1]]))
+            padded_list.append(list(ch_list))
+
+    return np.squeeze(np.array(padded_list))
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 if __name__ == "__main__":
