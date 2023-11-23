@@ -54,8 +54,11 @@ behav$congruency_stim <- as.integer(as.logical(behav$congruency_stim))
 behav <- na.omit(behav) 
 
 #rename alpha and beta power variables
-behav$alpha <- behav$prestim__alpha
-behav$beta <- behav$prestim__beta
+behav$alpha <- behav$pre_alpha
+behav$beta <- behav$pre_beta
+
+# dummy recode
+behav$cue <- ifelse(behav$cue == 0.25, 0, 1) 
 ########################### Brain behavior GLMMs ###################################################
 
 # does beta or alpha predict the stimulus? control analysis:
@@ -68,23 +71,35 @@ beta_stim <- glm(isyes ~ -1 + beta,
                   data = behav, family=binomial(link='probit'))
 summary(beta_stim)
 
-# replace stimulus probability regressor with beta or alpha power per trial (neural correlate of stimulus probability)
+# replace stimulus probability regressor with beta or alpha power per trial 
+# (neural correlate of stimulus probability)
 
-summary(lmer(alpha ~ cue + (cue|ID), data=behav, 
+alpha_cue = lmer(alpha ~ cue + (cue|ID), data=behav, 
              control=lmerControl(optimizer="bobyqa",
-            optCtrl=list(maxfun=2e5))))
+            optCtrl=list(maxfun=2e5)))
 
-summary(lmer(beta ~ cue + (cue|ID), 
+summary(alpha_cue)
+
+beta_cue = lmer(beta ~ cue+ (cue|ID), 
              data=behav, control=lmerControl(optimizer="bobyqa",
-            optCtrl=list(maxfun=2e5))))
+            optCtrl=list(maxfun=2e5)))
+
+summary(beta_cue)
 
 # the cue sign. predicts beta in both environments, alpha only in the stable env.
 
+###################################################################################################
 ### does prestimulus power predict detection, while controlling for previous choice
+
+base_glm <- glmer(sayyes ~ isyes +
+                    (isyes|ID),
+                  data = behav, family=binomial(link='probit'), 
+                  control=glmerControl(optimizer="bobyqa",
+                                       optCtrl=list(maxfun=2e5)))
 
 alpha_base_glm <- glmer(sayyes ~ alpha + isyes + 
                           alpha*isyes +
-                          (isyes + alpha|ID),
+                          (isyes*alpha|ID),
                         data = behav, family=binomial(link='probit'), 
                         control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e5)))
@@ -96,8 +111,7 @@ check_convergence(alpha_base_glm)
 
 summary(alpha_base_glm)
 
-beta_base_glm <- glmer(sayyes ~ beta + isyes + 
-                    beta*isyes +
+beta_base_glm <- glmer(sayyes ~ beta + isyes + beta*isyes +
                     (isyes+beta|ID),
                   data = behav, family=binomial(link='probit'), 
                   control=glmerControl(optimizer="bobyqa",
@@ -139,7 +153,7 @@ summary(alpha_prev_glm)
 
 beta_prev_glm <- glmer(sayyes ~ beta + isyes + prevresp + 
                      beta*isyes +
-                     (isyes + prevresp + beta + beta*isyes|ID),
+                     (isyes + prevresp|ID),
                    data = behav, family=binomial(link='probit'), 
                    control=glmerControl(optimizer="bobyqa",
                                         optCtrl=list(maxfun=2e5)))
@@ -181,7 +195,7 @@ summary(alpha_int_glm)
 beta_int_glm <- glmer(sayyes ~ beta + isyes + prevresp + 
                         beta*isyes + 
                         beta*prevresp + 
-                        (isyes + prevresp + beta| ID),
+                        (isyes + prevresp| ID),
                       data = behav, family=binomial(link='probit'), 
                       control=glmerControl(optimizer="bobyqa",
                                            optCtrl=list(maxfun=2e5)))
@@ -192,7 +206,7 @@ check_convergence(beta_int_glm)
 summary(beta_int_glm)
 
 # Post hoc tests for behavior interaction
-emm_model <- emmeans(beta_int_glm, "prevresp", by = "beta")
+emm_model <- emmeans(beta_int_glm, "beta", by = "prevresp")
 con <- contrast(emm_model)
 con
 
@@ -208,6 +222,42 @@ cue_model_path = file.path("data", "behav", "mixed_models", filename)
 saveRDS(beta_int_glm, cue_model_path)
 beta_int_glm <- readRDS(cue_model_path)
 
+############################################### Model comparision ##################################
+
+# Likelihood ratio tests
+anova(base_glm, beta_base_glm)
+anova(base_glm, alpha_base_glm)
+anova(beta_base_glm, beta_prev_glm)
+anova(alpha_base_glm, alpha_prev_glm)
+anova(beta_prev_glm, beta_int_glm)
+anova(alpha_prev_glm, alpha_int_glm)
+
+# difference in AIC and BIC
+diff_aic_1 = AIC(beta_prev_model) - AIC(beta_beta_glm)
+diff_bic_1 = BIC(beta_prev_model) - BIC(beta_base_glm)
+print(diff_aic_1)
+print(diff_bic_1)
+
+diff_aic_2 = AIC(beta_int_glm) - AIC(beta_prev_glm)
+diff_bic_2 = BIC(beta_int_glm) - BIC(beta_prev_glm)
+
+print(diff_aic_2)
+print(diff_bic_2)
+
+# save table to html
+table1 = sjPlot::tab_model(beta_base_glm, beta_prev_glm, beta_int_glm, 
+                           show.aic=TRUE, show.loglik=TRUE)
+
+table2 = sjPlot::tab_model(alpha_base_glm, alpha_prev_glm, alpha_int_glm, 
+                           show.aic=TRUE, show.loglik=TRUE)
+
+filename = paste("beta_expecon", expecon, ".html", sep="_")
+output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
+htmlTable(table1, file = output_file_path)
+
+filename = paste("alpha_expecon", expecon, ".html", sep="_")
+output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
+htmlTable(table2, file = output_file_path)
 ##########################congruency###############################################################
 
 # does beta power per trial predict congruent responses in both probability conditions?
