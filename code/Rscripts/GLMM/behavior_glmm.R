@@ -31,7 +31,7 @@ par(family = "Arial", cex = 1.2)
 
 # which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
 
-expecon <- 1
+expecon <- 2
 
 ####################################################################################################
 # set base directory
@@ -110,6 +110,7 @@ filename = paste("cue_model_expecon", expecon, ".rda", sep="_")
 cue_model_path = file.path("data", "behav", "mixed_models", filename)
 saveRDS(cue_model, cue_model_path)
 cue_model <- readRDS(cue_model_path)
+
 ########################### add previous choice predictor###########################################
 cue_prev_model = glmer(sayyes ~ isyes + cue + prevresp + isyes*cue +
                          + (isyes + cue + prevresp|ID), data=behav, 
@@ -176,6 +177,35 @@ cue_prev_int_model <- readRDS(cue_model_path)
 emm_model <- emmeans(cue_prev_int_model, "prevresp", by = "cue")
 con <- contrast(emm_model)
 con
+
+###########################check interaction in study 2 if you condition on prev cue #############
+
+# Create a column that indexes wether the current cue had the same cue in the trial before (==1)
+behav <- behav %>%
+  mutate(same_as_previous = ifelse(cue == lag(cue), 1, 0))
+
+same_only = filter(behav, same_as_previous==1)
+diff_only = filter(behav, same_as_previous==0)
+
+cue_prev_int_model_same = glmer(sayyes ~ isyes + cue + prevresp + prevresp*cue
+                           + cue*isyes +
+                             (isyes + cue + prevresp|ID), data=same_only, 
+                           family=binomial(link='probit'),
+                           control=glmerControl(optimizer="bobyqa",
+                                                optCtrl=list(maxfun=2e5)),
+)
+
+summary(cue_prev_int_model_same)
+
+cue_prev_int_model_diff = glmer(sayyes ~ isyes + cue + prevresp + prevresp*cue
+                                + cue*isyes +
+                                  (isyes + cue + prevresp|ID), data=diff_only, 
+                                family=binomial(link='probit'),
+                                control=glmerControl(optimizer="bobyqa",
+                                                     optCtrl=list(maxfun=2e5)),
+)
+
+summary(cue_prev_int_model_diff)
 ############################################### Model comparision ##################################
 
 # Likelihood ratio tests
