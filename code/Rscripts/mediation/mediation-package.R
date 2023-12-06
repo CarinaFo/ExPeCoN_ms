@@ -65,7 +65,7 @@ behav_grouped <- behav %>%
 # (does the IV predict the mediator?)
 
 # with p-value: lmerTest
-mediatorbeta  <- lmerTest::lmer(beta ~  cue*prevresp +  (cue+prevresp|ID), 
+mediatorbeta  <- lmerTest::lmer(beta ~  cue+prevresp +  (cue+prevresp|ID), 
                                 data = behav) # significant 
 summary(mediatorbeta)
 
@@ -75,21 +75,31 @@ summary(mediatorbeta_stim)
 # stimulus n.s. 
 
 # without p-values, model for mediation function
-med.model_beta <- lme4::lmer(beta ~  cue*prevresp +  (cue+prevresp|ID), 
+med.model_beta <- lme4::lmer(beta ~  cue+prevresp +  (cue+prevresp|ID), 
                                 data = behav) # significant 
 summary(med.model_beta)
+
+# expecon 1
 
 # fit outcome model: do the mediator (beta) and the IV (stimulus probability cue) predict the
 # detection response? included stimulus and previous choice at a given trial as covariates
 # and interaction between prev resp and cue
 out.model_beta <- glmer(sayyes ~ isyes + cue + beta + prevresp*cue + isyes*cue+
-                     (cue*isyes+prevresp|ID),
+                     (cue+isyes+prevresp|ID),
                    data = behav,
                    control=glmerControl(optimizer="bobyqa",
                                         optCtrl=list(maxfun=2e5)),
                    family=binomial(link='probit'))
 
 summary(out.model_beta)
+
+# save mediation output: probability cue
+setwd("E:/expecon_ms")
+# probability model beta power
+filename = paste('medglm_cue_beta_', expecon, '.rds', sep="")
+model_path = file.path("data", "behav", "mediation", filename)
+saveRDS(out.model_beta, model_path)
+mediation_cue_beta_yes = readRDS(model_path)
 
 # now fit mediation model with confidence as the outcome variable
 out.model_conf_beta <- glmer(conf ~ isyes + cue + beta + prevresp*cue + isyes*cue+
@@ -101,19 +111,41 @@ out.model_conf_beta <- glmer(conf ~ isyes + cue + beta + prevresp*cue + isyes*cu
 
 summary(out.model_conf_beta)
 
+# confidence model beta power
+filename = paste('medglm_conf_cue_beta_', expecon, '.rds', sep="")
+model_path = file.path("data", "behav", "mediation", filename)
+saveRDS(out.model_conf_beta, model_path)
+mediation_cue_beta_yes = readRDS(model_path)
+
+# save table to html
+table1 = sjPlot::tab_model(out.model_beta, out.model_conf_beta,
+                           show.aic=TRUE, show.loglik=TRUE)
+
+filename = paste("mediationglm_expecon", expecon, ".html", sep="_")
+output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
+htmlTable(table1, file = output_file_path)
+
 # expecon 2
 
 # fit outcome model: do the mediator (beta) and the IV (stimulus probability cue) predict the
 # detection response? included stimulus and previous choice at a given trial as covariates,
 # but no interaction between prev. resp and cue
 out.model_beta <- glmer(sayyes ~ isyes + cue + beta + prevresp +isyes*cue+
-                          (cue*isyes+prevresp|ID),
+                          (cue+isyes+prevresp|ID),
                         data = behav,
                         control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e5)),
                         family=binomial(link='probit'))
 
 summary(out.model_beta)
+
+# save mediation output: probability cue
+setwd("E:/expecon_ms")
+# probability model beta power
+filename = paste('medglm_cue_beta_', expecon, '.rds', sep="")
+model_path = file.path("data", "behav", "mediation", filename)
+saveRDS(out.model_beta, model_path)
+mediation_cue_beta_yes = readRDS(model_path)
 
 # now fit mediation model with confidence as the outcome variable
 out.model_conf_beta <- glmer(conf ~ isyes + cue + beta + prevresp + isyes*cue+
@@ -124,6 +156,20 @@ out.model_conf_beta <- glmer(conf ~ isyes + cue + beta + prevresp + isyes*cue+
                              family=binomial(link='probit'))
 
 summary(out.model_conf_beta)
+
+# confidence model beta power
+filename = paste('medglm_conf_cue_beta_', expecon, '.rds', sep="")
+model_path = file.path("data", "behav", "mediation", filename)
+saveRDS(out.model_conf_beta, model_path)
+mediation_cue_beta_yes = readRDS(model_path)
+
+# save table to html
+table2 = sjPlot::tab_model(out.model_beta, out.model_conf_beta,
+                           show.aic=TRUE, show.loglik=TRUE)
+
+filename = paste("mediationglm_expecon", expecon, ".html", sep="_")
+output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
+htmlTable(table2, file = output_file_path)
 
 # now fit mediation model
 mediation_cue_beta_prevno <- mediate(med.model_beta, out.model_beta, treat='cue', mediator='beta', 
@@ -147,18 +193,22 @@ setwd("E:/expecon_ms")
 filename = paste('med_cue_beta_prevyes_', expecon, '.rds', sep="")
 model_path = file.path("data", "behav", "mediation", filename)
 saveRDS(mediation_cue_beta_prevyes, model_path)
+mediation_cue_beta_yes = readRDS(model_path)
 
 filename = paste('med_cue_beta_prevno_', expecon, '.rds', sep="")
 model_path = file.path("data", "behav", "mediation", filename)
 saveRDS(mediation_cue_beta_prevno, model_path)
+mediation_cue_beta_no = readRDS(model_path)
 
 filename = paste('med_cue_beta_', expecon, '.rds', sep="")
 model_path = file.path("data", "behav", "mediation", filename)
 saveRDS(mediation_cue_beta, model_path)
+mediation_cue_beta = readRDS(model_path)
 
 filename = paste('med_conf_beta_', expecon, '.rds', sep="")
 model_path = file.path("data", "behav", "mediation", filename)
 saveRDS(mediation_conf_beta, model_path)
+mediation_conf_beta_1 = readRDS(model_path)
 
 # save results in a table
 extract_mediation_summary(mediation_cue_beta)
@@ -167,7 +217,6 @@ extract_mediation_summary(mediation_cue_beta)
 # https://easystats.github.io/bayestestR/articles/mediation.html
 
 # bayesian mediation currently not reported
-
 # how many cores do we have available on  this machine?
 detectCores()
 
