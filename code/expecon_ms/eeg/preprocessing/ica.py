@@ -46,14 +46,28 @@ epochs_for_ICA1 = Path(path_to.data.eeg.preprocessed.stimulus_expecon1)
 epochs_for_ICA2 = Path(path_to.data.eeg.preprocessed.stimulus_expecon2)
 
 # directory where to save the ICA cleaned epochs
-save_dir_epochs_after_ica1 = Path(path_to.data.eeg.preprocessed.ica.ICA1).mkdir(parents=True, exist_ok=True)
-save_dir_epochs_after_ica2 = Path(path_to.data.eeg.preprocessed.ica.ICA2).mkdir(parents=True, exist_ok=True)
+save_dir_epochs_after_ica1 = Path(path_to.data.eeg.preprocessed.ica.ICA1)
+save_dir_epochs_after_ica2 = Path(path_to.data.eeg.preprocessed.ica.ICA2)
 
 # directory of the ICA solution
-save_dir_ica_sol1 = Path(path_to.data.eeg.preprocessed.ica.ICA_solution1).mkdir(parents=True, exist_ok=True)
-save_dir_ica_comps1 = Path(path_to.data.eeg.preprocessed.ica.ICA_components1).mkdir(parents=True, exist_ok=True)
-save_dir_ica_sol2 = Path(path_to.data.eeg.preprocessed.ica.ICA_solution2).mkdir(parents=True, exist_ok=True)
-save_dir_ica_comps2 = Path(path_to.data.eeg.preprocessed.ica.ICA_components2).mkdir(parents=True, exist_ok=True)
+save_dir_ica_sol1 = Path(path_to.data.eeg.preprocessed.ica.ICA_solution1)
+save_dir_ica_comps1 = Path(path_to.data.eeg.preprocessed.ica.ICA_components1)
+save_dir_ica_sol2 = Path(path_to.data.eeg.preprocessed.ica.ICA_solution2)
+save_dir_ica_comps2 = Path(path_to.data.eeg.preprocessed.ica.ICA_components2)
+
+# directory to save PSD per participant
+save_dir_psd1 = Path(path_to.data.eeg.preprocessed.ica.PSD1)
+save_dir_psd2 = Path(path_to.data.eeg.preprocessed.ica.PSD2)
+save_dir_psd1.mkdir(parents=True, exist_ok=True)
+save_dir_psd2.mkdir(parents=True, exist_ok=True)
+
+# create directory if not existing
+save_dir_epochs_after_ica1.mkdir(parents=True, exist_ok=True)
+save_dir_epochs_after_ica2.mkdir(parents=True, exist_ok=True)
+save_dir_ica_sol1.mkdir(parents=True, exist_ok=True)
+save_dir_ica_comps1.mkdir(parents=True, exist_ok=True)
+save_dir_ica_sol2.mkdir(parents=True, exist_ok=True)
+save_dir_ica_comps2.mkdir(parents=True, exist_ok=True)
 
 # participant IDs
 id_list = config.participants.ID_list_expecon1
@@ -62,7 +76,7 @@ id_list_expecon2 = config.participants.ID_list_expecon2
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # add this line to jupyter script
-# run_ica(infomax=1, save_psd=1)
+# run_ica(study=1, infomax=1, save_psd=1)
 # label_ica_correlation()
 
 def run_ica(study: int, infomax: int, save_psd: int):
@@ -100,9 +114,10 @@ def run_ica(study: int, infomax: int, save_psd: int):
             if save_psd:
                 # Compute and plot the power spectral density (PSD)
                 epochs.compute_psd(fmin=1, fmax=40, picks=picks).plot(show=False)
-                plt.savefig(Path(path_to.data.eeg.preprocessed.ica.PSD1, f"PSD_{subj}.png").mkdir(parents=True, exist_ok=True))
-                if study == 1 else plt.savefig(
-                    Path(path_to.data.eeg.preprocessed.ica.PSD2, f"PSD_{subj}.png").mkdir(parents=True, exist_ok=True))
+                if study == 1:
+                    plt.savefig(save_dir_psd1, f"PSD_{subj}.png")
+                else: 
+                    plt.savefig(save_dir_psd2, f"PSD_{subj}.png")
 
             if infomax == 1:
                 # Fit ICA using infomax method with extended parameters
