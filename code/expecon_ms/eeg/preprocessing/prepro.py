@@ -17,7 +17,6 @@ import mne
 import pandas as pd
 from autoreject import AutoReject, Ransac  # Jas et al., 2016
 
-import expecon_ms.configs
 from expecon_ms.configs import PROJECT_ROOT, config, path_to
 
 # if you change the config.toml file instead of reloading the kernel you can 
@@ -66,7 +65,7 @@ pilot_counter = config.participants.pilot_counter
 # add this line to jupyter script
 # prepro(study = 1, trigger='stimulus', l_freq=1, h_freq=40, tmin=-0.2, tmax=0.8, resample_rate=250, 
 # sf=2500, detrend=1, ransac=1, autoreject=0)
-# n_channels_interpolated(trigger='stimulus', l_freq=1)
+# n_channels_interpolated(study=1, trigger='stimulus', l_freq=1)
 
 def prepro(
     study: int,
@@ -126,7 +125,7 @@ def prepro(
     if study == 1:
         # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
         # no matching trigger in the EEG recording)
-        df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expeocon1.csv")
+        df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon1.csv")
     else:
         df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon2.csv")
 
@@ -154,15 +153,17 @@ def prepro(
         if (save_dir / f"P{subj}_epochs_{l_freq}Hz-epo.fif").exists():
             print(f"{subj} already exists")
             continue
-        
+
         if study == 1:
             # load raw data concatenated for all blocks
-            raw = mne.io.read_raw_fif(save_dir_concatenated_raw_expecon1 / f"P{subj}_concatenated_raw.fif",
+            raw = mne.io.read_raw_fif(save_dir_concatenated_raw1 / f"P{subj}_concatenated_raw.fif",
                                     preload=True)
         else:
-            raw = mne.io.read_raw_fif(save_dir_concatenated_raw_expecon2 / f"P{subj}_concatenated_raw.fif",
+            if subj == '013': # stimulation device was not working for this participant
+                continue
+            raw = mne.io.read_raw_fif(save_dir_concatenated_raw2 / f"P{subj}_concatenated_raw.fif",
                                     preload=True)
-            
+
         # save the annotations (trigger) information
         annot.append(raw.annotations.to_data_frame())
 
@@ -194,7 +195,7 @@ def prepro(
             # add dataframe as metadata to epochs
             metadata = df_cleaned[index + pilot_counter == df_cleaned.ID]
         else:
-              metadata = df_cleaned[index + 1 == df_cleaned.ID]
+            metadata = df_cleaned[index + 1 == df_cleaned.ID]
 
         # lock the data to the specified trigger and create epochs
         if trigger == "cue":
@@ -256,7 +257,7 @@ def prepro(
             epochs, reject_log = ar.fit_transform(epochs)
 
             reject_log.save(save_dir / f'P_{subj}_reject_log_{l_freq}.npz')
-        
+
         #save epochs to disk
         epochs.save(save_dir / f'P{subj}_epochs_{l_freq}Hz-epo.fif')
 
@@ -265,7 +266,7 @@ def prepro(
     # for methods part: how many channels were interpolated per participant
     ch_df = pd.DataFrame(ch_interp)
 
-    ch_df.to_csv(save_dir / f"interpolated_channels_{l_freq}.csv", 
+    ch_df.to_csv(save_dir / f"interpolated_channels_{l_freq}.csv",
                  index=False)
 
     print("Done with preprocessing and creating clean epochs")
@@ -273,12 +274,14 @@ def prepro(
     return ch_interp, annot
 
 
-def n_channels_interpolated(trigger: str, l_freq: float) -> None:
+def n_channels_interpolated(study: int, trigger: str, l_freq: float) -> None:
     """
     Calculate the mean, std, min and max of channels interpolated across participants.
-
     Parameters
     ----------
+    study : int
+        data from first or second study
+        Options: 1 or 2
     trigger : str
         Specify whether to epoch the data to the stimulus or cue trigger.
         Options: "stimulus" or "cue"
@@ -288,17 +291,15 @@ def n_channels_interpolated(trigger: str, l_freq: float) -> None:
     -------
     None.
     """
-    
+
     if trigger == "stimulus":
-        save_dir = save_dir_stim
+        save_dir = save_dir_stim_1 if study == 1 else save_dir_stim_2
     else:
-        save_dir = save_dir_cue
+        save_dir = save_dir_cue_1 if study == 1 else save_dir_cue_2
 
     # load channel interpolation data
     df_inter_ch = pd.read_csv(f'{save_dir}{Path("/")}interpolated_channels_{l_freq}.csv')
 
-    # (simon): Check this out: https://stackoverflow.com/questions/36519086/how-to-get-rid-of-unnamed-0-column-in-a-pandas-dataframe-read-in-from-csv-fil
-    # Merci, this is very useful!
     df_inter_ch["count_ch"] = df_inter_ch.count(axis=1)
 
     print(f"mean channels interpolated {df_inter_ch['count_ch'].mean()}")
@@ -309,7 +310,7 @@ def n_channels_interpolated(trigger: str, l_freq: float) -> None:
 
 # Unused functions
 
-def add_reaction_time_trigger(metadata=None, sf: int, events=None) -> None:
+def add_reaction_time_trigger(sf: int, metadata=None, events=None) -> None:
 
     """Add the reaction time as a trigger to the event structure.
     
