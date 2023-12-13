@@ -1,7 +1,7 @@
 # Config file for expecon_ms
 # Drop all relevant paths, parameters, etc. here
 # They can be accessed in the code via:
-#   from expecon_ms.configs import config, path_to, params
+# from expecon_ms.configs import config, path_to, params
 
 PROJECT_NAME = "expecon_ms"
 
@@ -18,11 +18,16 @@ EEG = "./data/eeg"
 templates = "./data/templates"
 
 [paths.data.eeg]
-RAW = "./data/eeg/raw_concatenated"
+RAW_expecon1 = "./data/eeg/raw_concatenated_expecon1"
+RAW_expecon2 = "./data/eeg/raw_concatenated_expecon2"
+
 
 [paths.data.eeg.preprocessed]
-stimulus = "./data/eeg/prepro_stim"
-cue = "./data/eeg/prepro_cue"
+stimulus_expecon1 = "./data/eeg/prepro_stim_expecon1"
+stimulus_expecon2 = "./data/eeg/prepro_stim_expecon2"
+
+cue_expecon1 = "./data/eeg/prepro_cue_expecon1"
+cue_expecon1 = "./data/eeg/prepro_cue_expecon2"
 
 [paths.data.eeg.preprocessed.ica]
 PSD = "./data/eeg/prepro_ica/psd"

@@ -37,13 +37,16 @@ last_commit_date = (
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # raw concatenated eeg data
-save_dir_concatenated_raw = Path(path_to.data.eeg.RAW)
+save_dir_concatenated_raw1 = Path(path_to.data.eeg.RAW_expecon1)
+save_dir_concatenated_raw2 = Path(path_to.data.eeg.RAW_expecon2)
 
 # stimulus locked
-save_dir_stim = Path(path_to.data.eeg.preprocessed.stimulus)
+save_dir_stim_1 = Path(path_to.data.eeg.preprocessed.stimulus_expecon1)
+save_dir_stim_2 = Path(path_to.data.eeg.preprocessed.stimulus_expecon2)
 
 # cue locked
-save_dir_cue = Path(path_to.data.eeg.preprocessed.cue)
+save_dir_cue_1 = Path(path_to.data.eeg.preprocessed.cue_expecon1)
+save_dir_cue_2 = Path(path_to.data.eeg.preprocessed.cue_expecon2)
 
 # EEG cap layout file
 filename_montage = Path(path_to.data.templates)
@@ -52,7 +55,8 @@ filename_montage = Path(path_to.data.templates)
 behav_path = Path(path_to.data.behavior)
 
 # participant IDs
-id_list = config.participants.ID_list
+id_list = config.participants.ID_list_expecon1
+id_list_expecon2 = config.participants.ID_list_expecon2
 
 # pilot data counter
 pilot_counter = config.participants.pilot_counter
@@ -60,11 +64,12 @@ pilot_counter = config.participants.pilot_counter
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # add this line to jupyter script
-# prepro(trigger='stimulus', l_freq=1, h_freq=40, tmin=-0.2, tmax=0.8, resample_rate=250, 
+# prepro(study = 1, trigger='stimulus', l_freq=1, h_freq=40, tmin=-0.2, tmax=0.8, resample_rate=250, 
 # sf=2500, detrend=1, ransac=1, autoreject=0)
 # n_channels_interpolated(trigger='stimulus', l_freq=1)
 
 def prepro(
+    study: int,
     trigger: str,
     l_freq: float,
     h_freq: int,
@@ -87,7 +92,9 @@ def prepro(
 
     Args:
     ----
-   
+    study: int
+        data from first or second study
+        Options: 1 or 2
     trigger: str
         Specify whether to epoch the data to the stimulus or cue trigger.
         Options: "stimulus" or "cue"
@@ -115,9 +122,13 @@ def prepro(
     annot: list
         List with the annotations (trigger) information.
     """
-    # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
-    # no matching trigger in the EEG recording)
-    df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg.csv")
+
+    if study == 1:
+        # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
+        # no matching trigger in the EEG recording)
+        df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expeocon1.csv")
+    else:
+        df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon2.csv")
 
     # set eeg channel layout for topo plots
     montage = mne.channels.read_custom_montage(filename_montage / "CACS-64_REF.bvef")
@@ -127,9 +138,15 @@ def prepro(
     ch_interp, annot = [], []
 
     if trigger == "stimulus":
-        save_dir = save_dir_stim
+        if study == 1:
+            save_dir = save_dir_stim_1
+        else:
+            save_dir = save_dir_stim_2
     else:
-        save_dir = save_dir_cue
+        if study == 1:
+            save_dir = save_dir_cue_1
+        else:
+            save_dir = save_dir_cue_2
 
     # loop over participants
     for index, subj in enumerate(id_list):
@@ -137,11 +154,15 @@ def prepro(
         if (save_dir / f"P{subj}_epochs_{l_freq}Hz-epo.fif").exists():
             print(f"{subj} already exists")
             continue
-
-        # load raw data concatenated for all blocks
-        raw = mne.io.read_raw_fif(save_dir_concatenated_raw / f"P{subj}_concatenated_raw.fif",
-                                   preload=True)
-
+        
+        if study == 1:
+            # load raw data concatenated for all blocks
+            raw = mne.io.read_raw_fif(save_dir_concatenated_raw_expecon1 / f"P{subj}_concatenated_raw.fif",
+                                    preload=True)
+        else:
+            raw = mne.io.read_raw_fif(save_dir_concatenated_raw_expecon2 / f"P{subj}_concatenated_raw.fif",
+                                    preload=True)
+            
         # save the annotations (trigger) information
         annot.append(raw.annotations.to_data_frame())
 
@@ -158,15 +179,22 @@ def prepro(
 
         # add stimulus onset cue as a trigger to event structure
         if trigger == "cue":
-            cue_timings = [i - int(0.4 * sf) for i in events[:, 0]]
+
+            if study == 1:
+                cue_timings = [i - int(0.4 * sf) for i in events[:, 0]]
+            else:
+                cue_timings = [i - int(1.7 * sf) for i in events[:, 0]]
 
             # subtract 0.4*sampling frequency to get the cue time stamps
             cue_events = copy.deepcopy(events)
             cue_events[:, 0] = cue_timings
             cue_events[:, 2] = 2
 
-        # add dataframe as metadata to epochs
-        metadata = df_cleaned[index + pilot_counter == df_cleaned.ID]
+        if study == 1:
+            # add dataframe as metadata to epochs
+            metadata = df_cleaned[index + pilot_counter == df_cleaned.ID]
+        else:
+              metadata = df_cleaned[index + 1 == df_cleaned.ID]
 
         # lock the data to the specified trigger and create epochs
         if trigger == "cue":
