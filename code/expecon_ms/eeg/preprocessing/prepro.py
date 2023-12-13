@@ -36,22 +36,30 @@ last_commit_date = (
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # raw concatenated eeg data
-save_dir_concatenated_raw1 = Path(path_to.data.eeg.RAW_expecon1).mkdir(parents=True, exist_ok=True)
-save_dir_concatenated_raw2 = Path(path_to.data.eeg.RAW_expecon2).mkdir(parents=True, exist_ok=True)
+save_dir_concatenated_raw1 = Path(path_to.data.eeg.RAW_expecon1)
+save_dir_concatenated_raw2 = Path(path_to.data.eeg.RAW_expecon2)
+save_dir_concatenated_raw1.mkdir(parents=True, exist_ok=True)
+save_dir_concatenated_raw2.mkdir(parents=True, exist_ok=True)
 
 # stimulus locked
-save_dir_stim_1 = Path(path_to.data.eeg.preprocessed.stimulus_expecon1).mkdir(parents=True, exist_ok=True)
-save_dir_stim_2 = Path(path_to.data.eeg.preprocessed.stimulus_expecon2).mkdir(parents=True, exist_ok=True)
+save_dir_stim_1 = Path(path_to.data.eeg.preprocessed.stimulus_expecon1)
+save_dir_stim_2 = Path(path_to.data.eeg.preprocessed.stimulus_expecon2)
+save_dir_stim_1.mkdir(parents=True, exist_ok=True)
+save_dir_stim_2.mkdir(parents=True, exist_ok=True)
 
 # cue locked
-save_dir_cue_1 = Path(path_to.data.eeg.preprocessed.cue_expecon1).mkdir(parents=True, exist_ok=True)
-save_dir_cue_2 = Path(path_to.data.eeg.preprocessed.cue_expecon2).mkdir
+save_dir_cue_1 = Path(path_to.data.eeg.preprocessed.cue_expecon1)
+save_dir_cue_2 = Path(path_to.data.eeg.preprocessed.cue_expecon2)
+save_dir_cue_1.mkdir(parents=True, exist_ok=True)
+save_dir_cue_2.mkdir(parents=True, exist_ok=True)
 
 # EEG cap layout file
-filename_montage = Path(path_to.data.templates).mkdir(parents=True, exist_ok=True)
+filename_montage = Path(path_to.data.templates)
+filename_montage.mkdir(parents=True, exist_ok=True)
 
 # raw behavioral data
-behav_path = Path(path_to.data.behavior).mkdir(parents=True, exist_ok=True)
+behav_path = Path(path_to.data.behavior)
+behav_path.mkdir(parents=True, exist_ok=True)
 
 # participant IDs
 id_list = config.participants.ID_list_expecon1
