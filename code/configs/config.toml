@@ -30,12 +30,16 @@ cue_expecon1 = "./data/eeg/prepro_cue_expecon1"
 cue_expecon2 = "./data/eeg/prepro_cue_expecon2"
 
 [paths.data.eeg.preprocessed.ica]
-PSD = "./data/eeg/prepro_ica/psd"
-ICA_solution = "./data/eeg/prepro_ica/ica_solution"
-ICA_components = "./data/eeg/prepro_ica/ica_comps"
-clean_epochs = "./data/eeg/prepro_ica/clean_epochs_corr"
-ICA = "./data/eeg/prepro_ica"
-clean_epochs_expecon2 = "./data/eeg/prepro_ica/clean_epochs_expecon2"
+PSD1 = "./data/eeg/prepro_ica/psd1"
+PSD2 = "./data/eeg/prepro_ica/psd2"
+ICA_solution1 = "./data/eeg/prepro_ica/ica_solution1"
+ICA_solution2 = "./data/eeg/prepro_ica/ica_solution2"
+ICA_components1 = "./data/eeg/prepro_ica/ica_comps1"
+ICA_components2 = "./data/eeg/prepro_ica/ica_comps2"
+clean_epochs1 = "./data/eeg/prepro_ica/clean_epochs_corr1"
+clean_epochs2 = "./data/eeg/prepro_ica/clean_epochs_corr2
+ICA1 = "./data/eeg/prepro_ica1"
+ICA2 = "./data/eeg/prepro_ica2"
 
 [paths.data.eeg.sensor]
 tfr = "./data/eeg/sensor/tfr"

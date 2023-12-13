@@ -19,7 +19,6 @@ import mne
 import pandas as pd
 from mne_icalabel import label_components
 
-import expecon_ms.configs
 from expecon_ms.configs import PROJECT_ROOT, config, path_to
 
 # if you change the config.toml file instead of reloading the kernel you can 
@@ -42,21 +41,23 @@ last_commit_date = (
 )
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
-# directory where to find the cleaned, epoched data
-epochs_for_ICA = Path(path_to.data.eeg.preprocessed.stimulus)
+# directory where to find the cleaned, stimulus locked and epoched data
+epochs_for_ICA1 = Path(path_to.data.eeg.preprocessed.stimulus_expecon1)
+epochs_for_ICA2 = Path(path_to.data.eeg.preprocessed.stimulus_expecon2)
 
 # directory where to save the ICA cleaned epochs
-save_dir_epochs_after_ica = Path(path_to.data.eeg.preprocessed.ica.ICA)
+save_dir_epochs_after_ica1 = Path(path_to.data.eeg.preprocessed.ica.ICA1).mkdir(parents=True, exist_ok=True)
+save_dir_epochs_after_ica2 = Path(path_to.data.eeg.preprocessed.ica.ICA2).mkdir(parents=True, exist_ok=True)
 
 # directory of the ICA solution
-save_dir_ica_sol = Path(path_to.data.eeg.preprocessed.ica.ICA_solution)
-save_dir_ica_comps = Path(path_to.data.eeg.preprocessed.ica.ICA_components)
-
-# raw EEG data
-raw_dir = Path(path_to.data.eeg.RAW)
+save_dir_ica_sol1 = Path(path_to.data.eeg.preprocessed.ica.ICA_solution1).mkdir(parents=True, exist_ok=True)
+save_dir_ica_comps1 = Path(path_to.data.eeg.preprocessed.ica.ICA_components1).mkdir(parents=True, exist_ok=True)
+save_dir_ica_sol2 = Path(path_to.data.eeg.preprocessed.ica.ICA_solution2).mkdir(parents=True, exist_ok=True)
+save_dir_ica_comps2 = Path(path_to.data.eeg.preprocessed.ica.ICA_components2).mkdir(parents=True, exist_ok=True)
 
 # participant IDs
-id_list = config.participants.ID_list
+id_list = config.participants.ID_list_expecon1
+id_list_expecon2 = config.participants.ID_list_expecon2
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -64,12 +65,13 @@ id_list = config.participants.ID_list
 # run_ica(infomax=1, save_psd=1)
 # label_ica_correlation()
 
-def run_ica(infomax: int, save_psd: int):
+def run_ica(study: int, infomax: int, save_psd: int):
     """
     Run ICA on epoched data and save the ICA solution.
 
     Args:
     ----
+        study (int): Flag indicating whether to use the data from study 1 or study 2.
         infomax (int): Flag indicating whether to use the infomax method (default: 1).
         save_psd (int): Flag indicating whether to save the power spectral density (PSD) plot (default: 0).
 
@@ -78,14 +80,19 @@ def run_ica(infomax: int, save_psd: int):
         None
     """
     for subj in id_list:
-
-        file_path = save_dir_ica_sol / f"icas_{subj}.pkl"
+        if study == 1:
+            file_path = save_dir_ica_sol1 / f"icas_{subj}.pkl"
+        else:
+            file_path = save_dir_ica_sol2 / f"icas_{subj}.pkl"
 
         if not Path(file_path).exists():
             print("The file does not exist.")
 
             # Read the epoch data for the current participant (1Hz filtered data for ICA)
-            epochs = mne.read_epochs(epochs_for_ICA / f"P{subj}_epochs_1Hz-epo.fif")
+            if study == 1:
+                epochs = mne.read_epochs(epochs_for_ICA1 / f"P{subj}_epochs_1Hz-epo.fif")
+            else:
+                epochs = mne.read_epochs(epochs_for_ICA2 / f"P{subj}_epochs_1Hz-epo.fif")
 
             # Pick EEG channels for ICA
             picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
@@ -93,7 +100,9 @@ def run_ica(infomax: int, save_psd: int):
             if save_psd:
                 # Compute and plot the power spectral density (PSD)
                 epochs.compute_psd(fmin=1, fmax=40, picks=picks).plot(show=False)
-                plt.savefig(Path(path_to.data.eeg.preprocessed.ica.PSD, f"PSD_{subj}.png"))
+                plt.savefig(Path(path_to.data.eeg.preprocessed.ica.PSD1, f"PSD_{subj}.png").mkdir(parents=True, exist_ok=True))
+                if study == 1 else plt.savefig(
+                    Path(path_to.data.eeg.preprocessed.ica.PSD2, f"PSD_{subj}.png").mkdir(parents=True, exist_ok=True))
 
             if infomax == 1:
                 # Fit ICA using infomax method with extended parameters
@@ -102,16 +111,17 @@ def run_ica(infomax: int, save_psd: int):
             else:
                 # Fit ICA using fastica method
                 ica = mne.preprocessing.ICA(method="fastica").fit(epochs, picks=picks)
-            
+
             # save ICA solution
-            save_data(path=save_dir_ica_sol, data=ica, identifier=subj)
+            save_data(path=save_dir_ica_sol1, data=ica, identifier=subj) if study == 1 else save_data(
+                path=save_dir_ica_sol2, data=ica, identifier=subj)
         else:
             print("The file exists.")
 
     return "Done with ICA"
 
 
-def label_ica_correlation():
+def label_ica_correlation(study: int):
     """
     Perform template matching for blink and cardiac artifact detection.
 
@@ -123,7 +133,7 @@ def label_ica_correlation():
 
     Args:
     ----
-        None.
+        study (int): Flag indicating whether to use the data from study 1 or study 2.
 
     Returns:
     -------
@@ -137,13 +147,19 @@ def label_ica_correlation():
 
     for subj in id_list:
 
-        file_path = epochs_for_ICA / f"P{subj}_epochs_1Hz-epo.fif"
+        if study == 1:
+            file_path = epochs_for_ICA1 / f"P{subj}_epochs_1Hz-epo.fif"
+        else:
+            file_path = epochs_for_ICA2 / f"P{subj}_epochs_1Hz-epo.fif"
 
         # load epochs (1Hz filtered)
         epochs = mne.read_epochs(file_path, preload=True)
 
         # load ICA solution
-        ica_sol = load_pickle(save_dir_ica_sol / f"icas_{subj}.pkl")
+        if study == 1:
+            ica_sol = load_pickle(save_dir_ica_sol1 / f"icas_{subj}.pkl")
+        else:
+            ica_sol = load_pickle(save_dir_ica_sol2 / f"icas_{subj}.pkl")
 
         # correlate components with ECG and EOG
         eog_inds, _ = ica_sol.find_bads_eog(epochs, ch_name=ch_name_blinks)
@@ -157,20 +173,33 @@ def label_ica_correlation():
         ica_sol.plot_sources(epochs, show_scrollbars=False, block=False, show=False,
                               picks=list(range(21)))
         # save figures
-        plt.savefig(save_dir_ica_comps / f"ica_sources_{subj}")
+        if study == 1:
+            plt.savefig(save_dir_ica_comps1 / f"ica_sources_{subj}")
+        else:
+            plt.savefig(save_dir_ica_comps2 / f"ica_sources_{subj}")
 
         ica_sol.plot_components(inst=epochs, show=False, picks=list(range(21)))
-        plt.savefig(save_dir_ica_comps / f"ica_comps_{subj}")
+        # save figures
+        if study == 1:
+            plt.savefig(save_dir_ica_comps1 / f"ica_comps_{subj}")
+        else:
+            plt.savefig(save_dir_ica_comps2 / f"ica_comps_{subj}")
 
         ica_sol.plot_components(inst=epochs, show=False, picks=inds_to_exclude)
-        plt.savefig(save_dir_ica_comps / f"ica_del_{subj}")
+        if study == 1:
+            plt.savefig(save_dir_ica_comps1 / f"ica_del_{subj}")
+        else:
+            plt.savefig(save_dir_ica_comps2 / f"ica_del_{subj}")
 
         ica_sol.exclude = inds_to_exclude
 
         comps_removed.append(len(inds_to_exclude))
 
         # now load the highpass filtered data
-        filter_path = epochs_for_ICA / f"P{subj}_epochs_0.1Hz-epo.fif"
+        if study == 1:
+            filter_path = epochs_for_ICA1 / f"P{subj}_epochs_0.1Hz-epo.fif"
+        else:
+            filter_path = epochs_for_ICA2 / f"P{subj}_epochs_0.1Hz-epo.fif"
 
         epochs_filter = mne.read_epochs(filter_path, preload=True)
 
@@ -181,12 +210,19 @@ def label_ica_correlation():
         epochs_filter.set_eeg_reference("average", ch_type="eeg")
 
         # save the cleaned epochs
-        epochs_filter.save(save_dir_epochs_after_ica / f"P{subj}_icacorr_0.1Hz-epo.fif")
-
+        if study == 1:
+            epochs_filter.save(save_dir_epochs_after_ica1 / f"P{subj}_icacorr_0.1Hz-epo.fif")
+        else:
+            epochs_filter.save(save_dir_epochs_after_ica2 / f"P{subj}_icacorr_0.1Hz-epo.fif")
+        
         print(f"Saved ICA cleaned epochs for participant {subj}.")
 
     # save a dataframe with info on how many components were removed
-    pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica / "ica_components_stats_icacorr.csv", 
+    if study == 1:
+        pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica1 / "ica_components_stats_icacorr.csv", 
+                                       index=False)
+    else:
+        pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica2 / "ica_components_stats_icacorr.csv", 
                                        index=False)
 
     return comps_removed
