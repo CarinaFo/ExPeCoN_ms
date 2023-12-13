@@ -27,7 +27,7 @@ stimulus_expecon1 = "./data/eeg/prepro_stim_expecon1"
 stimulus_expecon2 = "./data/eeg/prepro_stim_expecon2"
 
 cue_expecon1 = "./data/eeg/prepro_cue_expecon1"
-cue_expecon1 = "./data/eeg/prepro_cue_expecon2"
+cue_expecon2 = "./data/eeg/prepro_cue_expecon2"
 
 [paths.data.eeg.preprocessed.ica]
 PSD = "./data/eeg/prepro_ica/psd"
