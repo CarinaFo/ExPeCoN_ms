@@ -37,7 +37,7 @@ ICA_solution2 = "./data/eeg/prepro_ica/ica_solution2"
 ICA_components1 = "./data/eeg/prepro_ica/ica_comps1"
 ICA_components2 = "./data/eeg/prepro_ica/ica_comps2"
 clean_epochs1 = "./data/eeg/prepro_ica/clean_epochs_corr1"
-clean_epochs2 = "./data/eeg/prepro_ica/clean_epochs_corr2
+clean_epochs2 = "./data/eeg/prepro_ica/clean_epochs_corr2"
 ICA1 = "./data/eeg/prepro_ica1"
 ICA2 = "./data/eeg/prepro_ica2"
 
