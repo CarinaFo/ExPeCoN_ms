@@ -58,8 +58,6 @@ save_dir_ica_comps2 = Path(path_to.data.eeg.preprocessed.ica.ICA_components2)
 # directory to save PSD per participant
 save_dir_psd1 = Path(path_to.data.eeg.preprocessed.ica.PSD1)
 save_dir_psd2 = Path(path_to.data.eeg.preprocessed.ica.PSD2)
-save_dir_psd1.mkdir(parents=True, exist_ok=True)
-save_dir_psd2.mkdir(parents=True, exist_ok=True)
 
 # create directory if not existing
 save_dir_epochs_after_ica1.mkdir(parents=True, exist_ok=True)
@@ -68,6 +66,8 @@ save_dir_ica_sol1.mkdir(parents=True, exist_ok=True)
 save_dir_ica_comps1.mkdir(parents=True, exist_ok=True)
 save_dir_ica_sol2.mkdir(parents=True, exist_ok=True)
 save_dir_ica_comps2.mkdir(parents=True, exist_ok=True)
+save_dir_psd1.mkdir(parents=True, exist_ok=True)
+save_dir_psd2.mkdir(parents=True, exist_ok=True)
 
 # participant IDs
 id_list = config.participants.ID_list_expecon1
@@ -94,10 +94,8 @@ def run_ica(study: int, infomax: int, save_psd: int):
         None
     """
     for subj in id_list:
-        if study == 1:
-            file_path = save_dir_ica_sol1 / f"icas_{subj}.pkl"
-        else:
-            file_path = save_dir_ica_sol2 / f"icas_{subj}.pkl"
+
+        file_path = save_dir_ica_sol1 / f"icas_{subj}.pkl" if study == 1 else save_dir_ica_sol2 / f"icas_{subj}.pkl"
 
         if not Path(file_path).exists():
             print("The file does not exist.")
@@ -162,10 +160,8 @@ def label_ica_correlation(study: int):
 
     for subj in id_list:
 
-        if study == 1:
-            file_path = epochs_for_ICA1 / f"P{subj}_epochs_1Hz-epo.fif"
-        else:
-            file_path = epochs_for_ICA2 / f"P{subj}_epochs_1Hz-epo.fif"
+        # set file path for clean epochs (1Hz filtered)
+        file_path = epochs_for_ICA1 / f"P{subj}_epochs_1Hz-epo.fif" if study == 1 else file_path = epochs_for_ICA2 / f"P{subj}_epochs_1Hz-epo.fif"
 
         # load epochs (1Hz filtered)
         epochs = mne.read_epochs(file_path, preload=True)
@@ -184,7 +180,7 @@ def label_ica_correlation(study: int):
         # combine the sources to exclude
         inds_to_exclude = eog_inds + ecg_inds
 
-        # plot ICs applied to raw data, with ECG matches highlighted (first 20 components only)
+        # plot ICs applied to epoched data, with ECG matches highlighted (first 20 components only)
         ica_sol.plot_sources(epochs, show_scrollbars=False, block=False, show=False,
                               picks=list(range(21)))
         # save figures
@@ -192,25 +188,29 @@ def label_ica_correlation(study: int):
             plt.savefig(save_dir_ica_comps1 / f"ica_sources_{subj}")
         else:
             plt.savefig(save_dir_ica_comps2 / f"ica_sources_{subj}")
-
+        # plot the components
         ica_sol.plot_components(inst=epochs, show=False, picks=list(range(21)))
+
         # save figures
         if study == 1:
             plt.savefig(save_dir_ica_comps1 / f"ica_comps_{subj}")
         else:
             plt.savefig(save_dir_ica_comps2 / f"ica_comps_{subj}")
 
+        # plot the components to be excluded
         ica_sol.plot_components(inst=epochs, show=False, picks=inds_to_exclude)
+
         if study == 1:
             plt.savefig(save_dir_ica_comps1 / f"ica_del_{subj}")
         else:
             plt.savefig(save_dir_ica_comps2 / f"ica_del_{subj}")
 
+        # set the indices to exclude
         ica_sol.exclude = inds_to_exclude
 
         comps_removed.append(len(inds_to_exclude))
 
-        # now load the highpass filtered data
+        # now load the highpass filtered data (0.1 Hz)
         if study == 1:
             filter_path = epochs_for_ICA1 / f"P{subj}_epochs_0.1Hz-epo.fif"
         else:
@@ -229,21 +229,21 @@ def label_ica_correlation(study: int):
             epochs_filter.save(save_dir_epochs_after_ica1 / f"P{subj}_icacorr_0.1Hz-epo.fif")
         else:
             epochs_filter.save(save_dir_epochs_after_ica2 / f"P{subj}_icacorr_0.1Hz-epo.fif")
-        
+
         print(f"Saved ICA cleaned epochs for participant {subj}.")
 
     # save a dataframe with info on how many components were removed
     if study == 1:
-        pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica1 / "ica_components_stats_icacorr.csv", 
+        pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica1 / "ica_components_stats_icacorr.csv",
                                        index=False)
     else:
-        pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica2 / "ica_components_stats_icacorr.csv", 
+        pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica2 / "ica_components_stats_icacorr.csv",
                                        index=False)
 
     return comps_removed
 
 
-def label_iclabel():
+def label_iclabel(study: int):
     """
     Apply automatic labeling of ICA components using the iclabel method:
     doi:https://doi.org/10.1016/j.neuroimage.2019.05.026.
@@ -251,27 +251,31 @@ def label_iclabel():
     averaged to a common reference and saved as .fif files.
     Args:
     ----
-        None
+        study (int): Flag indicating whether to use the data from study 1 or study 2.
 
     Returns:
     -------
         str: Message indicating the completion of removing ICA components.
     """
     # Store the count of removed ICA components for each participant
-    ica_list = []
+    comps_removed = []
 
     for subj in id_list:
 
-        file_path = Path(epochs_for_ICA, f"P{subj}_epochs_1Hz-epo.fif")
+        # set file path for clean epochs (1Hz filtered)
+        file_path = epochs_for_ICA1 / f"P{subj}_epochs_1Hz-epo.fif" if study == 1 else epochs_for_ICA2 / f"P{subj}_epochs_1Hz-epo.fif"
 
-        # Load the clean epochs (1-Hz filtered)
-        epochs_ica = mne.read_epochs(file_path)
+        # load epochs (1Hz filtered)
+        epochs = mne.read_epochs(file_path, preload=True)
 
         # load ICA solution
-        ica_sol = load_pickle(save_dir_ica_sol / f"icas_{subj}.pkl")
+        if study == 1:
+            ica_sol = load_pickle(save_dir_ica_sol1 / f"icas_{subj}.pkl")
+        else:
+            ica_sol = load_pickle(save_dir_ica_sol2 / f"icas_{subj}.pkl")
 
         # use the 'iclabel' method to label components
-        label_components(epochs_ica, ica_sol, method="iclabel")
+        label_components(epochs, ica_sol, method="iclabel")
 
         # Get indices of non-brain or other labeled components to exclude
         all_non_brain = []
@@ -286,10 +290,13 @@ def label_iclabel():
         print(f"Excluding these ICA components for participant {subj}: {exclude_idx}")
 
         # Save the count of excluded components per participant for methods
-        ica_list.append(len(exclude_idx))
+        comps_removed.append(len(exclude_idx))
 
-        # now load the highpass filtered data
-        filter_path = epochs_for_ICA / f"P{subj}_epochs_0.1Hz-epo.fif"
+        # now load the highpass filtered data (0.1 Hz)
+        if study == 1:
+            filter_path = epochs_for_ICA1 / f"P{subj}_epochs_0.1Hz-epo.fif"
+        else:
+            filter_path = epochs_for_ICA2 / f"P{subj}_epochs_0.1Hz-epo.fif"
 
         epochs_filter = mne.read_epochs(filter_path, preload=True)
 
@@ -303,17 +310,23 @@ def label_iclabel():
         epochs_filter.set_eeg_reference("average", ch_type="eeg")
 
         # save the cleaned epochs
-        epochs_filter.save(Path(save_dir_epochs_after_ica, 
-                                f"{subj}_epochs_iclabel_0.1Hz-epo.fif"))
-        print(f"Saved ICA cleaned epochs for participant {subj}")
+        if study == 1:
+            epochs_filter.save(save_dir_epochs_after_ica1 / f"P{subj}_iclabel_0.1Hz-epo.fif")
+        else:
+            epochs_filter.save(save_dir_epochs_after_ica2 / f"P{subj}_iclabel_0.1Hz-epo.fif")
+
+        print(f"Saved ICA cleaned epochs for participant {subj}.")
 
     # save a dataframe with info on how many components were removed
+    if study == 1:
+        pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica1 / "ica_components_stats_iclabel.csv",
+                                       index=False)
+    else:
+        pd.DataFrame(comps_removed).to_csv(save_dir_epochs_after_ica2 / "ica_components_stats_iclabel.csv",
+                                       index=False)
 
-    pd.DataFrame(ica_list).to_csv(Path(save_dir_epochs_after_ica, 
-                                       "ica_components_stats_icalabel.csv",
-                                       index=False))
 
-    return "Done with removing ICA components"
+    return "Done with removing ICA components", comps_removed
 
 
 # Helper functions
