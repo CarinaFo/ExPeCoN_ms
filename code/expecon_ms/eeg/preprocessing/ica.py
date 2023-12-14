@@ -161,7 +161,7 @@ def label_ica_correlation(study: int):
     for subj in id_list:
 
         # set file path for clean epochs (1Hz filtered)
-        file_path = epochs_for_ICA1 / f"P{subj}_epochs_1Hz-epo.fif" if study == 1 else file_path = epochs_for_ICA2 / f"P{subj}_epochs_1Hz-epo.fif"
+        file_path = epochs_for_ICA1 / f"P{subj}_epochs_1Hz-epo.fif" if study == 1 else epochs_for_ICA2 / f"P{subj}_epochs_1Hz-epo.fif"
 
         # load epochs (1Hz filtered)
         epochs = mne.read_epochs(file_path, preload=True)
