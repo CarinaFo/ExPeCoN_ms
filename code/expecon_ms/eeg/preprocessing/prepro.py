@@ -61,20 +61,7 @@ filename_montage.mkdir(parents=True, exist_ok=True)
 behav_path = Path(path_to.data.behavior)
 behav_path.mkdir(parents=True, exist_ok=True)
 
-# participant IDs
-id_list = config.participants.ID_list_expecon1
-id_list_expecon2 = config.participants.ID_list_expecon2
-
-# pilot data counter
-pilot_counter = config.participants.pilot_counter
-
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-# add this line to jupyter script
-# prepro(study = 1, trigger='stimulus', l_freq=1, h_freq=40, tmin=-1,
-#  tmax=1, resample_rate=250,
-# sf=2500, detrend=1, ransac=1, autoreject=0)
-# n_channels_interpolated(study=1, trigger='stimulus', l_freq=1)
 
 def prepro(
     study: int,
@@ -90,7 +77,8 @@ def prepro(
     autoreject: int,
 ):
     """
-    Bandpass-filter the data using a finite response filter.
+    Preprocess EEG data using the MNE toolbox.
+
     As implemented in MNE, add channel locations according to the 10/10 system,
     load a specified behavioral data file (.csv) and add events as metadata to 
     each epoch, inspect data for bad channels and bad epochs using RANSAC from the 
@@ -123,6 +111,7 @@ def prepro(
     ransac: int
         If 1, RANSAC is used to detect bad channels.
     autoreject: int
+
     Returns:
     -------
     ch_interp: list
@@ -130,6 +119,12 @@ def prepro(
     annot: list
         List with the annotations (trigger) information.
     """
+    # participant IDs
+    id_list = config.participants.ID_list_expecon1
+    id_list_expecon2 = config.participants.ID_list_expecon2
+
+    # pilot data counter
+    pilot_counter = config.participants.pilot_counter
 
     if study == 1:
         # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
