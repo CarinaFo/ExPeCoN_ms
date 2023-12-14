@@ -71,7 +71,8 @@ pilot_counter = config.participants.pilot_counter
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # add this line to jupyter script
-# prepro(study = 1, trigger='stimulus', l_freq=1, h_freq=40, tmin=-0.2, tmax=0.8, resample_rate=250, 
+# prepro(study = 1, trigger='stimulus', l_freq=1, h_freq=40, tmin=-1,
+#  tmax=1, resample_rate=250,
 # sf=2500, detrend=1, ransac=1, autoreject=0)
 # n_channels_interpolated(study=1, trigger='stimulus', l_freq=1)
 
@@ -136,6 +137,7 @@ def prepro(
         df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon1.csv")
     else:
         df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon2.csv")
+        id_list = id_list_expecon2
 
     # set eeg channel layout for topo plots
     montage = mne.channels.read_custom_montage(filename_montage / "CACS-64_REF.bvef")
@@ -169,7 +171,7 @@ def prepro(
         else:
             if subj == '013': # stimulation device was not working for this participant
                 continue
-            raw = mne.io.read_raw_fif(save_dir_concatenated_raw2 / f"P{subj}_concatenated_raw.fif",
+            raw = mne.io.read_raw_fif(save_dir_concatenated_raw2 / f"P{subj}_raw.fif",
                                     preload=True)
 
         # save the annotations (trigger) information
