@@ -35,32 +35,6 @@ last_commit_date = (
 )
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
-# raw concatenated eeg data
-save_dir_concatenated_raw1 = Path(path_to.data.eeg.RAW_expecon1)
-save_dir_concatenated_raw2 = Path(path_to.data.eeg.RAW_expecon2)
-save_dir_concatenated_raw1.mkdir(parents=True, exist_ok=True)
-save_dir_concatenated_raw2.mkdir(parents=True, exist_ok=True)
-
-# stimulus locked
-save_dir_stim_1 = Path(path_to.data.eeg.preprocessed.stimulus_expecon1)
-save_dir_stim_2 = Path(path_to.data.eeg.preprocessed.stimulus_expecon2)
-save_dir_stim_1.mkdir(parents=True, exist_ok=True)
-save_dir_stim_2.mkdir(parents=True, exist_ok=True)
-
-# cue locked
-save_dir_cue_1 = Path(path_to.data.eeg.preprocessed.cue_expecon1)
-save_dir_cue_2 = Path(path_to.data.eeg.preprocessed.cue_expecon2)
-save_dir_cue_1.mkdir(parents=True, exist_ok=True)
-save_dir_cue_2.mkdir(parents=True, exist_ok=True)
-
-# EEG cap layout file
-filename_montage = Path(path_to.data.templates)
-filename_montage.mkdir(parents=True, exist_ok=True)
-
-# raw behavioral data
-behav_path = Path(path_to.data.behavior)
-behav_path.mkdir(parents=True, exist_ok=True)
-
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 def prepro(
@@ -119,13 +93,6 @@ def prepro(
     annot: list
         List with the annotations (trigger) information.
     """
-    # participant IDs
-    id_list = config.participants.ID_list_expecon1
-    id_list_expecon2 = config.participants.ID_list_expecon2
-
-    # pilot data counter
-    pilot_counter = config.participants.pilot_counter
-
     if study == 1:
         # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
         # no matching trigger in the EEG recording)
@@ -281,7 +248,9 @@ def prepro(
 
 def n_channels_interpolated(study: int, trigger: str, l_freq: float) -> None:
     """
+
     Calculate the mean, std, min and max of channels interpolated across participants.
+
     Parameters
     ----------
     study : int
@@ -292,11 +261,11 @@ def n_channels_interpolated(study: int, trigger: str, l_freq: float) -> None:
         Options: "stimulus" or "cue"
     l_freq : float
         Low cut-off frequency in Hz.
+
     Returns
     -------
     None.
     """
-
     if trigger == "stimulus":
         save_dir = save_dir_stim_1 if study == 1 else save_dir_stim_2
     else:
@@ -316,9 +285,9 @@ def n_channels_interpolated(study: int, trigger: str, l_freq: float) -> None:
 # Unused functions
 
 def add_reaction_time_trigger(sf: int, metadata=None, events=None) -> None:
+    """
+    Add the reaction time as a trigger to the event structure.
 
-    """Add the reaction time as a trigger to the event structure.
-    
     Parameters
     ----------
     metadata : pd.DataFrame
@@ -327,11 +296,11 @@ def add_reaction_time_trigger(sf: int, metadata=None, events=None) -> None:
         Sampling frequency of the raw data in Hz.
     events : np.array
         Array with the event structure.
+
     Returns
     -------
     None.
     """
-
     # reset index
     metadata_index = metadata.reset_index()
 
