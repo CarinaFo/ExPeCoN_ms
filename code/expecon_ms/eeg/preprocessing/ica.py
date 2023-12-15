@@ -69,11 +69,10 @@ save_dir_ica_comps2.mkdir(parents=True, exist_ok=True)
 save_dir_psd1.mkdir(parents=True, exist_ok=True)
 save_dir_psd2.mkdir(parents=True, exist_ok=True)
 
+# %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 # participant IDs
 id_list = config.participants.ID_list_expecon1
 id_list_expecon2 = config.participants.ID_list_expecon2
-
-# %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # add this line to jupyter script
 # run_ica(study=1, infomax=1, save_psd=1)
@@ -104,6 +103,8 @@ def run_ica(study: int, infomax: int, save_psd: int):
             if study == 1:
                 epochs = mne.read_epochs(epochs_for_ICA1 / f"P{subj}_epochs_1Hz-epo.fif")
             else:
+                if subj == '013':
+                    continue
                 epochs = mne.read_epochs(epochs_for_ICA2 / f"P{subj}_epochs_1Hz-epo.fif")
 
             # Pick EEG channels for ICA
@@ -170,6 +171,8 @@ def label_ica_correlation(study: int):
         if study == 1:
             ica_sol = load_pickle(save_dir_ica_sol1 / f"icas_{subj}.pkl")
         else:
+            if subj == '013':
+                continue
             ica_sol = load_pickle(save_dir_ica_sol2 / f"icas_{subj}.pkl")
 
         # correlate components with ECG and EOG
@@ -214,6 +217,8 @@ def label_ica_correlation(study: int):
         if study == 1:
             filter_path = epochs_for_ICA1 / f"P{subj}_epochs_0.1Hz-epo.fif"
         else:
+            if subj == '013':
+                continue
             filter_path = epochs_for_ICA2 / f"P{subj}_epochs_0.1Hz-epo.fif"
 
         epochs_filter = mne.read_epochs(filter_path, preload=True)
@@ -245,10 +250,12 @@ def label_ica_correlation(study: int):
 
 def label_iclabel(study: int):
     """
-    Apply automatic labeling of ICA components using the iclabel method:
+    Apply automatic labeling of ICA components using the iclabel method.
+
     doi:https://doi.org/10.1016/j.neuroimage.2019.05.026.
     Non-brain related ica components are rejected. The ica cleaned epoch are
     averaged to a common reference and saved as .fif files.
+
     Args:
     ----
         study (int): Flag indicating whether to use the data from study 1 or study 2.
@@ -272,6 +279,8 @@ def label_iclabel(study: int):
         if study == 1:
             ica_sol = load_pickle(save_dir_ica_sol1 / f"icas_{subj}.pkl")
         else:
+            if subj == '013':
+                continue
             ica_sol = load_pickle(save_dir_ica_sol2 / f"icas_{subj}.pkl")
 
         # use the 'iclabel' method to label components
@@ -296,6 +305,8 @@ def label_iclabel(study: int):
         if study == 1:
             filter_path = epochs_for_ICA1 / f"P{subj}_epochs_0.1Hz-epo.fif"
         else:
+            if subj == '013':
+                continue
             filter_path = epochs_for_ICA2 / f"P{subj}_epochs_0.1Hz-epo.fif"
 
         epochs_filter = mne.read_epochs(filter_path, preload=True)
