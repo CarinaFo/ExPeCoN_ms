@@ -40,10 +40,10 @@ print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # where to store source files for forward solution
 save_dir_fsaverage_source_files = Path("E:/expecon_ms/data/templates")
-
+save_dir_fsaverage_source_files.mkdir(parents=True, exist_ok=True)
 
 # clean epochs path
-dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
+dir_clean_epochs_expecon1 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon1)
 dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
 
 # behavioral data
@@ -51,12 +51,15 @@ behav_path = Path(path_to.data.behavior)
 
 # save paths for beamforming
 beamformer_path = Path(path_to.data.eeg.source.beamformer)
+beamformer_path.mkdir(parents=True, exist_ok=True)
 
 # save paths for mne
 mne_path = Path(path_to.data.eeg.source.mne)
+mne_path.mkdir(parents=True, exist_ok=True)
 
 # save source space figures
 save_path_source_figs = Path(path_to.figures.manuscript.figure4_source)
+save_path_source_figs.mkdir(parents=True, exist_ok=True)
 
 # participant IDs
 id_list_expecon1 = config.participants.ID_list_expecon1
@@ -73,10 +76,6 @@ hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # pilot data counter for expecon 1
 pilot_counter = config.participants.pilot_counter
 
-# add to jupyter file
-# run_source_reco(study=1, cond="probability", dics=True, fmin=15, fmax=25,
-# tmin = -0.4, tmax = 0, save_path = beamformer_path, drop_bads = True, plot_alignment=False)
-# spatio_tempo
 
 def make_new_forward_solution(setup_source_space: bool):
 
@@ -180,7 +179,7 @@ def run_source_reco(study: int,
     if study == 1:
         id_list = id_list_expecon1
         # load behavioral data
-        data = pd.read_csv(Path(path_to.data.behavior, "prepro_behav_data.csv"))
+        data = pd.read_csv(Path(path_to.data.behavior, "prepro_behav_data_expecon1.csv"))
 
     elif study == 2:
         id_list = id_list_expecon2
@@ -229,7 +228,7 @@ def run_source_reco(study: int,
             # load clean epochs (after ica component rejection)
             if study == 1:
                 epochs = mne.read_epochs(
-                    Path(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif"))
+                    Path(dir_clean_epochs_expecon1 / f"P{subj}_icacorr_0.1Hz-epo.fif"))
             elif study == 2:
                 # skip ID 13
                 if subj == '013':
