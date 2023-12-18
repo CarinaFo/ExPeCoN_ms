@@ -71,7 +71,7 @@ save_dir_psd2.mkdir(parents=True, exist_ok=True)
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 # participant IDs
-id_list = config.participants.ID_list_expecon1
+id_list_expecon1 = config.participants.ID_list_expecon1
 id_list_expecon2 = config.participants.ID_list_expecon2
 
 # add this line to jupyter script
@@ -92,6 +92,8 @@ def run_ica(study: int, infomax: int, save_psd: int):
     -------
         None
     """
+    id_list = id_list_expecon1 if study == 1 else id_list_expecon2
+
     for subj in id_list:
 
         file_path = save_dir_ica_sol1 / f"icas_{subj}.pkl" if study == 1 else save_dir_ica_sol2 / f"icas_{subj}.pkl"
@@ -158,6 +160,8 @@ def label_ica_correlation(study: int):
     ch_name_ecg = "ECG"
 
     comps_removed = []
+
+    id_list = id_list_expecon1 if study == 1 else id_list_expecon2
 
     for subj in id_list:
 
@@ -266,6 +270,8 @@ def label_iclabel(study: int):
     """
     # Store the count of removed ICA components for each participant
     comps_removed = []
+
+    id_list = id_list_expecon1 if study == 1 else id_list_expecon2
 
     for subj in id_list:
 
