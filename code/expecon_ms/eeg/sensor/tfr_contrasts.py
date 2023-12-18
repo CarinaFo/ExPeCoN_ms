@@ -41,11 +41,15 @@ print("Last Commit Date for", __file__path, ":", last_commit_date)
 plt.rcParams.update({"font.size": 14, "font.family": "sans-serif", "font.sans-serif": "Arial"})
 
 # clean epochs
-dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
+dir_clean_epochs_expecon1 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon1)
 dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
 
 # save tfr solutions
 tfr_path = Path(path_to.data.eeg.sensor.tfr)
+tfr_path.mkdir(parents=True, exist_ok=True)
+
+figure4_path = Path(path_to.figures.manuscript.figure4)
+figure4_path.mkdir(parents=True, exist_ok=True)
 
 # participant IDs
 id_list_expecon1 = config.participants.ID_list_expecon1
@@ -62,24 +66,6 @@ hitrate_min = config.behavioral_cleaning.hitrate_min
 farate_max = config.behavioral_cleaning.farate_max
 hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-# add this to jupyter script
-# compute_tfr(study=1, cond='probability', tmin=-0.4, tmax=0, fmax=35,
-# fmin=3, laplace=False, induced=False, mirror=False, drop_bads=True)
-
-# tfr_a_cond, tfr_b_cond = load_tfr_conds(cond='probability',
-# cond_a_name='high_mirror', cond_b_name='low_mirror',
-# cond_a_names=['high_prevhit_mirror', "high_prevmiss_mirror", "high_cr_mirror",
-# "high_prevfa_mirror"], cond_b_names=['low_prevhit_mirror', "low_prevmiss_mirror", "low_cr_mirror",
-# "low_prevfa_mirror"])
-
-# tfr_a_cond, tfr_b_cond = load_tfr_conds(cond='prev_resp',
-# cond_a_name='prevyesresp_highprob_stim_mirror',
-# cond_b_name='prevnoresp_highprob_stim_mirror',
-# cond_a_names=None, cond_b_names=None)
-
-# plot_tfr_cluster_test_output(tfr_a_cond=tfr_a_cond, tfr_b_cond=tfr_b_cond,  
-# threed_test=False, cond_a_name='high', cond_b_name='low', channel_name=['CP4'])
 
 def compute_tfr(
     study: int,
@@ -504,8 +490,7 @@ def plot_tfr_cluster_test_output(cond: str,
     plt.tight_layout()
     # now save the figure to disk as png and svg
     for fm in ["svg", "png"]:
-        fig.savefig(
-            Path(path_to.figures.manuscript.figure4) / f"fig4_tfr_tvals_{cond_a_name}_"
+        fig.savefig(figure4_path / f"fig4_tfr_tvals_{cond_a_name}_"
             f"{cond_b_name}_{channel_names[0]}.{fm}",
             dpi=300,
             format=fm,
