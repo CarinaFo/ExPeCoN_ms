@@ -46,8 +46,8 @@ epochs_for_ICA1 = Path(path_to.data.eeg.preprocessed.stimulus_expecon1)
 epochs_for_ICA2 = Path(path_to.data.eeg.preprocessed.stimulus_expecon2)
 
 # directory where to save the ICA cleaned epochs
-save_dir_epochs_after_ica1 = Path(path_to.data.eeg.preprocessed.ica.ICA1)
-save_dir_epochs_after_ica2 = Path(path_to.data.eeg.preprocessed.ica.ICA2)
+save_dir_epochs_after_ica1 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon1)
+save_dir_epochs_after_ica2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
 
 # directory of the ICA solution
 save_dir_ica_sol1 = Path(path_to.data.eeg.preprocessed.ica.ICA_solution1)
@@ -116,9 +116,9 @@ def run_ica(study: int, infomax: int, save_psd: int):
                 # Compute and plot the power spectral density (PSD)
                 epochs.compute_psd(fmin=1, fmax=40, picks=picks).plot(show=False)
                 if study == 1:
-                    plt.savefig(save_dir_psd1, f"PSD_{subj}.png")
-                else: 
-                    plt.savefig(save_dir_psd2, f"PSD_{subj}.png")
+                    plt.savefig(save_dir_psd1 / f"PSD_{subj}.png")
+                else:
+                    plt.savefig(save_dir_psd2 / f"PSD_{subj}.png")
 
             if infomax == 1:
                 # Fit ICA using infomax method with extended parameters
