@@ -41,14 +41,14 @@ print("Last Commit Date for", __file__path, ":", last_commit_date)
 plt.rcParams.update({"font.size": 14, "font.family": "sans-serif", "font.sans-serif": "Arial"})
 
 # directory that contains the cleaned epochs
-dir_clean_epochs = Path(path_to.data.eeg.preprocessed.ica.ICA)
+dir_clean_epochs_expecon1 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon1)
 dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
 
 # behavioral data for each epoch
 behav_path = Path(path_to.data.behavior)
 
 # participant IDs
-id_list = config.participants.ID_list_expecon1
+id_list_expecon1 = config.participants.ID_list_expecon1
 id_list_expecon2 = config.participants.ID_list_expecon2
 
 # pilot data counter
@@ -62,10 +62,6 @@ hitrate_min = config.behavioral_cleaning.hitrate_min
 farate_max = config.behavioral_cleaning.farate_max
 hit_fa_diff = config.behavioral_cleaning.hit_fa_diff
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-# run in jupyter script
-# create_contrast(study=2, drop_bads=True, laplace=True, subtract_evoked=True, save_data_to_disk=True)
-# plot_roi(tmin=0.04, tmax=0.06, tmin_base=-0.2, tmax_base=-0.1, study=2)
 
 def create_contrast(study: int,
                     drop_bads: bool,
@@ -97,32 +93,34 @@ def create_contrast(study: int,
     # metadata after epoch cleaning
     metadata_allsubs = []
 
-    # load behavioral dataframe
     if study == 1:
-        data = pd.read_csv(f'{behav_path}{Path("/")}prepro_behav_data.csv')
+        # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
+        # no matching trigger in the EEG recording)
+        id_list = id_list_expecon1
+        df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon1.csv")
     else:
         id_list = id_list_expecon2
-        data = pd.read_csv(f'{behav_path}{Path("/")}prepro_behav_data_expecon2.csv')
+        df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon2.csv")
 
     for idx, subj in enumerate(id_list):
 
         # print participant idx
         print(f"Participant {idx!s}")
-        
+
         if study == 1:
+            dir_clean_epochs = dir_clean_epochs_expecon1
             # load cleaned epochs
-            epochs = mne.read_epochs(dir_clean_epochs 
-                                     / f"P{subj}_icacorr_0.1Hz-epo.fif")
+            epochs = mne.read_epochs(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif")
         else:
             # skip ID 13
             if subj == '013':
                 continue
-            epochs = mne.read_epochs(dir_clean_epochs_expecon2 
-                                     / f"P{subj}_icacorr_0.1Hz-epo.fif")
+            dir_clean_epochs = dir_clean_epochs_expecon2
+            epochs = mne.read_epochs(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif")
             epochs.metadata = epochs.metadata.rename(columns ={"resp1_t": "respt1",
                                                                "stim_type": "isyes",
                                                                "resp1": "sayyes"})
-            
+
         # save for descriptives
         before_cleaning = len(epochs.metadata)
 
