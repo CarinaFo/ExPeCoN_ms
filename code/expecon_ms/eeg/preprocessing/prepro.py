@@ -96,6 +96,7 @@ def prepro(
     if study == 1:
         # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
         # no matching trigger in the EEG recording)
+        id_list = id_list_expecon1
         df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon1.csv")
     else:
         df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon2.csv")
