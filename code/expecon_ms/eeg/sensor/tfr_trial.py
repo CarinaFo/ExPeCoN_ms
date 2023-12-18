@@ -51,9 +51,6 @@ freq_bands = {"alpha": (7, 13), "beta": (15, 25)}
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-# add this line to jupyter script
-# save_band_power_per_trial(study=2, time_intervals={'pre': [(-0.2,0), (-0.3, -0.1)]}, channel_name=['CP4'])
-
 def save_band_power_per_trial(study: int, time_intervals: dict,
                               channel_name: list):
     """
