@@ -36,10 +36,8 @@ ICA_solution1 = "./data/eeg/prepro_ica/ica_solution1"
 ICA_solution2 = "./data/eeg/prepro_ica/ica_solution2"
 ICA_components1 = "./data/eeg/prepro_ica/ica_comps1"
 ICA_components2 = "./data/eeg/prepro_ica/ica_comps2"
-clean_epochs1 = "./data/eeg/prepro_ica/clean_epochs_corr1"
-clean_epochs2 = "./data/eeg/prepro_ica/clean_epochs_corr2"
-ICA1 = "./data/eeg/prepro_ica1"
-ICA2 = "./data/eeg/prepro_ica2"
+clean_epochs_expecon1 = "./data/eeg/prepro_ica/clean_epochs_corr1"
+clean_epochs_expecon2 = "./data/eeg/prepro_ica/clean_epochs_corr2"
 
 [paths.data.eeg.sensor]
 tfr = "./data/eeg/sensor/tfr"
@@ -93,13 +91,5 @@ hitrate_max = 0.9
 hitrate_min = 0.2
 farate_max = 0.4
 hit_fa_diff = 0.05
-# Follwing creates arrays of tables
-# [[tester]]
-# id = 3
-# name = "Nomis"
-#
-# [[tester]]
-# id = 2
-# name = "aniraC"
 
 # Note store private configs in same folder: "./[PRIVATE_PREFIX]_configs.toml"
