@@ -20,7 +20,6 @@ import mne
 import numpy as np
 import pandas as pd
 
-from expecon_ms.behav import figure1
 from expecon_ms.configs import PROJECT_ROOT, config, params, path_to
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -43,6 +42,18 @@ plt.rcParams.update({"font.size": 14, "font.family": "sans-serif", "font.sans-se
 # directory that contains the cleaned epochs
 dir_clean_epochs_expecon1 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon1)
 dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
+
+# paths for saving evoked data
+hit_path = Path(path_to.data.eeg.sensor.erp.hit)
+miss_path = Path(path_to.data.eeg.sensor.erp.miss)
+signal_path = Path(path_to.data.eeg.sensor.erp.signal)
+noise_path = Path(path_to.data.eeg.sensor.erp.noise)
+
+# if paths don't exist yet, creat them
+hit_path.mkdir(parents=True, exist_ok=True)
+miss_path.mkdir(parents=True, exist_ok=True)
+signal_path.mkdir(parents=True, exist_ok=True)
+noise_path.mkdir(parents=True, exist_ok=True)
 
 # behavioral data for each epoch
 behav_path = Path(path_to.data.behavior)
@@ -67,7 +78,8 @@ def create_contrast(study: int,
                     drop_bads: bool,
                     laplace: bool,
                     subtract_evoked: bool,
-                    save_data_to_disk: bool):
+                    save_data_to_disk: bool,
+                    save_drop_log: bool):
     """
     Load cleaned epoched data and create contrasts.
 
@@ -78,11 +90,12 @@ def create_contrast(study: int,
     laplace: apply CSD to data if boolean is True
     subtract_evoked: boolean, subtract evoked signal from each epoch
     save_data_to_disk: boolean, save data to disk if True
+    save_drop_log: boolean, save drop log plots to disk if True
+
     Returns:
     -------
     list of condition evokeds
     """
-
     # store trials remaining and removed per participant
     all_trials, trials_removed = [], []
 
@@ -94,13 +107,13 @@ def create_contrast(study: int,
     metadata_allsubs = []
 
     if study == 1:
-        # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
-        # no matching trigger in the EEG recording)
+        # load the cleaned behavioral data for EEG preprocessing
+        # includes additional variables, e.g. previous trial history
         id_list = id_list_expecon1
-        df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon1.csv")
+        df_cleaned = pd.read_csv(behav_path / "prepro_behav_data_expecon1.csv")
     else:
         id_list = id_list_expecon2
-        df_cleaned = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon2.csv")
+        df_cleaned = pd.read_csv(behav_path / "prepro_behav_data_expecon2.csv")
 
     for idx, subj in enumerate(id_list):
 
@@ -135,9 +148,9 @@ def create_contrast(study: int,
 
         # get behavioral data for current participant
         if study == 1:
-            subj_data = data[idx + pilot_counter == data.ID]
+            subj_data = df_cleaned[idx + pilot_counter == df_cleaned.ID]
         else:
-            subj_data = data[idx + 1 == data.ID]
+            subj_data = df_cleaned[idx + 1 == df_cleaned.ID]
 
         # get drop log from epochs
         drop_log = epochs.drop_log
@@ -158,6 +171,9 @@ def create_contrast(study: int,
         # reject epochs that exceed a certain threshold (amplitude)
         if drop_bads:
             epochs.drop_bad(reject=dict(eeg=200e-6))
+
+        # save drop log plots to disk
+        if save_drop_log:
             droplog_fig = epochs.plot_drop_log(show=False)
             droplog_fig.savefig(dir_clean_epochs / f"drop_log_{subj}.png")
 
@@ -171,9 +187,9 @@ def create_contrast(study: int,
         epochs_noise = epochs[(epochs.metadata.isyes == 0)]
 
         # hit vs. miss trials
-        epochs_hit = epochs[((epochs.metadata.isyes == 1) & 
+        epochs_hit = epochs[((epochs.metadata.isyes == 1) &
                              (epochs.metadata.sayyes == 1))]
-        epochs_miss = epochs[((epochs.metadata.isyes == 1) & 
+        epochs_miss = epochs[((epochs.metadata.isyes == 1) &
                               (epochs.metadata.sayyes == 0))]
 
         mne.epochs.equalize_epoch_counts([epochs_hit, epochs_miss])
@@ -185,10 +201,14 @@ def create_contrast(study: int,
         evokeds_noise_all.append(epochs_noise.average())
 
         if save_data_to_disk:
-            with Path(path_to.data.eeg.sensor.erp.hits).open("wb") as fp:  # pickling
-                pickle.dump(evokeds_hit_all, fp)  
-            with Path(path_to.data.eeg.sensor.erp.misses).open("wb") as fp:  # pickling
+            with hit_path.open("wb") as fp:  # pickling
+                pickle.dump(evokeds_hit_all, fp)
+            with miss_path.open("wb") as fp:
                 pickle.dump(evokeds_miss_all, fp)
+            with signal_path.open("wb") as fp:
+                pickle.dump(evokeds_signal_all, fp)
+            with noise_path.open("wb") as fp:
+                pickle.dump(evokeds_noise_all, fp)
 
         # save trial number and trials removed to csv file
         pd.DataFrame(trials_removed).to_csv(f'{dir_clean_epochs}{Path("/")}trials_removed_{str(study)}.csv')
@@ -206,7 +226,8 @@ def plot_roi(study: int,
              ):
     """
     Plot topography of P50 for the contrast of signal - noise trials.
-    
+
+    Args:
     ----
     study: int: study number (1 or 2), 1 == expecon1, 2 == expecon2
     data: list of evoked objects
@@ -219,8 +240,6 @@ def plot_roi(study: int,
     -------
     None
     """
-    data = create_contrast(study=2)
-
     # baseline correct and crop the data for each participant
     signal = [s.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for s in data[0]]
     noise = [n.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for n in data[1]]
@@ -251,24 +270,39 @@ def plot_roi(study: int,
     plt.show()
 
 
-def get_significant_channel(tmin: float, 
-                            tmax: float, 
-                            tmin_base: float, 
+def get_significant_channel(study: int,
+                            data: np.ndarray,
+                            tmin: float,
+                            tmax: float,
+                            tmin_base: float,
                             tmax_base: float):
+    """
+    Get significant channels for the contrast of signal - noise trials.
 
-    conds = create_contrast()
+    Args:
+    ----
+    study: int: study number (1 or 2), 1 == expecon1, 2 == expecon2
+    data: list of evoked objects
+    tmin: float: start time of time window
+    tmax: float: end time of time window
+    tmin_base: float: start time of baseline window
+    tmax_base: float: end time of baseline window
 
+    Returns:
+    -------
+    None
+    """
     # get data from each participant
     x = np.array(
         [
             ax.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax).data
             - bx.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax).data
-            for ax, bx in zip(conds[2], conds[3])
+            for ax, bx in zip(data[0], data[1])
         ]
     )
 
     # significant channels (average over time)
-    t, p, h = mne.stats.permutation_t_test(np.squeeze(np.mean(x, axis=2)),
+    t, p, _ = mne.stats.permutation_t_test(np.squeeze(np.mean(x, axis=2)),
                                             n_permutations=10000, n_jobs=-1)
     # get significant channels
     np.where(p < params.alpha)
@@ -280,8 +314,9 @@ def get_significant_channel(tmin: float,
     x = np.transpose(x, [0, 2, 1])  # channels should be last dimension
 
     # load example epoch to extract channel adjacency matrix
+    # doesn't matter which study, same channel layout for both studies
     subj = "007"
-    epochs = mne.read_epochs(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif")
+    epochs = mne.read_epochs(dir_clean_epochs_expecon1 / f"P{subj}_icacorr_0.1Hz-epo.fif")
 
     ch_adjacency, _ = mne.channels.find_ch_adjacency(epochs.info, ch_type="eeg")
 
@@ -302,7 +337,8 @@ def plot_cluster_output_2D(tmin: float, tmax: float,
                            clusters: int):
     """
     Plot cluster output of 2D cluster permutation test.
-    
+
+    Args:
     ----
     tmin: float: start time of time window
     tmax: float: end time of time window
@@ -312,7 +348,6 @@ def plot_cluster_output_2D(tmin: float, tmax: float,
     t_obs: int: t-values
     clusters: int: cluster information
     """
-
     # extract data
     signal = [s.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for s in conds[2]]
     noise = [n.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for n in conds[3]]
@@ -391,9 +426,7 @@ def plot_cluster_output_2D(tmin: float, tmax: float,
         )
         plt.show()
 
-
-#### Helper functions
-
+# Helper functions
 
 def drop_trials(data=None):
     """
@@ -402,12 +435,11 @@ def drop_trials(data=None):
     Args:
     ----
     data: mne.Epochs, epoched data
-    
+
     Returns:
     -------
     data: mne.Epochs, epoched data
     """
-
     # store number of trials before rt cleaning
     before_rt_cleaning = len(data.metadata)
 
@@ -449,7 +481,7 @@ def drop_trials(data=None):
     # Hitrate should be > false alarm rate
     filtered_groups = hitrate_per_block[hitrate_per_block - farate_per_block < hit_fa_diff]
     print('Blocks with hit rates < false alarm rates: ', len(filtered_groups))
-          
+
     # Extract the ID and block information from the filtered groups
     hitvsfarate = filtered_groups.reset_index()
 
@@ -463,7 +495,7 @@ def drop_trials(data=None):
     data.metadata = data.metadata.merge(unique_df, on=['ID', 'block'], how='left',
                              indicator=True,
                              suffixes=('', '_y'))
-    
+
     data = data[data.metadata['_merge'] == 'left_only']
 
     # Remove the '_merge' column
