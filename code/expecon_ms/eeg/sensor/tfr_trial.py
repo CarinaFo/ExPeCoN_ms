@@ -37,7 +37,7 @@ plt.rcParams.update({"font.size": 14, "font.family": "sans-serif", "font.sans-se
 
 # set directory paths
 behav_dir = Path(path_to.data.behavior)
-tfr_dir = Path(path_to.data.eeg.sensor.tfr)
+tfr_dir = Path(path_to.data.eeg.sensor.tfr.tfr_contrasts)
 
 # participant IDs
 id_list_expecon1 = config.participants.ID_list_expecon1
