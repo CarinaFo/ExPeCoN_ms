@@ -17,37 +17,48 @@ behavior = "./data/behav"
 EEG = "./data/eeg"
 templates = "./data/templates"
 
+# raw EEG data
 [paths.data.eeg]
 RAW_expecon1 = "./data/eeg/raw_concatenated_expecon1"
 RAW_expecon2 = "./data/eeg/raw_concatenated_expecon2"
 
-
+# preprocessed EEG data (no ICA), stimulus or cue locked
 [paths.data.eeg.preprocessed]
 stimulus_expecon1 = "./data/eeg/prepro_stim_expecon1"
 stimulus_expecon2 = "./data/eeg/prepro_stim_expecon2"
-
 cue_expecon1 = "./data/eeg/prepro_cue_expecon1"
 cue_expecon2 = "./data/eeg/prepro_cue_expecon2"
 
+# ica preprocessed EEG data
 [paths.data.eeg.preprocessed.ica]
+clean_epochs_expecon1 = "./data/eeg/prepro_ica/clean_epochs_corr1"
+clean_epochs_expecon2 = "./data/eeg/prepro_ica/clean_epochs_corr2"
+
+# ica components, rejected components and PSDs after ICA
 PSD1 = "./data/eeg/prepro_ica/psd1"
 PSD2 = "./data/eeg/prepro_ica/psd2"
 ICA_solution1 = "./data/eeg/prepro_ica/ica_solution1"
 ICA_solution2 = "./data/eeg/prepro_ica/ica_solution2"
 ICA_components1 = "./data/eeg/prepro_ica/ica_comps1"
 ICA_components2 = "./data/eeg/prepro_ica/ica_comps2"
-clean_epochs_expecon1 = "./data/eeg/prepro_ica/clean_epochs_corr1"
-clean_epochs_expecon2 = "./data/eeg/prepro_ica/clean_epochs_corr2"
 
-[paths.data.eeg.sensor]
+# evoked data for ERP analysis
+[paths.data.eeg.sensor.erp]
+hit = "./data/eeg/sensor/erp/hit"
+miss = "./data/eeg/sensor/erp/miss"
+signal = "./data/eeg/sensor/erp/signal"
+noise = "./data/eeg/sensor/erp/noise"
+
+# Time-frequency representations
+[paths.data.eeg.sensor.tfr]
 tfr = "./data/eeg/sensor/tfr"
-hits = "./data/eeg/sensor/erps/hits"
-misses = "./data/eeg/sensor/erps/miss"
 
+# Source localization data
 [paths.data.eeg.source]
 beamformer = "./data/eeg/source/DICS"
 mne = "./data/eeg/source/MNE"
 
+# figure paths
 [paths.figures.manuscript]
 figure1 = "./figs/manuscript_figures/figure1_expecon1_paradigm_behav"
 figure2 = "./figs/manuscript_figures/figure2_expecon2_paradigm_behav"
@@ -57,16 +68,11 @@ figure4 = "./figs/manuscript_figures/figure4_tfr"
 figure4_source = "./figs/manuscript_figures/figure4_tfr/source"
 figure6 = "./figs/manuscript_figures/brain_behavior"
 
-[paths.questionnaire]
-q_clean = "./questionnaire/q_clean.csv"
-
-[paths.expecon2]
-behavior = "../expecon_2/behav"
-figures = "../expecon_2/figures"
-
+# alpha level for all tests
 [params]
 alpha = 0.05
 
+# ID lists for both studies
 [participants]
 ID_list_expecon1 = [
     "007", "008", "009", "010", "011", "012", "013", "014", "015", "016",
@@ -75,6 +81,7 @@ ID_list_expecon1 = [
     "037", "038", "039", "040", "041", "042", "043", "044", "045", "046",
     "047", "048", "049"
 ]
+pilot_counter = 7
 
 ID_list_expecon2 = [
     "001", "002", "003", "004", "005", "006", "007", "008", "009", "010",
@@ -82,8 +89,8 @@ ID_list_expecon2 = [
      "021", "022", "023", "024", "025", "026", "027", "028", "029", "030",
     "031", "032", "033", "034", "035", "036", "037", "038", "039", "040"
 ]
-pilot_counter = 7
 
+# parameters for behavioral data preprocessing
 [behavioral_cleaning]
 rt_max = 2.5
 rt_min = 0.1
