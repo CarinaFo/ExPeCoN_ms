@@ -165,6 +165,10 @@ def label_ica_correlation(study: int):
 
     for subj in id_list:
 
+        # no ica for ID 13 in study 2
+        if ((study == 2) and (subj == '013')):
+            continue
+
         # set file path for clean epochs (1Hz filtered)
         file_path = epochs_for_ICA1 / f"P{subj}_epochs_1Hz-epo.fif" if study == 1 else epochs_for_ICA2 / f"P{subj}_epochs_1Hz-epo.fif"
 
@@ -175,8 +179,6 @@ def label_ica_correlation(study: int):
         if study == 1:
             ica_sol = load_pickle(save_dir_ica_sol1 / f"icas_{subj}.pkl")
         else:
-            if subj == '013':
-                continue
             ica_sol = load_pickle(save_dir_ica_sol2 / f"icas_{subj}.pkl")
 
         # correlate components with ECG and EOG
