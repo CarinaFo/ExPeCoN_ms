@@ -51,7 +51,7 @@ noise = "./data/eeg/sensor/erp/noise"
 
 # Time-frequency representations
 [paths.data.eeg.sensor.tfr]
-tfr = "./data/eeg/sensor/tfr"
+tfr_contrasts = "./data/eeg/sensor/tfr/tfr_contrasts"
 
 # Source localization data
 [paths.data.eeg.source]
