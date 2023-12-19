@@ -45,7 +45,7 @@ dir_clean_epochs_expecon1 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_
 dir_clean_epochs_expecon2 = Path(path_to.data.eeg.preprocessed.ica.clean_epochs_expecon2)
 
 # save tfr solutions
-tfr_path = Path(path_to.data.eeg.sensor.tfr)
+tfr_path = Path(path_to.data.eeg.sensor.tfr.tfr_contrasts)
 tfr_path.mkdir(parents=True, exist_ok=True)
 
 figure4_path = Path(path_to.figures.manuscript.figure4)
@@ -80,10 +80,13 @@ def compute_tfr(
     drop_bads: bool
 ):
     """
-    Calculate the time-frequency representations per trial (induced power) 
-    using multitaper method.
-    Data is then saved in a tfr object per subject and stored to disk
+    Calculate the time-frequency representations per trial (induced power).
+
+    Power is calculated using multitaper method.
+    Power is averaged over conditions after calculating power per trial.
+    Data is saved in a tfr object per subject and stored to disk
     as a .h5 file.
+
     Args:
     ----
     study : int, info: which study to analyze: 1 (block, stable environment) or 2 (trial,
@@ -97,6 +100,7 @@ def compute_tfr(
     induced : boolean, info: subtract evoked response from each epoch
     mirror_data : boolean, info: mirror the data on both sides to avoid edge artifacts
     drop_bads : boolean: drop epochs with abnormal strong signal (> 200 micro-volts)
+
     Returns:
     -------
     None
@@ -107,11 +111,13 @@ def compute_tfr(
 
     # store behavioral data
     df_all = []
+    # store epoch count per participant
+    n_ave = []
 
     if study == 1:
         id_list = id_list_expecon1
         # load behavioral data
-        data = pd.read_csv(Path(path_to.data.behavior, "prepro_behav_data.csv"))
+        data = pd.read_csv(Path(path_to.data.behavior, "prepro_behav_data_expecon1.csv"))
 
     elif study == 2:
         id_list = id_list_expecon2
@@ -130,7 +136,7 @@ def compute_tfr(
         # load clean epochs (after ica component rejection)
         if study == 1:
             epochs = mne.read_epochs(
-                Path(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif"))
+                Path(dir_clean_epochs_expecon1 / f"P{subj}_icacorr_0.1Hz-epo.fif"))
         elif study == 2:
             # skip ID 13
             if subj == '013':
@@ -202,10 +208,12 @@ def compute_tfr(
         df_all.append(epochs.metadata)
 
         if cond == "probability":
-            epochs_a = epochs[(epochs.metadata.cue == 0.75)]
-            epochs_b = epochs[(epochs.metadata.cue == 0.25)]
-            cond_a_name = "high"
-            cond_b_name = "low"
+            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.previsyes == 1)
+                              & (epochs.metadata.prevresp == 0))]
+            epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.previsyes == 1)
+                              & (epochs.metadata.prevresp == 0))]
+            cond_a_name = "high_prevmiss"
+            cond_b_name = "low_prevmiss"
 
             if mirror:
                 cond_a_name = f'{cond_a_name}_mirror'
@@ -231,6 +239,9 @@ def compute_tfr(
         # make sure we have an equal amount of trials in both conditions
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
 
+        n_epochs = len(epochs_a.events)
+        n_ave.append(n_epochs)
+
         # set tfr path
         if (tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5").exists():
             print("TFR already exists")
@@ -246,21 +257,15 @@ def compute_tfr(
             )
 
             # save tfr data
-            if cond == "probability":
-                tfr_a.save(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5")
-                tfr_b.save(fname=tfr_path / f"{subj}_{cond_b_name}_{str(study)}-tfr.h5")
-            elif cond == "prev_resp":
-                tfr_a.save(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5")
-                tfr_b.save(fname=tfr_path / f"{subj}_{cond_b_name}_{str(study)}-tfr.h5")
-            else:
-                raise ValueError("input should be 'probability' or 'prev_resp'")
+            tfr_a.save(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5")
+            tfr_b.save(fname=tfr_path / f"{subj}_{cond_b_name}_{str(study)}-tfr.h5")
 
         # calculate tfr for all trials
         if (tfr_path / f"{subj}_single_trial_power_mirror_{str(study)}-tfr.h5").exists():
             print("TFR already exists")
         else:
             tfr = mne.time_frequency.tfr_multitaper(
-                epochs, freqs=freqs, n_cycles=cycles, return_itc=False, 
+                epochs, freqs=freqs, n_cycles=cycles, return_itc=False,
                 n_jobs=-1, average=False, decim=2
             )
             if mirror:
@@ -268,6 +273,9 @@ def compute_tfr(
             else:
                 tfr.save(fname=tfr_path / f"{subj}_single_trial_power_{str(study)}-tfr.h5", 
                         overwrite=True)
+
+    # save number of epochs per participant as csv file
+    pd.DataFrame(n_ave).to_csv(f'{tfr_path}{Path("/")}n_ave_{cond_a_name}_{str(study)}.csv')
 
     return "Done with tfr/erp computation", cond_a_name, cond_b_name
 
