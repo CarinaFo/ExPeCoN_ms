@@ -509,18 +509,17 @@ def plot_grand_average_source_contrast(
     colorbar_conds = [True, False]
 
     # save source plot with colorbar and without for both hemispheres and views
-    for hemi in hemispheres:
-        for view in views:
-            for colbar in colorbar_conds:
-                # plot average source or t values
-                brain = stc.plot(
-                    hemi=hemi, views=view, subjects_dir=subjects_dir, 
-                    subject="fsaverage",
-                    time_viewer=True, background="white", colorbar=colbar
-                )
+    for hemi, view in zip(hemispheres, views):
+        for colbar in colorbar_conds:
+            # plot average source or t values
+            brain = stc.plot(
+                hemi=hemi, views=view, subjects_dir=subjects_dir, 
+                subject="fsaverage",
+                time_viewer=True, background="white", colorbar=colbar
+            )
 
-                brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_' +
-                                f'_{view}_{hemi}_{colbar}.png')
+            brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_' +
+                            f'_{view}_{hemi}_{colbar}.png')
 
     return None
 
