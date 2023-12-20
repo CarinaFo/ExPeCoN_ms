@@ -208,12 +208,10 @@ def compute_tfr(
         df_all.append(epochs.metadata)
 
         if cond == "probability":
-            epochs_a = epochs[((epochs.metadata.cue == 0.75) & (epochs.metadata.previsyes == 0)
-                              & (epochs.metadata.prevresp == 0))]
-            epochs_b = epochs[((epochs.metadata.cue == 0.25) & (epochs.metadata.previsyes == 0)
-                              & (epochs.metadata.prevresp == 0))]
-            cond_a_name = "high_prevcr"
-            cond_b_name = "low_prevcr"
+            epochs_a = epochs[(epochs.metadata.cue == 0.75)]
+            epochs_b = epochs[(epochs.metadata.cue == 0.25)]
+            cond_a_name = "high"
+            cond_b_name = "low"
 
             if mirror:
                 cond_a_name = f'{cond_a_name}_mirror'
@@ -280,7 +278,7 @@ def compute_tfr(
     return "Done with tfr/erp computation", cond_a_name, cond_b_name
 
 
-def load_tfr_conds(study: list,
+def load_tfr_conds(studies: list,
                    cond: str,
                    cond_a_name: str,
                    cond_b_name: str,
@@ -309,28 +307,26 @@ def load_tfr_conds(study: list,
 
     tfr_a_cond, tfr_b_cond = [], [] # store condition data
 
-    studies = study
-
-    for stud in studies:
+    for study in studies:
         tfr_a_all, tfr_b_all = [], [] # store participant data
 
         # adjust id list
-        if stud == 1:
+        if study == 1:
             id_list = id_list_expecon1
-        elif stud == 2:
+        elif study == 2:
             id_list = id_list_expecon2
         else:
             raise ValueError("input should be 1 or 2 for the respective study")
             # now load data for each participant and each condition
         if cond == 'probability':
-            if stud == 1:
+            if study == 1:
                 for subj in id_list:
                     tfr_a_all_conds, tfr_b_all_conds = [], [] # store the conditions
                     for c_a, c_b in zip(cond_a_names, cond_b_names):
                         # load tfr data
-                        tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{c_a}_{str(stud)}-tfr.h5",
+                        tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{c_a}_{str(study)}-tfr.h5",
                                                             condition=0)
-                        tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{c_b}_{str(stud)}-tfr.h5",
+                        tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{c_b}_{str(study)}-tfr.h5",
                                                             condition=0)
                         tfr_a_all_conds.append(tfr_a)
                         tfr_b_all_conds.append(tfr_b)
@@ -341,21 +337,21 @@ def load_tfr_conds(study: list,
                     if subj == '013':
                         continue
                     # load tfr data
-                    tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a_name}_{str(stud)}-tfr.h5",
+                    tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5",
                                                         condition=0)
-                    tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b_name}_{str(stud)}-tfr.h5",
+                    tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b_name}_{str(study)}-tfr.h5",
                                                         condition=0)
                     tfr_a_all.append(tfr_a)
                     tfr_b_all.append(tfr_b)
 
         elif cond == 'prev_resp':
             for subj in id_list:
-                if stud == 2 and subj == '013':
+                if study == 2 and subj == '013':
                     continue
                 # load tfr data
-                tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a_name}_{str(stud)}-tfr.h5",
+                tfr_a = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_a_name}_{str(study)}-tfr.h5",
                                                     condition=0)
-                tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b_name}_{str(stud)}-tfr.h5",
+                tfr_b = mne.time_frequency.read_tfrs(fname=tfr_path / f"{subj}_{cond_b_name}_{str(study)}-tfr.h5",
                                                     condition=0)
                 tfr_a_all.append(tfr_a)
                 tfr_b_all.append(tfr_b)
@@ -483,7 +479,7 @@ def plot_tfr_cluster_test_output(cond: str,
             threshold_tfce = dict(start=0, step=0.1)
 
             # run cluster test over time and frequencies (no need to define adjacency)
-            t_obs, _ , cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
+            t_obs, _, cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
                 x, n_jobs=-1, n_permutations=10000, threshold=threshold_tfce,
                 tail=0)
 
@@ -492,10 +488,14 @@ def plot_tfr_cluster_test_output(cond: str,
 
             # set mask for plotting sign. points that belong to the cluster
             mask = np.array(cluster_p).reshape(t_obs.shape[0], t_obs.shape[1])
-            mask = mask < params.alpha # boolean for masking sign. voxels
+            mask = mask < params.alpha  # boolean for masking sign. voxels
 
             # plot t contrast and sign. cluster contour
-            plot_cluster_contours(data=x, tfr_a_cond=tfr_a_cond, fmin=3, fmax=35)
+            plot_cluster_contours(data=x, t_obs=t_obs,
+                                  tfr_a_cond=tfr_a_cond,
+                                  fmin=3, fmax=35,
+                                  idx=idx, t=t,
+                                  axs=axs, mask=mask)
 
     plt.tight_layout()
     # now save the figure to disk as png and svg
@@ -511,9 +511,14 @@ def plot_tfr_cluster_test_output(cond: str,
 
 
 def plot_cluster_contours(data: np.ndarray,
+                          t_obs: np.ndarray,
                           tfr_a_cond: np.ndarray,
                           fmin: float,
-                          fmax: float):
+                          fmax: float,
+                          idx: int,
+                          t: float,
+                          axs: tuple,
+                          mask: np.ndarray):
     """Plot cluster permutation test output.
 
     Cluster is highlighted via a contour around it, code adapted Gimpert et al.
@@ -526,7 +531,7 @@ def plot_cluster_contours(data: np.ndarray,
     fmax: float, info: maximum frequency to plot
     """
     # define timepoints and frequencies
-    times = tfr_a_cond[0][5].copy().crop(tmin=t[0], tmax=t[1]).times
+    times = tfr_a_cond[1][5].copy().crop(tmin=t[0], tmax=t[1]).times
 
     freqs = np.arange(fmin, fmax, 1)
 
