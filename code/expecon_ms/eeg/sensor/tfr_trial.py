@@ -52,7 +52,7 @@ freq_bands = {"alpha": (7, 13), "beta": (15, 25)}
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 def save_band_power_per_trial(study: int, time_intervals: dict,
-                              channel_name: list):
+                              channel_names: list, mirror: bool):
     """
     Save the power per trial per frequency band in a csv file.
 
@@ -67,7 +67,8 @@ def save_band_power_per_trial(study: int, time_intervals: dict,
     study: int: Study number: 1 = block design, 2 = trial design
     time_intervals: dict: Dictionary with column names as keys and values
         as tuples with the time interval of interest.
-    channel_name: list: List with channel names of interest.
+    channel_names: list: List with channel names of interest.
+    mirror: bool: If True, load mirrored single trial power
 
     Return:
     ------
@@ -85,8 +86,12 @@ def save_band_power_per_trial(study: int, time_intervals: dict,
     for subj in id_list:
         if ((study == 2) & (subj == "013")):
             continue
-        # load single trial power
-        power = mne.time_frequency.read_tfrs(tfr_dir / f"{subj}_single_trial_power_{str(study)}-tfr.h5")[0]
+        if mirror:
+            # load single trial power
+            power = mne.time_frequency.read_tfrs(tfr_dir / f"{subj}_single_trial_power_mirror_{str(study)}-tfr.h5")[0]
+        else:
+            # load single trial power
+            power = mne.time_frequency.read_tfrs(tfr_dir / f"{subj}_single_trial_power_{str(study)}-tfr.h5")[0]
 
         # get behavioral data
         behav_data = power.metadata
@@ -94,10 +99,10 @@ def save_band_power_per_trial(study: int, time_intervals: dict,
         # at which time window do we want to look at?
         if study == 1:
             power_crop = power.copy().crop(tmin=time_intervals['pre'][0][0],
-                 tmax=time_intervals['pre'][0][1]).pick_channels(channel_name)
+                 tmax=time_intervals['pre'][0][1]).pick_channels(channel_names)
         else:
             power_crop = power.copy().crop(tmin=time_intervals['pre'][1][0],
-                 tmax=time_intervals['pre'][1][1]).pick_channels(channel_name)
+                 tmax=time_intervals['pre'][1][1]).pick_channels(channel_names)
 
         # now we average over time and channels
         power_crop.data = np.mean(power_crop.data, axis=(1, 3))
