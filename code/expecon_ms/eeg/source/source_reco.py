@@ -78,18 +78,17 @@ pilot_counter = config.participants.pilot_counter
 
 
 def make_new_forward_solution(setup_source_space: bool):
-
-    """ Create a new forward solution for source reconstruction.
+    """
+    Create a new forward solution for source reconstruction.
 
     Args:
     ----
-    setup_source_space: bool, info: if True, create new source space
+    setup_source_space: bool, info: if True, create new source space.
 
     Returns:
     -------
     .fif file containing the forward solution
     """
-
     # fetch fsaverage files and save path
     subjects_dir = fetch_fsaverage()
 
@@ -126,18 +125,6 @@ def make_new_forward_solution(setup_source_space: bool):
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-# run source reco function:
-#run_source_reco(study=1, cond="probability", dics=True, fmin=15, fmax=25, 
-#                tmin=-0.4, tmax=0, save_path = beamformer_path, 
-#                drop_bads = True, plot_alignment=False)
-
-# load source array
-#stc_array = create_source_contrast_array(study=1, 
- #                                        cond_a='high', 
-  #                                       cond_b='low', 
-   #                                      path_to_source=beamformer_path)
-
-
 def run_source_reco(study: int,
                     cond: str,
                     mirror: bool,
@@ -146,12 +133,12 @@ def run_source_reco(study: int,
                     fmax: int,
                     tmin: int,
                     tmax: int,
-                    save_path: str,
                     drop_bads: bool,
                     plot_alignment: bool) -> None:
     """
-    Run source reconstruction on epoched EEG data using 
-    eLoreta or DICS beamforming for oscillatory source analysis.
+    Run source reconstruction on epoched EEG data.
+
+    Methods supported: eLoreta or DICS beamforming for oscillatory source analysis.
 
     Args:
     ----
@@ -164,7 +151,6 @@ def run_source_reco(study: int,
     tmin: int, info: lower time bound for DICS beamforming
     tmax: int, info: upper time bound for DICS beamforming
     dics: 1 for DICS beamforming, 0 for eLoreta
-    save_path: path to save source estimates
     drop_bads: if True, bad epochs are dropped
     plot_alignment: if True, plot alignment of electrodes with source space
 
@@ -172,6 +158,8 @@ def run_source_reco(study: int,
     -------
     .stc files for each hemisphere containing source reconstructions for each participant, shape: vertices-x-timepoints
     """
+    # set save path for source estimates
+    save_path = beamformer_path if dics == 1 else mne_path
 
     # read forward solution
     fwd = mne.read_forward_solution(f'{save_dir_fsaverage_source_files}{Path("/")}5120-fwd.fif')
@@ -315,9 +303,6 @@ def run_source_reco(study: int,
 
             if dics == 1:
 
-                # save path for source estimates
-                save_path = beamformer_path
-
                 # define the frequency band of interest
                 freqs = np.arange(fmin, fmax, 1)
 
@@ -357,8 +342,6 @@ def run_source_reco(study: int,
                 source_power_b.save(Path(save_path, f"{cond_b_name}_{subj}_{study}"))
 
             else:
-
-                save_path = mne_path
 
                 # average epochs for MNE
                 evokeds_a = epochs_a.average()
@@ -405,23 +388,24 @@ def run_source_reco(study: int,
 def create_source_contrast_array(study: int,
                                  cond_a: str,
                                  cond_b: str,
-                                 path_to_source: str):
+                                 method: str):
     """
-    Load source estimates per participant and contrasts them, before storing the 
-    contrast in a numpy array.
+    Load source estimates per participant.
+
+    Contrasts are stored in numpy arrays.
+
     Args:
     ----
     study: int, info: which study to analyze: 1 (block, stable environment) or 2 (trial)
     cond: str, info: which condition to analyze: "probability" or "prev_resp"
     cond_a: str, info: name of condition a
     cond_b: str, info: name of condition b
-    path_to_source: path to source estimates: e.g. | Path = beamformer_path
+    method: str, info: which method to analyze: "beamformer" or "mne"
 
     Returns:
     -------
     shape of the numpy array: participants-x-vertices-x-timepoints
     """
-
     # load id list for respective study
     if study == 1:
         id_list = id_list_expecon1
@@ -430,12 +414,14 @@ def create_source_contrast_array(study: int,
     else:
         raise ValueError("input should be 1 or 2 for the respective study")
 
+    # set path to source files
+    path_to_source = beamformer_path if method == "beamformer" else mne_path
+
     stc_all = []
     # loop over participants
     for subj in id_list:
-        if study == 2:
-            if subj == '013':
-                continue
+        if (study == 2) and (subj == '013'):
+            continue
         # load source estimates
         stc_high = mne.read_source_estimate(path_to_source / f"{cond_a}_{subj}_{study}")
         stc_low = mne.read_source_estimate(path_to_source / f"{cond_b}_{subj}_{study}")
@@ -443,6 +429,7 @@ def create_source_contrast_array(study: int,
         stc_diff = stc_high.data - stc_low.data
         # append to list
         stc_all.append(stc_diff)
+
     # convert list to numpy array
     stc_array = np.array(stc_all)
 
@@ -471,15 +458,15 @@ def plot_grand_average_source_contrast(
         stc_array_hit = create_source_contrast_array(study=study,
                                              cond_a='high_prevhit_mirror',
                                              cond_b='low_prevhit_mirror',
-                                             path_to_source=beamformer_path)
+                                             method=method)
         stc_array_miss = create_source_contrast_array(study=study,
                                              cond_a='high_prevmiss_mirror',
                                              cond_b='low_prevmiss_mirror',
-                                             path_to_source=beamformer_path)
+                                             method=method)
         stc_array_cr = create_source_contrast_array(study=study, 
                                              cond_a='high_prevcr_mirror',
                                              cond_b='low_prevcr_mirror',
-                                             path_to_source=beamformer_path)
+                                             method=method)
         stc_array_conds = np.array([stc_array_hit, stc_array_miss, stc_array_cr])
         # mean over conditions (previous hit, previous miss, previous cr)
         stc_array = np.mean(stc_array_conds, axis=0)
@@ -487,12 +474,12 @@ def plot_grand_average_source_contrast(
         stc_array = create_source_contrast_array(study=study,
                                              cond_a='high_mirror',
                                              cond_b='low_mirror',
-                                             path_to_source=beamformer_path)
+                                             method=method)
     elif cond == "prev_resp":
         stc_array = create_source_contrast_array(study=study,
                                              cond_a='prevyesresp_highprob_stim_mirror',
                                              cond_b='prevnoresp_highprob_stim_mirror',
-                                             path_to_source=beamformer_path)
+                                             method=method)
 
     # get rid of zero dimension
     stc_array = np.squeeze(stc_array)
@@ -543,6 +530,7 @@ def run_and_plot_cluster_test(study=1,
                               n_perm=10000):
     """
     Plot significant clusters of a spatio-temporal cluster permutation test.
+
     Args:
     ----
     clu: list, output of spatio-temporal cluster permutation test
@@ -554,7 +542,6 @@ def run_and_plot_cluster_test(study=1,
     -------
     plot of cluster output
     """
-
     stc_array = create_source_contrast_array(study=study, 
                                              cond_a='high',
                                              cond_b='low', 
@@ -662,7 +649,6 @@ def drop_trials(data=None):
     -------
     data: mne.Epochs, epoched data
     """
-
     # store number of trials before rt cleaning
     before_rt_cleaning = len(data.metadata)
 
@@ -729,7 +715,6 @@ def drop_trials(data=None):
 # Unused functions
 
 def extract_time_course_from_label(data=None):
-
     """Extract the time course from a label in source space.
     
     Args:
@@ -740,7 +725,6 @@ def extract_time_course_from_label(data=None):
     -------
     time course for each label
     """
-    
     # this extracts a certain brain area
     label_s1 = "rh.BA3a"
     fname_labels1 = subjects_dir / f"fsaverage/label/{label_s1}.label"
@@ -781,6 +765,7 @@ def zero_pad_or_mirror_data(data, zero_pad: bool):
     ----
     data: data array with the structure epochs x channels x time
     zero_pad: boolean, info: whether to zero pad or mirror the data
+
     Returns:
     -------
     array with mirrored data on both ends = data.shape[2]
