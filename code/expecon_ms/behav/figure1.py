@@ -43,6 +43,9 @@ print("Last Commit Date for", __file__path, ":", last_commit_date)
 plt.rcParams["font.family"] = "Arial"
 plt.rcParams["font.size"] = 14
 
+# set up behavioral data path
+behav_path = Path(path_to.data.behavior)
+
 # set save paths
 save_path_fig1 = Path(path_to.figures.manuscript.figure1)
 
@@ -65,10 +68,8 @@ def prepro_behavioral_data(expecon: int):
     data: pandas dataframe containing the preprocessed behavioral data
     """
     if expecon == 1:
-        # analyze expecon 1 behavioral data
-        behav_path = Path(path_to.data.behavior)
         # Load the behavioral data from the specified path
-        data = pd.read_csv(behav_path / "behav_cleaned_for_eeg.csv")
+        data = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon1.csv")
 
         # Clean up the dataframe by dropping unnecessary columns
         columns_to_drop = [col for col in data.columns if "Unnamed" in col]
@@ -79,9 +80,7 @@ def prepro_behavioral_data(expecon: int):
         data.loc[(144 * 2): (144 * 3), "block"] = 4
 
     else:
-        # analyze expecon 2 behavioral data
-        behav_path = Path(path_to.expecon2.behavior)
-        data = pd.read_csv(behav_path / "behav_expecon2.csv")
+        data = pd.read_csv(behav_path / "behav_cleaned_for_eeg_expecon2.csv")
 
         # ID to exclude (missing stimulation in block 1 and 2)
         id_to_exclude = 13
@@ -138,7 +137,7 @@ def prepro_behavioral_data(expecon: int):
     data = data.drop(data[data.respt1 < 0.1].index)
 
     # save the preprocessed dataframe
-    data.to_csv(behav_path / "behav_data_exclrts.csv")
+    data.to_csv(f"{behav_path}{Path('/')}behav_data_exclrts_{str(expecon)}.csv")
 
     return data
 
@@ -156,11 +155,8 @@ def exclude_data(expecon: int):
     data: Pandas dataframe containing the data
 
     """
-    # Set up data path
-    behav_path = Path(path_to.data.behavior if expecon == 1 else path_to.expecon2.behavior)
-
     # Load data
-    data = pd.read_csv(behav_path / "behav_data_exclrts.csv")
+    data = pd.read_csv(f'{behav_path}{Path("/")}behav_data_exclrts_{str(expecon)}.csv')
 
     # Calculate hit rates by participant and cue condition
     signal = data[data.isyes == 1]
@@ -215,7 +211,54 @@ def exclude_data(expecon: int):
 
     data.to_csv(behav_path / "prepro_behav_data.csv")
 
-    return data, expecon
+    return data
+
+
+def calculate_mean_sdt_param_changes(expecon=1):
+    """
+    Calculate the mean change in hit rate, false alarm rate, dprime, and criterion between the cue conditions.
+
+    Args:
+    ----
+    expecon: int: which dataset to use: expecon 1 or expecon 2
+
+    Returns:
+    -------
+    None
+    """
+    # load cleaned dataframe
+    df = exclude_data(expecon=expecon)
+
+    # calculate hit rates, false alarm rates, d-prime, and criterion per participant and cue condition
+    df_sdt = calculate_sdt_dataframe(df, "isyes", "sayyes", "ID", "cue")
+
+    # calculate hit rate change between conditions per participant
+    diff_hit =  df_sdt.hit_rate[df_sdt.cue == 0.75].reset_index() - df_sdt.hit_rate[df_sdt.cue == 0.25].reset_index()
+
+    # calculate fa rate change between conditions per participant
+    diff_fa = df_sdt.fa_rate[df_sdt.cue == 0.75].reset_index() - df_sdt.fa_rate[df_sdt.cue == 0.25].reset_index()
+
+    # calculate dprime change between conditions per participant
+    diff_dprime = df_sdt.dprime[df_sdt.cue == 0.75].reset_index() - df_sdt.dprime[df_sdt.cue == 0.25].reset_index()
+
+    # calculate criterion change between conditions per participant
+    diff_crit = df_sdt.criterion[df_sdt.cue == 0.75].reset_index() - df_sdt.criterion[df_sdt.cue == 0.25].reset_index()
+
+    # Filter for correct trials only
+    correct_only = df[df.correct == 1]
+
+    # Calculate mean confidence for each participant and congruency condition
+    data_grouped = correct_only.groupby(["ID", "congruency"])["conf"].mean()
+    con_condition = data_grouped.unstack()[True].reset_index()
+    incon_condition = data_grouped.unstack()[False].reset_index()
+
+    diff_congruency = con_condition[True] - incon_condition[False]
+
+    print(diff_hit.mean())
+    print(diff_fa.mean())
+    print(diff_dprime.mean())
+    print(diff_crit.mean())
+    print(diff_congruency.mean())
 
 
 def plot_mean_response_and_confidence(
