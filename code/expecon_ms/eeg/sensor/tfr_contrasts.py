@@ -117,13 +117,13 @@ def compute_tfr(
     if study == 1:
         id_list = id_list_expecon1
         # load behavioral data
-        data = pd.read_csv(Path(path_to.data.behavior, "prepro_behav_data_expecon1.csv"))
+        data = pd.read_csv(Path(path_to.data.behavior, "prepro_behav_data_1.csv"))
 
     elif study == 2:
         id_list = id_list_expecon2
         # load behavioral data
         data = pd.read_csv(Path(path_to.data.behavior,
-                                "prepro_behav_data_expecon2.csv"))
+                                "prepro_behav_data_2.csv"))
     else:
         raise ValueError("input should be 1 or 2 for the respective study")
 

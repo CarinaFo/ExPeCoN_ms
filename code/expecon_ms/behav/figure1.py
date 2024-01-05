@@ -209,7 +209,7 @@ def exclude_data(expecon: int):
     # Remove the '_merge' column
     data = filtered_df.drop("_merge", axis=1)
 
-    data.to_csv(behav_path / "prepro_behav_data.csv")
+    data.to_csv(f'{behav_path}{Path("/")}prepro_behav_data_{str(expecon)}.csv')
 
     return data
 

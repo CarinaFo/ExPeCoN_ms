@@ -110,10 +110,10 @@ def create_contrast(study: int,
         # load the cleaned behavioral data for EEG preprocessing
         # includes additional variables, e.g. previous trial history
         id_list = id_list_expecon1
-        df_cleaned = pd.read_csv(behav_path / "prepro_behav_data_expecon1.csv")
+        df_cleaned = pd.read_csv(behav_path / "prepro_behav_data_1.csv")
     else:
         id_list = id_list_expecon2
-        df_cleaned = pd.read_csv(behav_path / "prepro_behav_data_expecon2.csv")
+        df_cleaned = pd.read_csv(behav_path / "prepro_behav_data_2.csv")
 
     for idx, subj in enumerate(id_list):
 
