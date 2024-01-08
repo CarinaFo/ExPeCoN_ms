@@ -372,7 +372,7 @@ def prepare_for_plotting(exclude_high_fa: bool, expecon: int):
     -------
     data: Pandas dataframe containing the data
     """
-    data, expecon = exclude_data(expecon=expecon)
+    data = exclude_data(expecon=expecon)
 
     # calculate hit rates, false alarm rates, d-prime, and criterion per participant and cue condition
     # and per condition
@@ -394,14 +394,26 @@ def prepare_for_plotting(exclude_high_fa: bool, expecon: int):
 
     # Filter for correct trials only
     correct_only = data[data.correct == 1]
+    yes_responses = correct_only[correct_only.sayyes == 1]
+    no_responses = correct_only[correct_only.sayyes == 0]
 
     # Calculate mean confidence for each participant and congruency condition
     data_grouped = correct_only.groupby(["ID", "congruency"])["conf"].mean()
+    yes_grouped = yes_responses.groupby(["ID", "congruency"])["conf"].mean()
+    no_grouped = no_responses.groupby(["ID", "congruency"])["conf"].mean()
+
     con_condition = data_grouped.unstack()[True].reset_index()
     incon_condition = data_grouped.unstack()[False].reset_index()
-    conf_con = [con_condition, incon_condition]
+    con_yes_condition = yes_grouped.unstack()[True].reset_index()
+    incon_yes_condition = yes_grouped.unstack()[False].reset_index()
+    con_no_condition = no_grouped.unstack()[True].reset_index()
+    incon_no_condition = no_grouped.unstack()[False].reset_index()
 
-    conditions = df_sdt, conf_con
+    conf_con = [con_condition, incon_condition]
+    conf_yes = [con_yes_condition, incon_yes_condition]
+    conf_no = [con_no_condition, incon_no_condition]
+
+    conditions = df_sdt, conf_con, conf_yes, conf_no
 
     return conditions, exclude_high_fa
 
