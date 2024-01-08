@@ -39,7 +39,7 @@ last_commit_date = (
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # where to store source files for forward solution
-save_dir_fsaverage_source_files = Path("E:/expecon_ms/data/templates")
+save_dir_fsaverage_source_files = Path(path_to.data.templates)
 save_dir_fsaverage_source_files.mkdir(parents=True, exist_ok=True)
 
 # clean epochs path
@@ -491,15 +491,13 @@ def plot_grand_average_source_contrast(
     # mean over participants
     x_avg = np.mean(stc_array, axis=0)
 
-    # Read the source space
-    # set root path to fsaverag files
+    # Read the source space for plotting
+    src_fname = f'{save_dir_fsaverage_source_files}{Path("/")}fsaverage-6oct-src.fif'
+    src = mne.read_source_spaces(src_fname)
     # fetch fsaverage files and save path
     subjects_dir = fetch_fsaverage()
-    fs_average_root_path = f'{subjects_dir}{Path("/")}bem{Path("/")}'
-    src_fname = f'{fs_average_root_path}fsaverage-oct6-src.fif'
-    src = mne.read_source_spaces(src_fname)
 
-    # put contrast or p values in source space
+    # put contrast (average) or p values in source space
     fsave_vertices = [s["vertno"] for s in src]
     stc = mne.SourceEstimate(x_avg, tmin=-0.4, tstep=0.0001, vertices=fsave_vertices,
      subject="fsaverage")
@@ -516,7 +514,8 @@ def plot_grand_average_source_contrast(
                 brain = stc.plot(
                     hemi=hemi, views=view, subjects_dir=subjects_dir, 
                     subject="fsaverage",
-                    time_viewer=True, background="white", colorbar=colbar
+                    time_viewer=False, 
+                    background="white", colorbar=colbar
                 )
 
                 brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_' +
