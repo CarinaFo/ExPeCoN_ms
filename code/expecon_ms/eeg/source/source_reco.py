@@ -439,7 +439,9 @@ def create_source_contrast_array(study: int,
 def plot_grand_average_source_contrast(
     study: int,
     cond: str,
-    method: str
+    method: str,
+    save_plots: bool,
+    backend: str
 ):
     """
     Run a cluster-based permutation test over space and time.
@@ -503,7 +505,7 @@ def plot_grand_average_source_contrast(
      subject="fsaverage")
 
     hemispheres = ["rh", "lh"]
-    views = ['lateral', 'medial']
+    views = ['lat', 'med']
     colorbar_conds = [True, False]
 
     # save source plot with colorbar and without for both hemispheres and views
@@ -514,14 +516,13 @@ def plot_grand_average_source_contrast(
                 brain = stc.plot(
                     hemi=hemi, views=view, subjects_dir=subjects_dir, 
                     subject="fsaverage",
-                    time_viewer=False, 
+                    time_viewer=False, backend=backend,
                     background="white", colorbar=colbar
                 )
+                if save_plots:
+                    brain.save_image(f"{save_path_source_figs}/grand_average_{cond}_{method}_{study}_" +
+                                     f"_{view}_{hemi}_{colbar}.png")
 
-                brain.save_image(f'{save_path_source_figs}{Path("/")}grand_average_{cond}_{method}_{study}_' +
-                                f'_{view}_{hemi}_{colbar}.png')
-
-    return None
 
 
 def run_and_plot_cluster_test(study=1,
