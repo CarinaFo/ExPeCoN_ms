@@ -507,7 +507,7 @@ def plot_tfr_cluster_test_output(cond: str,
         )
     plt.show()
 
-    return t_obs, cluster_p
+    return "Done with cluster test"
 
 
 def plot_cluster_contours(data: np.ndarray,
