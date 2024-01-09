@@ -46,8 +46,9 @@ plt.rcParams["font.size"] = 14
 # set up behavioral data path
 behav_path = Path(path_to.data.behavior)
 
-# set save paths
+# set save paths (figure 1 is study 1 (block design) and figure 2 is study2 (single trial design))
 save_path_fig1 = Path(path_to.figures.manuscript.figure1)
+save_path_fig2 = Path(path_to.figures.manuscript.figure2)
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -265,8 +266,7 @@ def plot_mean_response_and_confidence(
     expecon: int,
     blue="#0571b0", red="#ca0020",
     no_col="#088281", yes_col="#d01c8b",
-    savepath=path_to.figures.manuscript.figure2_suppl
-):
+    savepath=path_to.figures.manuscript.figure2_suppl):
     """
     Plot the mean detection response and mean confidence for each cue condition with a boxplot.
 
@@ -432,14 +432,14 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
     None
     """
     # set the save path
-    savepath_fig1 = Path(save_path_fig1 if expecon == 1 else path_to.expecon2.figures)
+    savepath_fig1 = Path(save_path_fig1 if expecon == 1 else save_path_fig2)
 
     # load data
     conditions, exclude_high_fa = prepare_for_plotting(exclude_high_fa=exclude_high_fa,
                                                         expecon=expecon)
 
     # unpack data
-    df_sdt, conf_con = conditions
+    df_sdt, conf_con, conf_yes, conf_no = conditions
 
     # set colors for both conditions
     blue = "#0571b0"  # 0.25 cue
