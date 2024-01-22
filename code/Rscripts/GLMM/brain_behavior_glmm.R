@@ -26,7 +26,7 @@ par(family = "Arial", cex = 1.2)
 
 # which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
 
-expecon <- 2
+expecon <- 1
 
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
@@ -50,15 +50,13 @@ behav$prevcue = as.factor(behav$prevcue) # previous probability
 behav$congruency <- as.integer(as.logical(behav$congruency))
 behav$congruency_stim <- as.integer(as.logical(behav$congruency_stim))
 
-# Remove NaN trials for model comparision (models neeed to have same amount of data)
+# Remove NaN trials for model comparision (models neeed to have same amount of data)(first row for
+# previous trial factor)
 behav <- na.omit(behav) 
 
 #rename alpha and beta power variables
 behav$alpha <- behav$pre_alpha
 behav$beta <- behav$pre_beta
-
-# dummy recode
-behav$cue <- ifelse(behav$cue == 0.25, 0, 1) 
 ########################### Brain behavior GLMMs ###################################################
 
 # does beta or alpha predict the stimulus? control analysis:
@@ -91,15 +89,10 @@ summary(beta_cue)
 ###################################################################################################
 ### does prestimulus power predict detection, while controlling for previous choice
 
-base_glm <- glmer(sayyes ~ isyes +
-                    (isyes|ID),
-                  data = behav, family=binomial(link='probit'), 
-                  control=glmerControl(optimizer="bobyqa",
-                                       optCtrl=list(maxfun=2e5)))
 
-alpha_base_glm <- glmer(sayyes ~ alpha + isyes + 
-                          alpha*isyes +
-                          (isyes*alpha|ID),
+alpha_base_glm <- glmer(sayyes ~ isyes + alpha + cue + prevresp +
+                          alpha*isyes + cue*isyes +
+                          (isyes + cue + prevresp|ID),
                         data = behav, family=binomial(link='probit'), 
                         control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e5)))
@@ -111,8 +104,9 @@ check_convergence(alpha_base_glm)
 
 summary(alpha_base_glm)
 
-beta_base_glm <- glmer(sayyes ~ beta + isyes + beta*isyes +
-                    (isyes+beta|ID),
+beta_base_glm <- glmer(sayyes ~ isyes + beta + cue + prevresp +
+                         beta*isyes + cue*isyes +
+                    (isyes + cue + prevresp|ID),
                   data = behav, family=binomial(link='probit'), 
                   control=glmerControl(optimizer="bobyqa",
                                        optCtrl=list(maxfun=2e5)))
@@ -138,9 +132,9 @@ saveRDS(beta_base_glm, cue_model_path)
 beta_base_glm <- readRDS(cue_model_path)
 
 # add previous response
-alpha_prev_glm <- glmer(sayyes ~ alpha + isyes + prevresp + 
-                         alpha*isyes +
-                         (isyes + prevresp + alpha | ID),
+alpha_prev_glm <- glmer(sayyes ~ isyes + alpha + cue + prevresp + 
+                         alpha*isyes + cue*isyes + cue*prevresp +
+                         (isyes + prevresp + cue | ID),
                        data = behav, family=binomial(link='probit'), 
                        control=glmerControl(optimizer="bobyqa",
                                             optCtrl=list(maxfun=2e5)))
@@ -151,9 +145,9 @@ check_convergence(alpha_prev_glm)
 
 summary(alpha_prev_glm)
 
-beta_prev_glm <- glmer(sayyes ~ beta + isyes + prevresp + 
-                     beta*isyes +
-                     (isyes + prevresp|ID),
+beta_prev_glm <- glmer(sayyes ~ isyes + beta + cue + prevresp + 
+                     beta*isyes + cue*isyes + cue*prevresp +
+                     (isyes + prevresp +cue|ID),
                    data = behav, family=binomial(link='probit'), 
                    control=glmerControl(optimizer="bobyqa",
                                         optCtrl=list(maxfun=2e5)))
@@ -178,10 +172,9 @@ beta_prev_glm <- readRDS(cue_model_path)
 ##### no we fit the interaction between prestimulus power and previous choice
 
 # alpha interaction
-alpha_int_glm <- glmer(sayyes ~ alpha + isyes + prevresp + 
-                                alpha*isyes +
-                                alpha*prevresp + 
-                                (isyes + prevresp + alpha|ID),
+alpha_int_glm <- glmer(sayyes ~ isyes + alpha + cue + prevresp + 
+                                alpha*isyes + cue*isyes + cue*prevresp + alpha*prevresp + 
+                                (isyes + prevresp +cue|ID),
                                 data = behav, family=binomial(link='probit'), 
                                 control=glmerControl(optimizer="bobyqa",
                                                      optCtrl=list(maxfun=2e5)))
@@ -192,10 +185,9 @@ check_convergence(alpha_int_glm)
 summary(alpha_int_glm)
 
 # beta interaction
-beta_int_glm <- glmer(sayyes ~ beta + isyes + prevresp + 
-                        beta*isyes + 
-                        beta*prevresp + 
-                        (isyes + prevresp| ID),
+beta_int_glm <- glmer(sayyes ~ isyes + beta + cue + prevresp + 
+                        beta*isyes + cue*isyes + cue*prevresp + beta*prevresp +
+                        (isyes + prevresp + cue| ID),
                       data = behav, family=binomial(link='probit'), 
                       control=glmerControl(optimizer="bobyqa",
                                            optCtrl=list(maxfun=2e5)))
@@ -225,8 +217,6 @@ beta_int_glm <- readRDS(cue_model_path)
 ############################################### Model comparision ##################################
 
 # Likelihood ratio tests
-anova(base_glm, beta_base_glm)
-anova(base_glm, alpha_base_glm)
 anova(beta_base_glm, beta_prev_glm)
 anova(alpha_base_glm, alpha_prev_glm)
 anova(beta_prev_glm, beta_int_glm)
