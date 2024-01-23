@@ -101,6 +101,20 @@ model_path = file.path("data", "behav", "mediation", filename)
 saveRDS(out.model_beta, model_path)
 mediation_cue_beta_yes = readRDS(model_path)
 
+# separate model for congruent and incongruent trials:
+congruent_trials = filter(behav, congruency=="True")
+incongruent_trials = filter(behav, congruency=="False")
+
+# now fit mediation model with confidence as the outcome variable
+out.model_conf_beta <- glmer(conf ~ isyes + cue + beta + prevresp*cue + isyes*cue+
+                               (cue*isyes+prevresp|ID),
+                             data = behav,
+                             control=glmerControl(optimizer="bobyqa",
+                                                  optCtrl=list(maxfun=2e5)),
+                             family=binomial(link='probit'))
+
+summary(out.model_conf_beta)
+
 # now fit mediation model with confidence as the outcome variable
 out.model_conf_beta <- glmer(conf ~ isyes + cue + beta + prevresp*cue + isyes*cue+
                           (cue*isyes+prevresp|ID),
