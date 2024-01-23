@@ -174,7 +174,7 @@ saveRDS(cue_prev_int_model, cue_model_path)
 cue_prev_int_model <- readRDS(cue_model_path)
 
 # Post hoc tests for behavior interaction
-emm_model <- emmeans(cue_prev_int_model, "prevresp", by = "cue")
+emm_model <- emmeans(cue_prev_int_model, "prevresp", by = "cue", infer=TRUE)
 con <- contrast(emm_model)
 con
 
