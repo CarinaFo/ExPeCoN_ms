@@ -75,15 +75,6 @@ jupyter lab code/notebooks/expecon_ms.ipynb &
 
 ## Publications
 
-*List resulted publications of this project here (including papers, posters, talks, ...)* [`TODO`]
-
-In case you use this code, please cite the following paper: ... [`TODO`]
-
-## Preregistration
-
-*If applicable, was the project pre-registered and if yes, when and where (link)* [`TODO`]
+In case you use this code, please cite the following paper: Forster et al., in prep.
 
 ## Contributors/Collaborators
-
-*Name people who are involved in this project, their position and/or contribution.
-Optional: add contact data* [`TODO`]
