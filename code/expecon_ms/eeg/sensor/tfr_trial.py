@@ -8,6 +8,7 @@ Author: Carina Forster
 Contact: forster@cbs.mpg.de
 Years: 2023
 """
+
 # %% Import
 import subprocess
 from pathlib import Path
@@ -20,7 +21,8 @@ import scipy
 import seaborn as sns
 
 from expecon_ms.behav import figure1
-from expecon_ms.configs import PROJECT_ROOT, config, path_to
+from expecon_ms.behav.corr_sdt import LOW_B, UP_B
+from expecon_ms.configs import PROJECT_ROOT, config, params, paths
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -33,15 +35,15 @@ last_commit_date = (
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # set font to Arial and font size to 14
-plt.rcParams.update({"font.size": 14, "font.family": "sans-serif", "font.sans-serif": "Arial"})
 
-# set directory paths
-behav_dir = Path(path_to.data.behavior)
-tfr_dir = Path(path_to.data.eeg.sensor.tfr.tfr_contrasts)
+plt.rcParams.update({
+    "font.size": params.plot.font.size,
+    "font.family": params.plot.font.family,
+    "font.sans-serif": params.plot.font.sans_serif,
+})
 
 # participant IDs
-id_list_expecon1 = config.participants.ID_list_expecon1
-id_list_expecon2 = config.participants.ID_list_expecon2
+participants = config.participants
 
 # frequencies from tfr calculation
 freq_list = np.arange(3, 35, 1)
@@ -51,8 +53,8 @@ freq_bands = {"alpha": (7, 13), "beta": (15, 25)}
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-def save_band_power_per_trial(study: int, time_intervals: dict,
-                              channel_names: list, mirror: bool):
+
+def save_band_power_per_trial(study: int, time_intervals: dict, channel_names: list, mirror: bool):
     """
     Save the power per trial per frequency band in a csv file.
 
@@ -73,62 +75,72 @@ def save_band_power_per_trial(study: int, time_intervals: dict,
     Return:
     ------
     csv file with power per trial per frequency band
+
     """
-    # save single subject dataframes in a list
+    # Save single subject dataframes in a list
     brain_behav = []
+    id_list = participants.ID_list_expecon1 if study == 1 else participants.ID_list_expecon2
 
-    if study == 1:
-        id_list = id_list_expecon1
-    elif study == 2:
-        id_list = id_list_expecon2
-
-    # loop over subjects
+    # Loop over subjects
     for subj in id_list:
-        if ((study == 2) & (subj == "013")):
+        if (study == 2) & (subj == "013"):  # noqa: PLR2004
             continue
         if mirror:
             # load single trial power
-            power = mne.time_frequency.read_tfrs(tfr_dir / f"{subj}_single_trial_power_mirror_{str(study)}-tfr.h5")[0]
+            power = mne.time_frequency.read_tfrs(
+                Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_single_trial_power_mirror_{study!s}-tfr.h5")
+            )[0]
         else:
             # load single trial power
-            power = mne.time_frequency.read_tfrs(tfr_dir / f"{subj}_single_trial_power_{str(study)}-tfr.h5")[0]
+            power = mne.time_frequency.read_tfrs(
+                Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_single_trial_power_{study!s}-tfr.h5")
+            )[0]
 
         # get behavioral data
         behav_data = power.metadata
 
         # at which time window do we want to look at?
         if study == 1:
-            power_crop = power.copy().crop(tmin=time_intervals['pre'][0][0],
-                 tmax=time_intervals['pre'][0][1]).pick_channels(channel_names)
+            power_crop = (
+                power.copy()
+                .crop(tmin=time_intervals["pre"][0][0], tmax=time_intervals["pre"][0][1])
+                .pick_channels(channel_names)
+            )
         else:
-            power_crop = power.copy().crop(tmin=time_intervals['pre'][1][0],
-                 tmax=time_intervals['pre'][1][1]).pick_channels(channel_names)
+            power_crop = (
+                power.copy()
+                .crop(tmin=time_intervals["pre"][1][0], tmax=time_intervals["pre"][1][1])
+                .pick_channels(channel_names)
+            )
 
         # now we average over time and channels
         power_crop.data = np.mean(power_crop.data, axis=(1, 3))
         # using list comprehension + enumerate()
 
         # extract the indices of the frequency bands
-        alpha_indices = [idx for idx, val in enumerate(freq_list) if val >= freq_bands['alpha'][0]
-                            and val <= freq_bands['alpha'][1]]
-        beta_indices = [idx for idx, val in enumerate(freq_list) if val >= freq_bands['beta'][0]
-                        and val <= freq_bands['beta'][1]]
+        alpha_indices = [
+            idx for idx, val in enumerate(freq_list) if freq_bands["alpha"][0] <= val <= freq_bands["alpha"][1]
+        ]
+        beta_indices = [
+            idx for idx, val in enumerate(freq_list) if freq_bands["beta"][0] <= val <= freq_bands["beta"][1]
+        ]
 
         # now we average over the frequency band
-        behav_data[f"pre_alpha"] = np.mean(power_crop.data[:, alpha_indices], axis=1)  # 7-13 Hz
-        behav_data[f"pre_beta"] = np.mean(power_crop.data[:, beta_indices], axis=1)  # 15-25 Hz
+        behav_data["pre_alpha"] = np.mean(power_crop.data[:, alpha_indices], axis=1)  # 7-13 Hz
+        behav_data["pre_beta"] = np.mean(power_crop.data[:, beta_indices], axis=1)  # 15-25 Hz
 
         # save the data in a list
         brain_behav.append(behav_data)
 
     # concatenate the list of dataframes and save as csv
-    pd.concat(brain_behav).to_csv(behav_dir / f"brain_behav_{str(study)}.csv")
+    pd.concat(brain_behav).to_csv(Path(paths.data.behavior, f"brain_behav_{study!s}.csv"))
 
     return brain_behav
 
 
 def power_criterion_corr(study: int) -> None:
-    """Correlate power vs. criterion difference.
+    """
+    Correlate power vs. criterion difference.
 
     Plots regression line and calculates spearman correlation.
 
@@ -139,9 +151,10 @@ def power_criterion_corr(study: int) -> None:
     Return:
     ------
     None
+
     """
     # load brain behav dataframe
-    df_brain_behav = pd.read_csv(behav_dir / f"brain_behav_{study}.csv")
+    df_brain_behav = pd.read_csv(Path(paths.data.behavior, f"brain_behav_{study}.csv"))
 
     freqs = ["prestim_alpha", "prestim_beta"]
 
@@ -149,14 +162,13 @@ def power_criterion_corr(study: int) -> None:
 
     # now get power per participant and per condition
     for f in freqs:
-
         power = df_brain_behav.groupby(["ID", "cue"])[f].mean()
 
-        low = power.unstack()[0.25].reset_index()
-        high = power.unstack()[0.75].reset_index()
+        low = power.unstack()[LOW_B].reset_index()
+        high = power.unstack()[UP_B].reset_index()
 
         # log transform and calculate the difference
-        diff_p = np.log(np.array(low[0.25])) - np.log(np.array(high[0.75]))
+        diff_p = np.log(np.array(low[LOW_B])) - np.log(np.array(high[UP_B]))
 
         diff_p_list.append(diff_p)
 
@@ -164,16 +176,16 @@ def power_criterion_corr(study: int) -> None:
     power_dict = {"alpha": diff_p_list[0], "beta": diff_p_list[1]}
 
     # load behavioral SDT data
-    out = figure1.prepare_for_plotting(exclude_high_fa = False, expecon = 1)
+    out = figure1.prepare_for_plotting(exclude_high_fa=False, expecon=1)
 
     # get sdt parameters
     sdt = out[0][0]
 
     # calculate criterion difference between conditions
-    c_diff = np.array(sdt.criterion[sdt.cue == 0.25]) - np.array(sdt.criterion[sdt.cue == 0.75])
+    c_diff = np.array(sdt.criterion[sdt.cue == LOW_B]) - np.array(sdt.criterion[sdt.cue == UP_B])
 
     # dprime difference between conditions
-    dprime_diff = np.array(sdt.dprime[sdt.cue == 0.25]) - np.array(sdt.dprime[sdt.cue == 0.75])
+    dprime_diff = np.array(sdt.dprime[sdt.cue == LOW_B]) - np.array(sdt.dprime[sdt.cue == UP_B])
 
     # add the sdt data to a dictionary
     sdt_params = {"dprime": dprime_diff, "criterion": c_diff}
@@ -186,10 +198,10 @@ def power_criterion_corr(study: int) -> None:
             plt.xlabel(f"{freq_band} power difference")
             plt.ylabel(f"{sdt_param} difference")
             plt.show()
-            # calculate correlation (spearman is non parametric)
+            # calculate correlation (spearman is non-parametric)
             print(scipy.stats.spearmanr(power_values, sdt_values))
             # save figure
-            fig.figure.savefig(Path(path_to.figures.manuscript.figure3, f"{freq_band}_{sdt_param}.svg"))
+            fig.figure.savefig(Path(paths.figures.manuscript.figure3, f"{freq_band}_{sdt_param}.svg"))
             plt.show()
 
 
