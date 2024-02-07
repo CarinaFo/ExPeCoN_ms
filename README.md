@@ -2,9 +2,11 @@
 
     Author(s): Carina Forster et al. (2023)
     Status: Code is not yet reviewed
-    Last update: Oct 19, 2023
+    Last update: Jan 31, 2024
 ***
-## Open ToDos before:
+
+## Open ToDos before
+
 - [ ] add readme/note to folder `code/experiment_code`, referring to author(s)
 - [ ] review functionality
 - [ ] ...
@@ -23,6 +25,7 @@ near-threshold somatosensory detection task in two datasets
 The project structure is based on [`scilaunch`](https://github.com/SHEscher/scilaunch).
 
 ### Data
+
 * data will be uploaded to [OSF](https://osf.io) [`TODO`]
 
 ## Install research code as package
@@ -31,6 +34,7 @@ First, clone the project to a local folder:
 
 ```shell
 git clone https://github.com/CarinaFo/ExPeCoN_ms.git
+cd expecon_ms
 ```
 
 Create a conda environment specific to `expecon_ms`:
@@ -53,7 +57,6 @@ python -m ipykernel install --user --name=expecon_3.9
 Install the project code `expecon_ms` as Python package:
 
 ```shell
-cd expecon_ms
 pip install -e .
 ```
 
@@ -65,6 +68,7 @@ Thus, the `-e` flag is recommended to use.
 *R*-scripts of the analysis are stored in `./code/Rscripts/`.
 
 ### Explore data and analysis
+
 Use jupyter notebooks to explore the data and analysis:
 
 ### Open code in your prefered editor but make sure to run the code in the environment

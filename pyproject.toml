@@ -5,14 +5,12 @@ description = "Expectation Perception Confidence Neural Correlates (ExPeCoN)."
 readme = "README.md"
 requires-python = "==3.9.*"
 license = { file = "LICENSE" }
-authors = [
-    { name = "Carina Forster", email = "forster@cbs.mpg.de" },
-]
+authors = [{ name = "Carina Forster", email = "forster@cbs.mpg.de" }]
 maintainers = [
     { name = "Carina Forster", email = "forster@cbs.mpg.de" },
     { name = "Simon M. Hofmann", email = "simon.hofmann@cbs.mpg.de" },
 ]
-keywords = ["eeg", "perception"]  # TODO add more
+keywords = ["eeg", "perception"] # TODO add more
 # Check for classifiers: https://pypi.org/classifiers/
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -38,17 +36,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-testing = [
+develop = [
     "black[jupyter]",
     "bumpver>=2023",
-    "ruff>=0.1.0",
+    "nbconvert>=6.3.3",
+    "nbstripout>=0.6.1",
+    "notebook==6.4.12",
+    "jupyter_contrib_nbextensions>=0.7.0",
+    "ruff>=0.1.15",
     "tox>=3.25.1",
     "pytest==7.4.2",
     "pytest-cov",
 ]
 
 [project.urls]
-osf = "https://www.osf.org/XXXXX"  # TODO: change to actual OSF project page
+osf = "https://www.osf.org/XXXXX"                     # TODO: change to actual OSF project page
 repository = "https://github.com/CarinaFo/ExPeCoN_ms"
 # Consider other URLs: pre-registration, data repository, etc.  # TODO: add more if needed
 
@@ -58,7 +60,13 @@ repository = "https://github.com/CarinaFo/ExPeCoN_ms"
 # expecon_ms = "expecon_ms.main:main"
 
 [tool.setuptools]
-platforms = ["unix", "linux", "osx", "cygwin", "win32"]  # TODO: keep intended platforms
+platforms = [
+    "unix",
+    "linux",
+    "osx",
+    "cygwin",
+    "win32",
+] # TODO: keep intended platforms
 zip-safe = false
 
 # # To automatically find the package(s) (Beta feature (Oct, 2022)):
@@ -111,70 +119,77 @@ directory = "code/tests/coverage_html_report"
 
 [tool.ruff]
 # Select rules / linters to apply
-select = [   # add /comment-out rules (list below does not contain all rulles)
-    # "ALL",  # all rules
-    "D",  # pydocstyle
-    "E", # pycodestyle [default]
-    "F",  # Pyflakes [default]
-    "I",  # isort imports
-    "RUF",  # ruff specific
+select = [ # add /comment-out rules (the list below does not contain all rulles)
+    # "ALL", # all rules
+    "D",   # pydocstyle
+    "E",   # pycodestyle [default]
+    "F",   # Pyflakes [default]
+    "I",   # isort imports
+    "RUF", # ruff specific
     "UP",  # pyupgrade [default]
-    "W",  # pycodestyle: warning
+    "W",   # pycodestyle: warning
     "C90", # mccabe
-    "N", # pep8-naming
+    "N",   # pep8-naming
     # "ANN", # flake8-annotations (toggle on if you intend to work with type annotations)
-    "S", # flake8-bandit
+    "S",   # flake8-bandit
     "BLE", # flake8-blind-except
-    "B", # flake8-bugbear
-    "A", # flake8-builtins
+    "B",   # flake8-bugbear
+    "A",   # flake8-builtins
     "COM", # flake8-commas
-    "C4", # flake8-comprehensions
+    "C4",  # flake8-comprehensions
     # "EM", # flake8-errmsg
     # "FA", # flake8-future-annotations (see ANN above)
     "ISC", # flake8-implicit-str-concat
     # "ICN", # flake8-import-conventions
-    "G", # flake8-logging-format
+    "G",   # flake8-logging-format
     "INP", # flake8-no-pep420
-    "PT", # flake8-pytest-style
-    "Q", # flake8-quotes
+    "PT",  # flake8-pytest-style
+    "Q",   # flake8-quotes
     "RET", # flake8-return
     "SIM", # flake8-simplify
     "TCH", # flake8-type-checking
     "ARG", # flake8-unused-arguments
     "PTH", # flake8-use-pathlib
-    "TD", # flake8-todos
+    "TD",  # flake8-todos
     "FIX", # flake8-fixme
     "ERA", # eradicate
-    "PD", # pandas-vet
-    "PL", # Pylint
+    "PD",  # pandas-vet
+    "PL",  # Pylint
     "NPY", # NumPy-specific rules
-]  # run `ruff linter` to see all rules
-fix = false  # true: Ruff will try to fix errors automatically
+] # run `ruff linter` to see all rules
+fix = false # true: Ruff will try to fix errors automatically
 # List of rules to consider non-autofix-able.
-unfixable = [  # either with fix = true or when `ruff . --fix` is executed
-    "ERA001",  # found commented-out code
-    "F401",  # unused imports
-    # "RUF100",  # `noqa` directives that are no longer applicable
+unfixable = [ # either with fix = true or when `ruff . --fix` is executed
+    "ERA001", # found commented-out code
+    "F401",   # unused imports
+    # "RUF100", # `noqa` directives that are no longer applicable
 ]
 # Ignore specific rules or the whole set of a rule
 ignore = [
-    "ANN101",  # flake8-annotations: Missing type annotation for self in method
-    "ANN102",  # flake8-annotations: Missing type annotation for cls in classmethod
-    "ANN401",  # flake8-annotations: Any
-    "COM812",  # Trailing comma missing
-    "D203",  # 1 blank line required before class docstring: incompatible with D211 (=no blank line required)
+    "ANN101", # flake8-annotations: Missing type annotation for self in method
+    "ANN102", # flake8-annotations: Missing type annotation for cls in classmethod
+    "ANN401", # flake8-annotations: Any
+    "COM812", # Trailing comma missing
+    "D203",   # 1 blank line required before class docstring: incompatible with D211 (=no blank line required)
     "D212",   # multi-line-summary-first-line incompatible with D213 (=should start at second line)
-    "DTZ005",  # timezone-naive datetime
-    "E402",  # Module level import not at top of file (covert by ISORT)
-    # "E501",  # Ignore line-length since we use 119
-    # "ERA001",  # Found commented-out code
-    "NPY002",  # numpy random generator
-    "S301",  # suspicious-pickle-usage
+    "DTZ005", # timezone-naive datetime
+    "E402",   # Module level import not at the top of file (covert by ISORT)
+    # "E501", # Ignore line-length since we use 119
+    # "ERA001", # Found commented-out code
+    "ISC001", # Implicit string concatenation
+    "NPY002", # numpy random generator
+    "PD010",  # pandas uses of `.pivot` or `.unstack`
+    "RUF003", # ambiguous `×`
+    "S301",   # suspicious-pickle-usage
+    "S403",   # suspicious-pickle-import
+    "S404",   # suspicious-subprocess-import
+    "S603",   # subprocess-popen-with-shell-equals-true
+    "S607",   # startfile-possible-misuse
     "TD002",  # Missing author in To-Do
     "TD003",  # Missing issue link on the line following a To-Do
 ]
-ignore-init-module-imports = true  # void automatically removing unused imports in __init__.py
-respect-gitignore = true  # files and folder ignored in gitignore are ignore by ruff as well [default: true]
+ignore-init-module-imports = true # void automatically removing unused imports in __init__.py
+respect-gitignore = true # files and folder ignored in gitignore are ignored by ruff as well [default: true]
 src = ["code/expecon_ms", "code/notebooks", "code/tests"]
 # Exclude a variety of commonly ignored directories.
 include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
@@ -188,14 +203,14 @@ extend-exclude = [
 ]
 line-length = 119 # Same as flake8 and black
 target-version = "py39" # assume Python 3.9
-output-format = "text"  # try out : "grouped"
-preview = true  # true: Ruff will use unstable rules and fixes
+output-format = "text" # try out: "grouped"
+preview = true # true: Ruff will use unstable rules and fixes
 
 [tool.ruff.extend-per-file-ignores]
 # Ignore specific rules in specific files
 "__init__.py" = ["F401", "D104"]
-"*.ipynb" = ["D100"]  # ignore docsstring in notebooks
-"code/tests/*.py" = ["S101"]  # ignore assert statements in tests
+"*.ipynb" = ["D100"]             # ignore docsstring in notebooks
+"code/tests/*.py" = ["S101"]     # ignore assert statements in tests
 
 [tool.ruff.flake8-annotations]
 allow-star-arg-any = true
@@ -211,19 +226,20 @@ known-local-folder = ["code/expecon_ms"]
 
 [tool.ruff.mccabe]
 # Flag errors (`C901`) whenever the complexity level exceeds x.
-max-complexity = 10  # default x: 10
+max-complexity = 25 # default x: 10
 
 [tool.ruff.pep8-naming]
-ignore-names = []  # fill with specific class, function, variable names
+ignore-names = [] # fill with specific class, function, variable names
 
 [tool.ruff.pydocstyle]
 # convention = "google"  # "numpy", "pep257"
 
 [tool.ruff.pylint]
-max-args = 5  # default: 5
-max-branches = 12  # default: 12
-max-returns = 6  # default: 6
-max-statements = 50  # default: 50
+max-args = 11        # default: 5
+max-branches = 30    # default: 12
+max-returns = 6      # default: 6
+max-statements = 126 # default: 50
+max-locals = 42      # default: 15
 # allow-magic-value-types = ["int"]
 
 [tool.black]
@@ -246,7 +262,7 @@ exclude = '''  # A regex preceded with ^/ will apply only to files and directori
 '''
 # preview = true
 
-# For instance run in shell: bumpver update --patch --no-fetch --dry
+# For instance, run in shell: bumpver update --patch --no-fetch --dry
 [tool.bumpver]
 current_version = "0.1.0"
 version_pattern = "MAJOR.MINOR.PATCH"

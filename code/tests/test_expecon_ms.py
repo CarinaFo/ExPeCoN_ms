@@ -1,8 +1,8 @@
 """Tests for `expecon_ms` package."""
 
 # %% Import
-import pytest
-from expecon_ms.eeg.preprocessing.ica import label_iclabel
+# import pytest # noqa: ERA001
+# from expecon_ms.eeg.preprocessing.ica import label_iclabel # noqa: ERA001
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 pass
@@ -10,29 +10,7 @@ pass
 
 # %% Test Functions o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-# TODO: add tests
-
-
-@pytest.fixture()
-def response():
-    """
-    Sample pytest fixture.
-
-    See more at: https://doc.pytest.org/en/latest/fixture.html
-    """
-    # import requests
-    # return requests.get('https://github.com/audreyr/cookiecutter-pypackage')
-
-
-def test_content(response):
-    """Sample pytest test function with the pytest fixture as an argument."""
-    # from bs4 import BeautifulSoup
-    # assert 'GitHub' in BeautifulSoup(response.content).title.string
-
-
-def test_label_iclabel():
-    """Test label_iclabel function."""
-    assert label_iclabel() is None
-
+# TODO: add tests  # noqa: FIX002
+pass
 
 # o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END

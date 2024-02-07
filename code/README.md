@@ -1,12 +1,12 @@
 # ExPeCoN – **code**
 
-`[Last update: October 18, 2023]`
+`[Last update: January 30, 2024]`
 
 ***
     Period:     2023-10 - ...
-    Status:     in preparation / work in progress / finalized
+    Status:     work in progress / finalized
 
-    Author(s):  Carina Forster
+    Author(s):  Carina Forster et al.
     Contact:    forster@cbs.mpg.de
 
 ***
@@ -41,13 +41,13 @@ Keep both config toml files and the script in their current places.
 To use the project configs in Python scripts or notebooks, do the following:
 
 ```python
-from expecon_ms.configs import config, path_to
+from expecon_ms.configs import config, paths, params
 
 # get the path to data
-path_to_data = path_to.DATA
+path_to_data = paths.DATA
 
 # Get parameter from config
-weight_decay = config.params.weight_decay
+weight_decay = params.weight_decay
 
 # Get private parameter from config
 api_key = config.service_x.api_key

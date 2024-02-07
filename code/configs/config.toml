@@ -1,7 +1,7 @@
 # Config file for expecon_ms
 # Drop all relevant paths, parameters, etc. here
 # They can be accessed in the code via:
-# from expecon_ms.configs import config, path_to, params
+# from expecon_ms.configs import config, paths, params
 
 PROJECT_NAME = "expecon_ms"
 
@@ -72,6 +72,20 @@ figure6 = "./figs/manuscript_figures/brain_behavior"
 [params]
 alpha = 0.05
 
+# parameters for behavioral data preprocessing
+[params.behavioral_cleaning]
+rt_max = 2.5
+rt_min = 0.1
+hitrate_max = 0.9
+hitrate_min = 0.2
+farate_max = 0.4
+hit_fa_diff = 0.05
+
+[params.plot.font]
+family = "sans-serif"
+sans_serif = "Arial"
+size = 14
+
 # ID lists for both studies
 [participants]
 ID_list_expecon1 = [
@@ -90,13 +104,4 @@ ID_list_expecon2 = [
     "031", "032", "033", "034", "035", "036", "037", "038", "039", "040"
 ]
 
-# parameters for behavioral data preprocessing
-[behavioral_cleaning]
-rt_max = 2.5
-rt_min = 0.1
-hitrate_max = 0.9
-hitrate_min = 0.2
-farate_max = 0.4
-hit_fa_diff = 0.05
-
-# Note store private configs in same folder: "./[PRIVATE_PREFIX]_configs.toml"
+# Note store private configs in the same folder as: "./[PRIVATE_PREFIX]_configs.toml"

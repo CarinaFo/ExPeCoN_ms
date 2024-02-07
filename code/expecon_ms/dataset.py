@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from expecon_ms.configs import path_to
+from expecon_ms.configs import paths
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 pass
@@ -24,8 +24,8 @@ pass
 def get_expecon_data(data_dir: str | Path | None = None):
     """Download study data of the ExPeCoN study from OSF."""
     if data_dir is None:
-        data_dir = Path(path_to.data)
-    # TODO implement
+        data_dir = Path(paths.data)
+    # TODO: implement
     raise NotImplementedError("get_expecon_data is not implemented yet.")
 
 
