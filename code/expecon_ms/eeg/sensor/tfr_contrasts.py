@@ -25,7 +25,6 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 
-from expecon_ms.behav.corr_sdt import LOW_B, UP_B
 from expecon_ms.configs import PROJECT_ROOT, config, params, paths
 from expecon_ms.utils import zero_pad_or_mirror_data
 
@@ -200,8 +199,8 @@ def compute_tfr(
         df_all.append(epochs.metadata)
 
         if cond == "probability":
-            epochs_a = epochs[(epochs.metadata.cue == UP_B)]
-            epochs_b = epochs[(epochs.metadata.cue == LOW_B)]
+            epochs_a = epochs[(epochs.metadata.cue == params.high_p)]
+            epochs_b = epochs[(epochs.metadata.cue == params.low_p)]
             cond_a_name = "high"
             cond_b_name = "low"
 
@@ -678,7 +677,7 @@ def plot_mirrored_data(subj: str):
     """
     # load epochs for a single participant
     # TODO: which dir_clean_epochs here?
-    epochs = mne.read_epochs(dir_clean_epochs / f"P{subj}_icacorr_0.1Hz-epo.fif")
+    epochs = mne.read_epochs(Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, f"P{subj}_icacorr_0.1Hz-epo.fif"))
 
     # crop the data in the pre-stimulus window
     epochs.crop(tmin=-0.4, tmax=0)
