@@ -40,10 +40,6 @@ plt.rcParams.update({
     "font.sans-serif": params.plot.font.sans_serif,
 })
 
-UP_B = 0.75  # TODO: consider moving this to config.toml, and use in all scripts where it is needed
-LOW_B = 0.25
-
-
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
@@ -69,8 +65,8 @@ def correlate_sdt_with_questionnaire(expecon: int):
     )
 
     # calculate criterion
-    high_c = list(df_sdt.criterion[df_sdt.cue == UP_B])
-    low_c = list(df_sdt.criterion[df_sdt.cue == LOW_B])
+    high_c = list(df_sdt.criterion[df_sdt.cue == params.high_p])
+    low_c = list(df_sdt.criterion[df_sdt.cue == params.low_p])
 
     # low - high stimulus probability
     diff_c = [x - y for x, y in zip(low_c, high_c)]
@@ -141,19 +137,19 @@ def diff_from_optimal_criterion(expecon: int):
         df=data, signal_col="isyes", response_col="sayyes", subject_col="ID", condition_col="cue"
     )
 
-    c_low = calculate_optimal_c(LOW_B, UP_B, 1, 1)
+    c_low = calculate_optimal_c(params.low_p, params.high_p, 1, 1)
     print("Optimal criterion (c) for low stimulus probability:", c_low)
 
-    c_high = calculate_optimal_c(UP_B, LOW_B, 1, 1)
+    c_high = calculate_optimal_c(params.high_p, params.low_p, 1, 1)
     print("Optimal criterion (c) for high stimulus probability:", c_high)
 
-    sub_op_low = [c - c_low for c in df_sdt.criterion[df_sdt.cue == LOW_B]]
+    sub_op_low = [c - c_low for c in df_sdt.criterion[df_sdt.cue == params.low_p]]
     mean_low = np.mean(sub_op_low)
     std_low = np.std(sub_op_low)
     print(f"mean difference from optimal criterion for low stimulus probability: {mean_low}")
     print(f"standard deviation for optimal criterion for low stimulus probability: {std_low}")
 
-    sub_op_high = [c - c_high for c in df_sdt.criterion[df_sdt.cue == UP_B]]
+    sub_op_high = [c - c_high for c in df_sdt.criterion[df_sdt.cue == params.high_p]]
     mean_high = np.mean(sub_op_high)
     std_high = np.std(sub_op_high)
     print(f"mean difference from optimal criterion for high stimulus probability: {mean_high}")
@@ -183,7 +179,6 @@ def calculate_sdt_dataframe(
 
     """
     # Apply Hautus correction and calculate SDT measures for each participant and condition
-    # Hautus correction depends on the condition (LOW_B==0.25 or UP_B==0.75)
     results = []
     subjects = df[subject_col].unique()
     conditions = df[condition_col].unique()
