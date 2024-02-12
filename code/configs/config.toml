@@ -68,6 +68,10 @@ figure4 = "./figs/manuscript_figures/figure4_tfr"
 figure4_source = "./figs/manuscript_figures/figure4_tfr/source"
 figure6 = "./figs/manuscript_figures/brain_behavior"
 
+# conditional probabilites
+high_p = 0.75 
+low_p = 0.25
+
 # alpha level for all tests
 [params]
 alpha = 0.05
