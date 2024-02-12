@@ -26,7 +26,6 @@ import numpy as np
 import pandas as pd
 from mne.datasets import fetch_fsaverage
 
-from expecon_ms.behav.corr_sdt import LOW_B, UP_B
 from expecon_ms.configs import PROJECT_ROOT, config, params, paths
 from expecon_ms.utils import zero_pad_or_mirror_data
 
@@ -94,8 +93,7 @@ def make_new_forward_solution(setup_source_space: bool):
     src = mne.read_source_spaces(src_fname)
 
     # load example epoch
-    # TODO: which dir_clean_epochs
-    epochs = mne.read_epochs(Path(dir_clean_epochs, "P015_icacorr_0.1Hz-epo.fif"))
+    epochs = mne.read_epochs(Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, "P015_icacorr_0.1Hz-epo.fif"))
 
     # set up the forward solution
     fwd = mne.make_forward_solution(epochs.info, trans=trans_dir, src=src, bem=bem, eeg=True, mindist=5.0, n_jobs=None)
@@ -173,7 +171,7 @@ def run_source_reco(
             # add mirror to filename if data is mirrored
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
-                cond_b_name = f"{cond_b_name}_mirror"  # TODO: var not used
+                cond_b_name = f"{cond_b_name}_mirror"
 
             source_files = Path(save_path, f"{cond_a_name}_{subj}_{study}-lh.stc")
         elif cond == "prev_resp":
@@ -182,8 +180,8 @@ def run_source_reco(
             cond_b_name = "prevnoresp_highprob_stim"
             # add mirror to filename if data is mirrored
             if mirror:
-                cond_a_name = f"{cond_a_name}_mirror"  # TODO: var not used
-                cond_b_name = f"{cond_b_name}_mirror"  # TODO: var not used
+                cond_a_name = f"{cond_a_name}_mirror"
+                cond_b_name = f"{cond_b_name}_mirror"
 
             source_files = Path(save_path, f"contrast_{cond}_{subj}_{study}-lh.stc")
 
@@ -256,8 +254,8 @@ def run_source_reco(
             epochs.metadata = metadata
 
         if cond == "probability":
-            epochs_a = epochs[(epochs.metadata.cue == UP_B)]
-            epochs_b = epochs[(epochs.metadata.cue == LOW_B)]
+            epochs_a = epochs[(epochs.metadata.cue == params.high_p)]
+            epochs_b = epochs[(epochs.metadata.cue == params.low_p)]
             cond_a_name = "high"
             cond_b_name = "low"
             if mirror:
@@ -266,10 +264,10 @@ def run_source_reco(
 
         elif cond == "prev_resp":
             epochs_a = epochs[
-                ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == UP_B))
+                ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == params.high_p))
             ]
             epochs_b = epochs[
-                ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == UP_B))
+                ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == params.high_p))
             ]
             cond_a_name = "prevyesresp_highprob_stim"
             cond_b_name = "prevnoresp_highprob_stim"
@@ -514,8 +512,12 @@ def run_and_plot_cluster_test(study: int = 1, jobs: int = -1, n_perm: int = 1000
 
     print("Computing adjacency.")
 
+    # Read the source space for plotting
+    src_fname = Path(paths.data.templates, "fsaverage-6oct-src.fif")
+    src = mne.read_source_spaces(src_fname)
+
     # get adjacency matrix for source space
-    adjacency = mne.spatial_src_adjacency(src)  # TODO: which src
+    adjacency = mne.spatial_src_adjacency(src)
 
     # Note that X needs to be a multidimensional array of shape
     # observations (subjects) × time × space, so we permute dimensions
@@ -531,12 +533,15 @@ def run_and_plot_cluster_test(study: int = 1, jobs: int = -1, n_perm: int = 1000
     if len(good_clusters_idx) == 0:
         return "No significant clusters."
 
-    fsave_vertices = [s["vertno"] for s in src]  # TODO: which src
+    fsave_vertices = [s["vertno"] for s in src]
 
     # summarize cluster perm test output and prepare for visualization
     stc_all_cluster_vis = mne.stats.summarize_clusters_stc(
         clu, vertices=fsave_vertices, subject="fsaverage", p_thresh=params.alpha
     )
+
+    # fetch fsaverage files and the save path
+    subjects_dir = fetch_fsaverage()
 
     # Let's actually plot the first "time point" in the SourceEstimate, which
     # shows all the clusters, weighted by duration.
@@ -544,7 +549,7 @@ def run_and_plot_cluster_test(study: int = 1, jobs: int = -1, n_perm: int = 1000
     brain = stc_all_cluster_vis.plot(
         hemi="rh",
         views="lateral",
-        subjects_dir=subjects_dir,  # TODO: which dir
+        subjects_dir=subjects_dir,
         time_label="temporal extent (ms)",
         size=(800, 800),
         smoothing_steps=5,
@@ -592,13 +597,26 @@ def plot_source_space_electrodes_alignment():
         Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2, f"P{random_subj}_icacorr_0.1Hz-epo.fif")
     )
 
+    # fetch fsaverage files and the save path
+    subjects_dir = fetch_fsaverage()
+
+    # Read the source space for plotting
+    src_fname = Path(paths.data.templates, "fsaverage-6oct-src.fif")
+    src = mne.read_source_spaces(src_fname)
+
+    # set the root path to fsaverage files
+    fs_average_root_path = Path(subjects_dir, "bem")
+
+    # set the root path to fsaverage files
+    trans_dir = fs_average_root_path / "fsaverage-trans.fif"
+
     mne.viz.plot_alignment(
         epochs.info,
-        trans_dir,  # TODO: which dir
-        subject=subject,  # TODO: which dir
+        trans_dir,
+        subject="fsaverage",
         dig=False,
-        src=src,  # TODO: which src
-        subjects_dir=subjects_dir,  # TODO: which dir
+        src=src,
+        subjects_dir=subjects_dir,
         verbose=True,
         meg=False,
         eeg=True,
@@ -688,45 +706,55 @@ def drop_trials(data=None):
 # Unused functions
 
 
-def extract_time_course_from_label(data=None):  # TODO: data not used
+def extract_time_course_from_label(stc: np.ndarray, src: mne.SourceSpaces):
     """
     Extract the time course from a label in source space.
 
     Args:
     ----
-    data: mne.SourceEstimate, source estimates
+    stc: np.ndarray, source estimates
+    src: mne.SourceSpaces, source space
 
     Returns:
     -------
     time course for each label
 
     """
+    # fetch fsaverage files and the save path
+    subjects_dir = fetch_fsaverage()
+
     # this extracts a certain brain area
     label_s1 = "rh.BA3a"
-    fname_labels1 = subjects_dir / f"fsaverage/label/{label_s1}.label"  # TODO: which dir
-    labels1 = mne.read_label(str(fname_labels1))  # TODO: var not used
+    fname_labels1 = subjects_dir / f"fsaverage/label/{label_s1}.label"
+    labels1 = mne.read_label(str(fname_labels1))
     label_s2 = "rh.BA3b"
-    fname_labels2 = subjects_dir / f"fsaverage/label/{label_s2}.label"  # TODO: which dir
+    fname_labels2 = subjects_dir / f"fsaverage/label/{label_s2}.label"
     labels2 = mne.read_label(str(fname_labels2))
-    label_aparc = "rh.aparc"  # TODO: var not used
-    fname_label_aparc = subjects_dir / f"fsaverage/label/{label_aparc}.label"  # TODO: which dir
-    label_ap = mne.read_label(str(fname_label_aparc))  # TODO: var not used
+    label_aparc = "rh.aparc"
+    fname_label_aparc = subjects_dir / f"fsaverage/label/{label_aparc}.label"
+    label_ap = mne.read_label(str(fname_label_aparc))
 
     # Get labels for FreeSurfer 'aparc' cortical parcellation with 75 labels/hemi
     labels_parc = mne.read_labels_from_annot(
         "fsaverage",
         parc="aparc.a2009s",
-        subjects_dir=subjects_dir,  # TODO: which dir
+        subjects_dir=subjects_dir,
     )
+
+    # S1 label
+    s1label = mne.extract_label_time_course(stc, labels1, src, allow_empty=True)
+    # S2
+    s2label = mne.extract_label_time_course(stc, labels2, src, allow_empty=True)
+    # label ap
+    ap_label = mne.extract_label_time_course(stc, label_ap, src, allow_empty=True)
 
     # extract activity in from source label
     # S1
-    # TODO: which src, stc
-    post_central_gyrus = mne.extract_label_time_course([stc], labels_parc[55], src, allow_empty=True)
+    post_central_gyrus = mne.extract_label_time_course(stc, labels_parc[55], src, allow_empty=True)
     # S2
-    g_front_inf_opercular_rh = mne.extract_label_time_course([stc], labels_parc[25], src, allow_empty=True)
+    g_front_inf_opercular_rh = mne.extract_label_time_course(stc, labels_parc[25], src, allow_empty=True)
     # ACC
-    g_cingul_post_dorsal_rh = mne.extract_label_time_course([stc], labels_parc[19], src, allow_empty=True)
+    g_cingul_post_dorsal_rh = mne.extract_label_time_course(stc, labels_parc[19], src, allow_empty=True)
 
     return post_central_gyrus, g_front_inf_opercular_rh, g_cingul_post_dorsal_rh
 
