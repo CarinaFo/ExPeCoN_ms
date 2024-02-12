@@ -12,6 +12,7 @@ Author: Simon M. Hofmann
 Contact: <[firstname].[lastname][at]pm.me>
 Years: 2023
 
+
 """
 
 # %% Imports
@@ -174,7 +175,7 @@ else:
     config.paths.update_paths()
 
 # Extract paths
-path_to = config.paths  # ready for import in other scripts
+paths = config.paths  # ready for import in other scripts
 params = config.params  # ready for import in other scripts
 
 # Welcome

@@ -8,6 +8,7 @@ Author: Carina Forster
 Contact: forster@cbs.mpg.de
 Years: 2023
 """
+
 # %% Import
 import math
 import subprocess
@@ -20,7 +21,7 @@ import seaborn as sns
 import statsmodels.api as sm
 from scipy import stats
 
-from expecon_ms.configs import PROJECT_ROOT, path_to
+from expecon_ms.configs import PROJECT_ROOT, params, paths
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -33,8 +34,14 @@ last_commit_date = (
 print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # Set Arial as the default font
-plt.rcParams["font.family"] = "Arial"
-plt.rcParams["font.size"] = 14
+plt.rcParams.update({
+    "font.size": params.plot.font.size,
+    "font.family": params.plot.font.family,
+    "font.sans-serif": params.plot.font.sans_serif,
+})
+
+UP_B = 0.75  # TODO: consider moving this to config.toml, and use in all scripts where it is needed
+LOW_B = 0.25
 
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -47,22 +54,23 @@ def correlate_sdt_with_questionnaire(expecon: int):
     Args:
     ----
     expecon: int: expecon = 1: analyze expecon 1 behavioral data | expecon = 2: analyze expecon 2 behavioral data
+
     """
     # Set up data path
-    behavior_path = Path(path_to.data.behavior if expecon == 1 else path_to.expecon2.behavior)
+    behavior_path = Path(paths.data.behavior if expecon == 1 else paths.expecon2.behavior)
 
     data = pd.read_csv(behavior_path / "prepro_behav_data.csv")
 
     # load questionnaire data (uncertainty of intolerance)
-    q_data = pd.read_csv(path_to.questionnaire.q_clean)
+    q_data = pd.read_csv(paths.questionnaire.q_clean)
 
     df_sdt = calculate_sdt_dataframe(
         df=data, signal_col="isyes", response_col="sayyes", subject_col="ID", condition_col="cue"
     )
 
-    # calculate criterio
-    high_c = list(df_sdt.criterion[df_sdt.cue == 0.75])
-    low_c = list(df_sdt.criterion[df_sdt.cue == 0.25])
+    # calculate criterion
+    high_c = list(df_sdt.criterion[df_sdt.cue == UP_B])
+    low_c = list(df_sdt.criterion[df_sdt.cue == LOW_B])
 
     # low - high stimulus probability
     diff_c = [x - y for x, y in zip(low_c, high_c)]
@@ -71,7 +79,7 @@ def correlate_sdt_with_questionnaire(expecon: int):
     filtered_diff_c = np.array(diff_c)[q_data["iu_sum"] > 0]
     filtered_iu_sum = q_data["iu_sum"][q_data["iu_sum"] > 0]
 
-    df_q= pd.DataFrame({"y": filtered_diff_c, "X": filtered_iu_sum})
+    df_q = pd.DataFrame({"y": filtered_diff_c, "X": filtered_iu_sum})
 
     # Select columns representing questionnaire score and criterion change
     x = df_q["X"]
@@ -110,22 +118,21 @@ def correlate_sdt_with_questionnaire(expecon: int):
     )
 
     for fm in ["png", "svg"]:
-        plt.savefig(Path(path_to.figures.manuscript.figure2) / f"linreg_c_q.{fm}", dpi=300)
+        plt.savefig(Path(paths.figures.manuscript.figure2) / f"linreg_c_q.{fm}", dpi=300)
     plt.show()
 
 
 def diff_from_optimal_criterion(expecon: int):
     """
-    Calculate the difference between the optimal criterion & the criterion for each participant and each condition
-    
+    Calculate the difference between the optimal criterion & the criterion for each participant and each condition.
+
     Args:
     ----
     expecon: int: expecon = 1: analyze expecon 1 behavioral data | expecon = 2: analyze expecon 2 behavioral data
-    
+
     """
-    
     # Set up data path
-    behavior_path = Path(path_to.data.behavior if expecon == 1 else path_to.expecon2.behavior)
+    behavior_path = Path(paths.data.behavior if expecon == 1 else paths.expecon2.behavior)
 
     data = pd.read_csv(behavior_path / "prepro_behav_data.csv")
 
@@ -134,25 +141,27 @@ def diff_from_optimal_criterion(expecon: int):
         df=data, signal_col="isyes", response_col="sayyes", subject_col="ID", condition_col="cue"
     )
 
-    c_low = calculate_optimal_c(0.25, 0.75, 1, 1)
+    c_low = calculate_optimal_c(LOW_B, UP_B, 1, 1)
     print("Optimal criterion (c) for low stimulus probability:", c_low)
 
-    c_high = calculate_optimal_c(0.75, 0.25, 1, 1)
+    c_high = calculate_optimal_c(UP_B, LOW_B, 1, 1)
     print("Optimal criterion (c) for high stimulus probability:", c_high)
 
-    subop_low = [c - c_low for c in df_sdt.criterion[df_sdt.cue == 0.25]]
-    mean_low = np.mean(subop_low)
-    std_low = np.std(subop_low)
+    sub_op_low = [c - c_low for c in df_sdt.criterion[df_sdt.cue == LOW_B]]
+    mean_low = np.mean(sub_op_low)
+    std_low = np.std(sub_op_low)
     print(f"mean difference from optimal criterion for low stimulus probability: {mean_low}")
     print(f"standard deviation for optimal criterion for low stimulus probability: {std_low}")
 
-    subop_high = [c - c_high for c in df_sdt.criterion[df_sdt.cue == 0.75]]
-    mean_high = np.mean(subop_high)
-    std_high = np.std(subop_high)
+    sub_op_high = [c - c_high for c in df_sdt.criterion[df_sdt.cue == UP_B]]
+    mean_high = np.mean(sub_op_high)
+    std_high = np.std(sub_op_high)
     print(f"mean difference from optimal criterion for high stimulus probability: {mean_high}")
     print(f"standard deviation for optimal criterion for high stimulus probability: {std_high}")
 
-############################# Helper functions #############################
+
+# Helper functions #############################
+
 
 def calculate_sdt_dataframe(
     df: pd.DataFrame, signal_col: str, response_col: str, subject_col: str, condition_col: str
@@ -171,9 +180,10 @@ def calculate_sdt_dataframe(
     Returns:
     -------
     Pandas dataframe containing the calculated SDT measures (d' and criterion) for each participant and condition.
+
     """
     # Apply Hautus correction and calculate SDT measures for each participant and condition
-    # Hautus correction depends on the condition (0.25 or 0.75)
+    # Hautus correction depends on the condition (LOW_B==0.25 or UP_B==0.75)
     results = []
     subjects = df[subject_col].unique()
     conditions = df[condition_col].unique()
@@ -182,10 +192,10 @@ def calculate_sdt_dataframe(
         for condition in conditions:
             subset = df[(df[subject_col] == subject) & (df[condition_col] == condition)]
 
-            detect_hits = subset[(subset[signal_col] == True) & (subset[response_col] == True)].shape[0]
-            detect_misses = subset[(subset[signal_col] == True) & (subset[response_col] == False)].shape[0]
-            false_alarms = subset[(subset[signal_col] == False) & (subset[response_col] == True)].shape[0]
-            correct_rejections = subset[(subset[signal_col] == False) & (subset[response_col] == False)].shape[0]
+            detect_hits = subset[(subset[signal_col] is True) & (subset[response_col] is True)].shape[0]
+            detect_misses = subset[(subset[signal_col] is True) & (subset[response_col] is False)].shape[0]
+            false_alarms = subset[(subset[signal_col] is False) & (subset[response_col] is True)].shape[0]
+            correct_rejections = subset[(subset[signal_col] is False) & (subset[response_col] is False)].shape[0]
 
             # log linear correction (Hautus, 1995)
             hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
@@ -208,6 +218,7 @@ def calculate_optimal_c(base_rate_signal, base_rate_catch, cost_hit, cost_false_
     """
     llr = math.log((base_rate_signal / base_rate_catch) * (cost_hit / cost_false_alarm))
     return -0.5 * llr  # c
+
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
