@@ -27,6 +27,11 @@ R-scripts are stored in `./code/Rscripts/`
 Jupyter notebooks are stored in `./code/notebooks/`.
 They are used for data exploration and visualization.
 
+We use nbstripout for seamless [version control](https://towardsdatascience.com/enhancing-data-science-workflows-mastering-version-control-for-jupyter-notebooks-b03c839e25ec) of jupyter notebooks:
+
+nbstripout integrates with Git hooks to automatically strip output cells fromnotebooks when they are committed.
+It modifies the notebook’s JSON content, removing the output fields, thus reducing the file size and simplifying diffs.
+
 ### Configs
 
 Paths to data, parameter settings, etc. are stored in the config file: `./code/configs/config.toml`
