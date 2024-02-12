@@ -298,6 +298,7 @@ def get_significant_channel(data: np.ndarray, tmin: float, tmax: float, tmin_bas
 
 
 def plot_cluster_output_2d(
+    study: int, data: np.ndarray,
     tmin: float, tmax: float, tmin_base: float, tmax_base: float, good_cluster_inds: int, t_obs: int, clusters: int
 ):
     """
@@ -305,6 +306,8 @@ def plot_cluster_output_2d(
 
     Args:
     ----
+    study: int: study number (1 or 2), 1 == expecon1, 2 == expecon2
+    data: list of evoked objects
     tmin: float: start time of time window
     tmax: float: end time of time window
     tmin_base: float: start time of baseline window
@@ -315,8 +318,8 @@ def plot_cluster_output_2d(
 
     """
     # extract data
-    signal = [s.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for s in conds[2]]  # TODO: conds?
-    noise = [n.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for n in conds[3]]  # TODO: conds?
+    signal = [s.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for s in data[0]]
+    noise = [n.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for n in data[1]]
 
     # loop over clusters
     for i_clu, clu_idx in enumerate(good_cluster_inds):
