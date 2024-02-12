@@ -40,15 +40,15 @@ setwd("E:/expecon_ms")
 if (expecon == 1) {
   
   # set working directory and load clean, behavioral dataframe
-  behav_path <- file.path("data", "behav", "prepro_behav_data.csv")
+  behav_path <- file.path("data", "behav", "prepro_behav_data_expecon1.csv")
   
-  behav = read.csv(behav_path)
+  behav_1 = read.csv(behav_path)
   
 } else {
   
   behav_path <- file.path("data", "behav", "prepro_behav_data_expecon2.csv")
   
-  behav = read.csv(behav_path)
+  behav_2 = read.csv(behav_path)
   
   # ID to exclude
   ID_to_exclude <- 13
@@ -57,6 +57,28 @@ if (expecon == 1) {
   behav <- behav[behav$ID != ID_to_exclude, ]
   
 }
+
+# to combine datasets, make sure they have the same amount of columns
+behav_1 = subset(behav_1, select = -c(X,Unnamed..0,index,sayyes_y,surprise, sex, prevconf_resp,
+                                      conf_resp))
+behav_2 = subset(behav_2, select = -c(X,Unnamed..0.1,Unnamed..0, sayyes_y, gender, ITI))
+
+# add sublock variable to study 2
+subblock_list <- rep(1, nrow(behav_2))
+behav_2$subblock <- subblock_list
+
+# add variable for the 2 studies to the big dataframe
+environment_list1 <- rep(1, nrow(behav_1))
+environment_list2 <-rep(2, nrow(behav_2))
+
+behav_1$study <- environment_list1
+behav_2$study <- environment_list2
+
+# change IDs for the second study (add 43 to each ID)
+behav_2$ID <- behav_2$ID + 43
+
+# combine both dataframes
+behav = rbind(behav_1, behav_2)
 ################################ linear mixed modelling ###########################################
 
 # make factors for categorical variables:
@@ -68,9 +90,8 @@ behav$previsyes = as.factor(behav$previsyes) # previous stimulus
 behav$prevconf = as.factor(behav$prevconf) # previous confidence
 behav$correct = as.factor(behav$correct) # performance
 behav$prevcue = as.factor(behav$prevcue) # previous probability
+behav$study = as.factor(behav$study)
 
-# remove NaN column
-behav <- subset(behav, select = -sayyes_y)
 # Remove NaN trials for model comparision (models neeed to have same amount of data)
 behav <- na.omit(behav) 
 ################################GLMMs##############################################################
@@ -88,7 +109,7 @@ simple_sdt_model = glmer(sayyes ~ isyes + (isyes|ID), data=behav,
 summary(simple_sdt_model)
 
 # now add the stimulus probability as a regressor: exclude interaction random effects: singularity
-cue_model = glmer(sayyes ~ isyes+cue+isyes*cue + (isyes+cue|ID), data=behav, 
+cue_model = glmer(sayyes ~ isyes+cue + isyes*cue + (isyes+cue|ID), data=behav, 
                   family=binomial(link='probit'),
                   control=glmerControl(optimizer="bobyqa",
                                        optCtrl=list(maxfun=2e5)),
@@ -154,7 +175,7 @@ ggplot(plot_data, aes(beta_probcue, beta_previouschoice)) +
 
 ################ including interaction between cue and previous choice#############################
 
-cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevresp + prevresp*cue
+cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevresp + study + prevresp*cue*study + 
                            + cue*isyes +
                              (isyes + cue*prevresp|ID), data=behav, 
                            family=binomial(link='probit'),
@@ -163,6 +184,7 @@ cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevresp + prevresp*cue
 )
 
 summary(cue_prev_int_model)
+report(cue_prev_int_model)
 
 check_collinearity(cue_prev_int_model)
 check_convergence(cue_prev_int_model)
@@ -178,6 +200,10 @@ emm_model <- emmeans(cue_prev_int_model, "prevresp", by = "cue", infer=TRUE)
 con <- contrast(emm_model)
 con
 
+# Post hoc tests for interaction for both studies
+emm_model <- emmeans(cue_prev_int_model, "cue", by = c("prevresp", "study"), infer=TRUE)
+con <- contrast(emm_model)
+con
 ###########################check interaction in study 2 if you condition on prev cue #############
 
 # Create a column that indexes wether the current cue had the same cue in the trial before (==1)
