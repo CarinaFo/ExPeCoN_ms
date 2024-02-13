@@ -3,8 +3,7 @@
 Run ICA.
 
 Functions to run ICA (extended infomax or fastica)
-and select ICA components semi-automatically using a correlation approach or
-a fully automated approach using iclabel.
+and select ICA components semi-automatically using a correlation approach.
 
 Data is re-referenced to the common average and saved as a .fif file.
 
@@ -23,7 +22,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import mne
 import pandas as pd
-from mne_icalabel import label_components
 
 from expecon_ms.configs import PROJECT_ROOT, config, paths
 
@@ -65,11 +63,6 @@ Path(paths.data.eeg.preprocessed.ica.PSD2).mkdir(parents=True, exist_ok=True)
 # participant IDs
 id_list_expecon1 = config.participants.ID_list_expecon1
 id_list_expecon2 = config.participants.ID_list_expecon2
-
-# add this line to jupyter script
-# run_ica(study=1, infomax=1, save_psd=1) # noqa: ERA001
-# label_ica_correlation() # noqa: ERA001
-
 
 def run_ica(study: int, infomax: int, save_psd: int):
     """
@@ -261,111 +254,6 @@ def label_ica_correlation(study: int):
         )
 
     return comps_removed
-
-
-def label_iclabel(study: int):
-    """
-    Apply automatic labeling of ICA components using the iclabel method.
-
-    doi:https://doi.org/10.1016/j.neuroimage.2019.05.026.
-    Non-brain related ica components are rejected.
-    The ica cleaned epochs are averaged to a common reference and saved as .fif files.
-
-    Args:
-    ----
-        study (int): Flag indicating whether to use the data from study 1 or study 2.
-
-    Returns:
-    -------
-        str: Message indicating the completion of removing ICA components.
-
-    """
-    # Store the count of removed ICA components for each participant
-    comps_removed = []
-
-    id_list = id_list_expecon1 if study == 1 else id_list_expecon2
-
-    for subj in id_list:
-        # set the file path for clean epochs (1Hz filtered)
-        file_path = (
-            epochs_for_ica_1 / f"P{subj}_epochs_1Hz-epo.fif"
-            if study == 1
-            else epochs_for_ica_2 / f"P{subj}_epochs_1Hz-epo.fif"
-        )
-
-        # load epochs (1Hz filtered)
-        epochs = mne.read_epochs(file_path, preload=True)
-
-        # load ICA solution
-        if study == 1:
-            ica_sol = load_pickle(Path(paths.data.eeg.preprocessed.ica.ICA_solution1, f"icas_{subj}.pkl"))
-        else:
-            if subj == "013":
-                continue
-            ica_sol = load_pickle(Path(paths.data.eeg.preprocessed.ica.ICA_solution2, f"icas_{subj}.pkl"))
-
-        # use the 'iclabel' method to label components
-        label_components(epochs, ica_sol, method="iclabel")
-
-        # Get indices of non-brain or other labeled components to exclude
-        all_non_brain = []
-
-        for label in ica_sol.labels_:
-            if label not in {"brain", "other"}:
-                all_non_brain.append(ica_sol.labels_[label])
-
-        # unpack list of lists
-        exclude_idx = [item for sublist in all_non_brain for item in sublist]
-
-        print(f"Excluding these ICA components for participant {subj}: {exclude_idx}")
-
-        # Save the count of excluded components per participant for methods
-        comps_removed.append(len(exclude_idx))
-
-        # now load the highpass filtered data (0.1 Hz)
-        if study == 1:
-            filter_path = epochs_for_ica_1 / f"P{subj}_epochs_0.1Hz-epo.fif"
-        else:
-            if subj == "013":
-                continue
-            filter_path = epochs_for_ica_2 / f"P{subj}_epochs_0.1Hz-epo.fif"
-
-        epochs_filter = mne.read_epochs(filter_path, preload=True)
-
-        # set the indices to exclude
-        ica_sol.exclude = exclude_idx
-
-        # Remove the non-brain components from the clean epochs
-        ica_sol.apply(epochs_filter)
-
-        # reference to average
-        epochs_filter.set_eeg_reference("average", ch_type="eeg")
-
-        # save the cleaned epochs
-        if study == 1:
-            epochs_filter.save(
-                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, f"P{subj}_iclabel_0.1Hz-epo.fif")
-            )
-        else:
-            epochs_filter.save(
-                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2, f"P{subj}_iclabel_0.1Hz-epo.fif")
-            )
-
-        print(f"Saved ICA cleaned epochs for participant {subj}.")
-
-    # save a dataframe with info on how many components were removed
-    if study == 1:
-        pd.DataFrame(comps_removed).to_csv(
-            Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, "ica_components_stats_iclabel.csv"),
-            index=False,
-        )
-    else:
-        pd.DataFrame(comps_removed).to_csv(
-            Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2, "ica_components_stats_iclabel.csv"),
-            index=False,
-        )
-
-    return "Done with removing ICA components", comps_removed
 
 
 # Helper functions
