@@ -21,7 +21,7 @@ package_version <- packageVersion("mediation")
 options(scipen=999)
 
 # which dataset to analyze (1 => block design, 2 => trial-by-trial design)
-expecon <- 2
+expecon <- 1
 
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
@@ -99,7 +99,7 @@ setwd("E:/expecon_ms")
 filename = paste('medglm_cue_beta_', expecon, '.rds', sep="")
 model_path = file.path("data", "behav", "mediation", filename)
 saveRDS(out.model_beta, model_path)
-mediation_cue_beta_yes = readRDS(model_path)
+out.model_beta = readRDS(model_path)
 
 # separate model for congruent and incongruent trials:
 congruent_trials = filter(behav, congruency=="True")
@@ -115,29 +115,20 @@ out.model_conf_beta <- glmer(conf ~ isyes + cue + beta + prevresp*cue + isyes*cu
 
 summary(out.model_conf_beta)
 
-# now fit mediation model with confidence as the outcome variable
-out.model_conf_beta <- glmer(conf ~ isyes + cue + beta + prevresp*cue + isyes*cue+
-                          (cue*isyes+prevresp|ID),
-                        data = behav,
-                        control=glmerControl(optimizer="bobyqa",
-                                             optCtrl=list(maxfun=2e5)),
-                        family=binomial(link='probit'))
-
-summary(out.model_conf_beta)
 
 # confidence model beta power
 filename = paste('medglm_conf_cue_beta_', expecon, '.rds', sep="")
 model_path = file.path("data", "behav", "mediation", filename)
 saveRDS(out.model_conf_beta, model_path)
-mediation_cue_beta_yes = readRDS(model_path)
+out.model_conf_beta = readRDS(model_path)
 
 # save table to html
-table1 = sjPlot::tab_model(out.model_beta, out.model_conf_beta,
-                           show.aic=TRUE, show.loglik=TRUE)
-
 filename = paste("mediationglm_expecon", expecon, ".html", sep="_")
 output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
-htmlTable(table1, file = output_file_path)
+
+sjPlot::tab_model(out.model_beta, out.model_conf_beta,
+                           show.aic=TRUE, show.loglik=TRUE,
+                  file = output_file_path)
 
 # expecon 2
 
@@ -159,7 +150,7 @@ setwd("E:/expecon_ms")
 filename = paste('medglm_cue_beta_', expecon, '.rds', sep="")
 model_path = file.path("data", "behav", "mediation", filename)
 saveRDS(out.model_beta, model_path)
-mediation_cue_beta_yes = readRDS(model_path)
+out.model_beta = readRDS(model_path)
 
 # now fit mediation model with confidence as the outcome variable
 out.model_conf_beta <- glmer(conf ~ isyes + cue + beta + prevresp + isyes*cue+
@@ -175,15 +166,16 @@ summary(out.model_conf_beta)
 filename = paste('medglm_conf_cue_beta_', expecon, '.rds', sep="")
 model_path = file.path("data", "behav", "mediation", filename)
 saveRDS(out.model_conf_beta, model_path)
-mediation_cue_beta_yes = readRDS(model_path)
+out.model_conf_beta = readRDS(model_path)
 
 # save table to html
-table2 = sjPlot::tab_model(out.model_beta, out.model_conf_beta,
-                           show.aic=TRUE, show.loglik=TRUE)
+sjPlot::tab_model(out.model_beta, out.model_conf_beta,
+                           show.aic=TRUE, show.loglik=TRUE,
+                  file = output_file_path)
 
 filename = paste("mediationglm_expecon", expecon, ".html", sep="_")
 output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
-htmlTable(table2, file = output_file_path)
+
 
 # now fit mediation model
 mediation_cue_beta_prevno <- mediate(med.model_beta, out.model_beta, treat='cue', mediator='beta', 
