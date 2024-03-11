@@ -121,13 +121,13 @@ summary(beta_base_glm)
 
 # save models to disk
 filename = paste("alpha_base_glm_", expecon, ".rda", sep="")
-cue_model_path = file.path("data", "behav", "mixed_models", filename)
+cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filename)
 saveRDS(alpha_base_glm, cue_model_path)
 alpha_base_glm <- readRDS(cue_model_path)
 
 
 filename = paste("beta_base_glm_", expecon, ".rda", sep="")
-cue_model_path = file.path("data", "behav", "mixed_models", filename)
+cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filename)
 saveRDS(beta_base_glm, cue_model_path)
 beta_base_glm <- readRDS(cue_model_path)
 
@@ -159,16 +159,14 @@ summary(beta_prev_glm)
 
 # save models to disk
 filename = paste("alpha_prev_glm_", expecon, ".rda", sep="")
-cue_model_path = file.path("data", "behav", "mixed_models", filename)
+cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filename)
 saveRDS(alpha_prev_glm, cue_model_path)
 alpha_prev_glm <- readRDS(cue_model_path)
 
-
 filename = paste("beta_prev_glm_", expecon, ".rda", sep="")
-cue_model_path = file.path("data", "behav", "mixed_models", filename)
+cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filename)
 saveRDS(beta_prev_glm, cue_model_path)
 beta_prev_glm <- readRDS(cue_model_path)
-
 ##### no we fit the interaction between prestimulus power and previous choice
 
 # alpha interaction
@@ -204,16 +202,15 @@ con
 
 # save models to disk
 filename = paste("alpha_int_glm_", expecon, ".rda", sep="")
-cue_model_path = file.path("data", "behav", "mixed_models", filename)
+cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filename)
 saveRDS(alpha_int_glm, cue_model_path)
 alpha_int_glm <- readRDS(cue_model_path)
 
 
 filename = paste("beta_int_glm_", expecon, ".rda", sep="")
-cue_model_path = file.path("data", "behav", "mixed_models", filename)
+cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filename)
 saveRDS(beta_int_glm, cue_model_path)
 beta_int_glm <- readRDS(cue_model_path)
-
 ############################################### Model comparision ##################################
 
 # Likelihood ratio tests
@@ -235,19 +232,19 @@ print(diff_aic_2)
 print(diff_bic_2)
 
 # save table to html
-table1 = sjPlot::tab_model(beta_base_glm, beta_prev_glm, beta_int_glm, 
-                           show.aic=TRUE, show.loglik=TRUE)
-
-table2 = sjPlot::tab_model(alpha_base_glm, alpha_prev_glm, alpha_int_glm, 
-                           show.aic=TRUE, show.loglik=TRUE)
-
 filename = paste("beta_expecon", expecon, ".html", sep="_")
-output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
-htmlTable(table1, file = output_file_path)
+output_file_path_beta <- file.path("figs", "manuscript_figures", "Tables", filename)
 
 filename = paste("alpha_expecon", expecon, ".html", sep="_")
-output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
-htmlTable(table2, file = output_file_path)
+output_file_path_alpha <- file.path("figs", "manuscript_figures", "Tables", filename)
+
+sjPlot::tab_model(beta_base_glm, beta_prev_glm, beta_int_glm, 
+                           show.aic=TRUE, show.loglik=TRUE,
+                           file = output_file_path_beta)
+
+sjPlot::tab_model(alpha_base_glm, alpha_prev_glm, alpha_int_glm, 
+                           show.aic=TRUE, show.loglik=TRUE,
+                           file = output_file_path_alpha)
 ##########################congruency###############################################################
 
 # does beta power per trial predict congruent responses in both probability conditions?
