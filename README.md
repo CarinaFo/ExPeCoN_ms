@@ -1,8 +1,9 @@
 # Expectation Perception Confidence Neural Correlates (`ExPeCoN`)
 
-    Author(s): Carina Forster et al. (2023)
-    Status: Code is not yet reviewed
-    Last update: Jan 31, 2024
+    Author(s): Carina Forster et al. (in prep)
+    Contact: forster@cbs.mpg.de
+    Status: Code is not reviewed yet
+    Last update: March 26, 2024
 ***
 
 ## Open ToDos before
@@ -20,7 +21,9 @@ near-threshold somatosensory detection task in two datasets
 
 ## Project structure
 
-*A brief description of the folder structure of the project (Where is what?).* [`TODO`]
+Analysis code can be found in `code/`.
+Code for conducting the experiment and data acquisition is in `experimental_code/`.
+
 
 The project structure is based on [`scilaunch`](https://github.com/SHEscher/scilaunch).
 
@@ -37,21 +40,17 @@ git clone https://github.com/CarinaFo/ExPeCoN_ms.git
 cd expecon_ms
 ```
 
-Create a conda environment specific to `expecon_ms`:
-Make sure you are in the local folder where you cloned the repository into.
+Create a conda environment specific to `expecon_ms`.
+Make sure you are in the local folder where you cloned the repository into:
 
 ```shell
-conda env create -f expecon.yml
-# the environment is called expecon_3.9
+conda create -n expecon_3.9 python=3.9.7
 ```
 
-And activate it:
+And activate the conda environment :
 
 ```shell
 conda activate expecon_3.9
-
-# Add the conda environment to jupyter (notebook)
-python -m ipykernel install --user --name=expecon_3.9
 ```
 
 Install the project code `expecon_ms` as Python package:
@@ -65,13 +64,20 @@ i.e., changes to the code will be directly reflected in the installed package.
 Moreover, the code keeps its access to the research data in the underlying folder structure.
 Thus, the `-e` flag is recommended to use.
 
+
+Now, add the conda environment as kernel to jupyter (notebook)
+
+```shell
+python -m ipykernel install --user --name=expecon_3.9
+```
+
 *R*-scripts of the analysis are stored in `./code/Rscripts/`.
 
 ### Explore data and analysis
 
 Use jupyter notebooks to explore the data and analysis:
 
-### Open code in your prefered editor but make sure to run the code in the environment
+### Open the code in your preferred editor, but make sure to run the code in the correct environment
 
 ```shell
 jupyter lab code/notebooks/expecon_ms.ipynb &
@@ -79,6 +85,7 @@ jupyter lab code/notebooks/expecon_ms.ipynb &
 
 ## Publications
 
-In case you use this code, please cite the following paper: Forster et al., in prep.
+In the case you use this code, please cite the following paper: Forster et al., in prep.
 
 ## Contributors/Collaborators
+* add [`TODO`]
