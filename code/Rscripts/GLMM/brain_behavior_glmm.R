@@ -4,6 +4,7 @@
 
 # author: Carina Forster
 # email: forster@mpg.cbs.de
+# date: 2021-06-01
 
 # libraries
 library(lme4) # mixed models
@@ -26,7 +27,7 @@ par(family = "Arial", cex = 1.2)
 
 # which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
 
-expecon <- 1
+expecon <- 2
 
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
@@ -183,9 +184,8 @@ check_convergence(alpha_int_glm)
 summary(alpha_int_glm)
 
 # beta interaction
-beta_int_glm <- glmer(sayyes ~ isyes + beta + cue + prevresp + 
-                        beta*isyes + cue*isyes + cue*prevresp + beta*prevresp +
-                        (isyes + prevresp + cue| ID),
+beta_int_glm_2 <- glmer(sayyes ~ isyes + beta*cue*prevresp +
+                        (isyes + prevresp + cue + beta| ID),
                       data = behav, family=binomial(link='probit'), 
                       control=glmerControl(optimizer="bobyqa",
                                            optCtrl=list(maxfun=2e5)))
