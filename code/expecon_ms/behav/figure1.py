@@ -143,49 +143,6 @@ def prepro_behavioral_data(expecon: int):
 
     return data
 
-def reproduce_interaction_non_model_based(expecon: int):
-    """
-    Reproduce the interaction between stim. probability and the previous response.
-
-    Args:
-    ----
-    expecon: int: which dataset to use: expecon 1 or expecon 2
-
-    Returns:
-    -------
-    None
-
-    """
-    # load the preprocessed data
-    data = pd.read_csv(Path(paths.data.behavior, f"prepro_behav_data_{str(expecon)}.csv"))
-
-    # calculate the interaction between the cue condition and the previous response on the current response
-    # for each participant
-    interaction = data.groupby(["ID", "prevresp", "cue"])[["sayyes"]].mean() \
-                      .unstack().unstack()
-    interaction.plot(kind="box")
-    # rename x labels and tilt them for better readability
-    plt.xticks([0, 1, 2, 3], ["0.25_prev_no", "0.25_prev_yes",
-                              "0.75_prev_no", "0.75_prev_yes"])
-    plt.xticks(rotation=45)
-    # set y label
-    plt.ylabel("mean detection response")
-    # run dependent samples ttests between the 4 conditions
-    print(stats.ttest_rel(interaction["sayyes"][params.low_p][0], interaction["sayyes"][params.high_p][0]))
-    print(stats.ttest_rel(interaction["sayyes"][params.low_p][1], interaction["sayyes"][params.high_p][1]))
-    print(stats.ttest_rel(interaction["sayyes"][params.low_p][0], interaction["sayyes"][params.low_p][1]))
-    print(stats.ttest_rel(interaction["sayyes"][params.high_p][0], interaction["sayyes"][params.high_p][1]))
-
-    if expecon == 1:
-        plt.savefig(Path(paths.figures.manuscript.figure1, f"interaction_prevresp_cue_{str(expecon)}.png"))
-        # save svg file
-        plt.savefig(Path(paths.figures.manuscript.figure1, f"interaction_prevresp_cue_{str(expecon)}.svg"))
-    else:
-        plt.savefig(Path(paths.figures.manuscript.figure2, f"interaction_prevresp_cue_{str(expecon)}.png"))
-        # save svg file
-        plt.savefig(Path(paths.figures.manuscript.figure1, f"interaction_prevresp_cue_{str(expecon)}.svg"))
-
-    plt.show()
 
 def exclude_data(expecon: int):
     """
