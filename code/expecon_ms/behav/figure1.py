@@ -144,6 +144,7 @@ def prepro_behavioral_data(expecon: int):
 
     return data
 
+
 def reproduce_interaction_non_model_based(expecon: int):
     """
     Reproduce the interaction between stim. probability and the previous response.
@@ -158,7 +159,7 @@ def reproduce_interaction_non_model_based(expecon: int):
 
     """
     # load the preprocessed data
-    data = pd.read_csv(f"{behav_path}{Path('/')}prepro_behav_data_{str(expecon)}.csv")
+    data = pd.read_csv(Path(behav_path) / f"prepro_behav_data_{expecon!s}.csv")  # TODO: define behav_path
 
     # calculate the interaction between the cue condition and the previous response on the current response
     # for each participant
@@ -178,15 +179,16 @@ def reproduce_interaction_non_model_based(expecon: int):
     print(stats.ttest_rel(interaction["sayyes"][0.75][0], interaction["sayyes"][0.75][1]))
 
     if expecon == 1:
-        plt.savefig(f"{save_path_fig1}{Path('/')}interaction_prevresp_cue_{str(expecon)}.png")
+        plt.savefig(Path(save_path_fig1, f"interaction_prevresp_cue_{expecon!s}.png"))  # TODO: define save_path_fig1
         # save svg file
-        plt.savefig(f"{save_path_fig1}{Path('/')}interaction_prevresp_cue_{str(expecon)}.svg")
+        plt.savefig(Path(save_path_fig1, f"interaction_prevresp_cue_{expecon!s}.svg"))  # TODO: define save_path_fig1
     else:
-        plt.savefig(f"{save_path_fig2}{Path('/')}interaction_prevresp_cue_{str(expecon)}.png")
+        plt.savefig(Path(save_path_fig2, f"interaction_prevresp_cue_{expecon!s}.png"))  # TODO: define save_path_fig2
         # save svg file
-        plt.savefig(f"{save_path_fig2}{Path('/')}interaction_prevresp_cue_{str(expecon)}.svg")
+        plt.savefig(Path(save_path_fig2, f"interaction_prevresp_cue_{expecon!s}.svg"))  # TODO: define save_path_fig2
 
     plt.show()
+
 
 def exclude_data(expecon: int):
     """
