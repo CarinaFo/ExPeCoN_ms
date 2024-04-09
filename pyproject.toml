@@ -44,13 +44,12 @@ develop = [
     "notebook==6.4.12",
     "jupyter_contrib_nbextensions>=0.7.0",
     "ruff>=0.1.15",
-    "tox>=3.25.1",
     "pytest==7.4.2",
     "pytest-cov",
 ]
 
 [project.urls]
-osf = "https://www.osf.org/XXXXX"                     # TODO: change to actual OSF project page
+osf = "https://www.osf.org/XXXXX"  # TODO: change to actual OSF project page
 repository = "https://github.com/CarinaFo/ExPeCoN_ms"
 # Consider other URLs: pre-registration, data repository, etc.  # TODO: add more if needed
 
@@ -66,7 +65,7 @@ platforms = [
     "osx",
     "cygwin",
     "win32",
-] # TODO: keep intended platforms
+]
 zip-safe = false
 
 # # To automatically find the package(s) (Beta feature (Oct, 2022)):
@@ -203,7 +202,7 @@ extend-exclude = [
 ]
 line-length = 119 # Same as flake8 and black
 target-version = "py39" # assume Python 3.9
-output-format = "text" # try out: "grouped"
+output-format = "concise" # try out: "grouped" or "full"
 preview = true # true: Ruff will use unstable rules and fixes
 
 [tool.ruff.extend-per-file-ignores]

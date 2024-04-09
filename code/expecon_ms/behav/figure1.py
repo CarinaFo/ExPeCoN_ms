@@ -143,7 +143,6 @@ def prepro_behavioral_data(expecon: int):
 
     return data
 
-
 def exclude_data(expecon: int):
     """
     Exclude experimental blocks from the data based on the exclusion criteria (hit rates, fa rates).

@@ -1,21 +1,14 @@
 # ExPeCoN – **code**
 
-`[Last update: January 30, 2024]`
-
 ***
-    Period:     2023-10 - ...
-    Status:     work in progress / finalized
-
-    Author(s):  Carina Forster et al.
-    Contact:    forster@cbs.mpg.de
+    Author(s): Carina Forster et al.
+    Contact: forster@cbs.mpg.de
+    Status: work in progress
+    Last update: March 26, 2024
 
 ***
 
 ## Codebase
-
-*Refer to the corresponding code/scripts written for the analysis etc.
-Which languages (Python, R, Matlab, ...) were used? Are there specific package versions,
-which one should take care of? Or is there a container (e.g., Docker) or virtual environment?*
 
 ### Python
 Python code is stored in `./code/expecon_ms/` and can be installed as a python package
