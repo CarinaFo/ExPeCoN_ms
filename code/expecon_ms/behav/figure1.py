@@ -27,7 +27,6 @@ import statsmodels.api as sm
 from matplotlib import gridspec
 from scipy import stats
 
-from expecon_ms.behav.corr_sdt import LOW_B, UP_B
 from expecon_ms.configs import PROJECT_ROOT, params, paths
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -108,9 +107,9 @@ def prepro_behavioral_data(expecon: int):
     # add a column that indicates correct responses & congruency
     data["correct"] = data.sayyes == data.isyes
     # Add a 'congruency' column
-    data["congruency"] = ((data.cue == LOW_B) & (data.sayyes == 0)) | ((data.cue == UP_B) & (data.sayyes == 1))
+    data["congruency"] = ((data.cue == params.low_p) & (data.sayyes == 0)) | ((data.cue == params.high_p) & (data.sayyes == 1))
     # Add a 'congruency stimulus' column
-    data["congruency_stim"] = ((data.cue == LOW_B) & (data.isyes == 0)) | ((data.cue == UP_B) & (data.isyes == 1))
+    data["congruency_stim"] = ((data.cue == params.low_p) & (data.isyes == 0)) | ((data.cue == params.high_p) & (data.isyes == 1))
 
     # add a column that combines the confidence ratings and the
     # detection response
@@ -136,59 +135,13 @@ def prepro_behavioral_data(expecon: int):
     data["previsyes"] = data.groupby(["ID", "block"])["isyes"].shift(1)
 
     # remove no response trials or super fast responses
-    data = data.drop(data[data.respt1 == 2.5].index)  # noqa: PLR2004
-    data = data.drop(data[data.respt1 < 0.1].index)  # noqa: PLR2004
+    data = data.drop(data[data.respt1 == params.behavioral_cleaning.rt_max].index)  # noqa: PLR2004
+    data = data.drop(data[data.respt1 < params.behavioral_cleaning.rt_min].index)  # noqa: PLR2004
 
     # save the preprocessed dataframe
     data.to_csv(Path(paths.data.behavior, f"behav_data_exclrts_{expecon!s}.csv"))
 
     return data
-
-
-def reproduce_interaction_non_model_based(expecon: int):
-    """
-    Reproduce the interaction between stim. probability and the previous response.
-
-    Args:
-    ----
-    expecon: int: which dataset to use: expecon 1 or expecon 2
-
-    Returns:
-    -------
-    None
-
-    """
-    # load the preprocessed data
-    data = pd.read_csv(Path(behav_path) / f"prepro_behav_data_{expecon!s}.csv")  # TODO: define behav_path
-
-    # calculate the interaction between the cue condition and the previous response on the current response
-    # for each participant
-    interaction = data.groupby(["ID", "prevresp", "cue"])[["sayyes"]].mean() \
-                      .unstack().unstack()
-    interaction.plot(kind="box")
-    # rename x labels and tilt them for better readability
-    plt.xticks([0, 1, 2, 3], ["0.25_prev_no", "0.25_prev_yes",
-                              "0.75_prev_no", "0.75_prev_yes"])
-    plt.xticks(rotation=45)
-    # set y label
-    plt.ylabel("mean detection response")
-    # run dependent samples ttests between the 4 conditions
-    print(stats.ttest_rel(interaction["sayyes"][0.25][0], interaction["sayyes"][0.75][0]))
-    print(stats.ttest_rel(interaction["sayyes"][0.25][1], interaction["sayyes"][0.75][1]))
-    print(stats.ttest_rel(interaction["sayyes"][0.25][0], interaction["sayyes"][0.25][1]))
-    print(stats.ttest_rel(interaction["sayyes"][0.75][0], interaction["sayyes"][0.75][1]))
-
-    if expecon == 1:
-        plt.savefig(Path(save_path_fig1, f"interaction_prevresp_cue_{expecon!s}.png"))  # TODO: define save_path_fig1
-        # save svg file
-        plt.savefig(Path(save_path_fig1, f"interaction_prevresp_cue_{expecon!s}.svg"))  # TODO: define save_path_fig1
-    else:
-        plt.savefig(Path(save_path_fig2, f"interaction_prevresp_cue_{expecon!s}.png"))  # TODO: define save_path_fig2
-        # save svg file
-        plt.savefig(Path(save_path_fig2, f"interaction_prevresp_cue_{expecon!s}.svg"))  # TODO: define save_path_fig2
-
-    plt.show()
-
 
 def exclude_data(expecon: int):
     """
@@ -289,17 +242,17 @@ def calculate_mean_sdt_param_changes(expecon=1):
     df_sdt = calculate_sdt_dataframe(df_study, "isyes", "sayyes", "ID", "cue")
 
     # calculate hit rate change between conditions per participant
-    diff_hit = df_sdt.hit_rate[df_sdt.cue == UP_B].reset_index() - df_sdt.hit_rate[df_sdt.cue == LOW_B].reset_index()
+    diff_hit = df_sdt.hit_rate[df_sdt.cue == params.high_p].reset_index() - df_sdt.hit_rate[df_sdt.cue == params.low_p].reset_index()
 
     # calculate fa rate change between conditions per participant
-    diff_fa = df_sdt.fa_rate[df_sdt.cue == UP_B].reset_index() - df_sdt.fa_rate[df_sdt.cue == LOW_B].reset_index()
+    diff_fa = df_sdt.fa_rate[df_sdt.cue == params.high_p].reset_index() - df_sdt.fa_rate[df_sdt.cue == params.low_p].reset_index()
 
     # calculate dprime change between conditions per participant
-    diff_dprime = df_sdt.dprime[df_sdt.cue == UP_B].reset_index() - df_sdt.dprime[df_sdt.cue == LOW_B].reset_index()
+    diff_dprime = df_sdt.dprime[df_sdt.cue == params.high_p].reset_index() - df_sdt.dprime[df_sdt.cue == params.low_p].reset_index()
 
     # calculate criterion change between conditions per participant
     diff_crit = (
-        df_sdt.criterion[df_sdt.cue == UP_B].reset_index() - df_sdt.criterion[df_sdt.cue == LOW_B].reset_index()
+        df_sdt.criterion[df_sdt.cue == params.high_p].reset_index() - df_sdt.criterion[df_sdt.cue == params.low_p].reset_index()
     )
 
     # Filter for correct trials only
@@ -372,7 +325,7 @@ def plot_mean_response_and_confidence(
 
     # Perform the Wilcoxon signed-rank test
     wilcoxon_statistic, p_value = stats.wilcoxon(
-        mean_resp_id_cue[mean_resp_id_cue.cue == LOW_B].sayyes, mean_resp_id_cue[mean_resp_id_cue.cue == UP_B].sayyes
+        mean_resp_id_cue[mean_resp_id_cue.cue == params.low_p].sayyes, mean_resp_id_cue[mean_resp_id_cue.cue == params.high_p].sayyes
     )
     print(f"Wilcoxon statistic: {wilcoxon_statistic}")
     print(f"p-value: {p_value}")
@@ -389,8 +342,8 @@ def plot_mean_response_and_confidence(
 
     # Perform the Wilcoxon signed-rank test
     wilcoxon_statistic, p_value = stats.wilcoxon(
-        mean_prevresp_id_cue[mean_prevresp_id_cue.cue == LOW_B].prevresp,
-        mean_prevresp_id_cue[mean_prevresp_id_cue.cue == UP_B].prevresp,
+        mean_prevresp_id_cue[mean_prevresp_id_cue.cue == params.low_p].prevresp,
+        mean_prevresp_id_cue[mean_prevresp_id_cue.cue == params.high_p].prevresp,
     )
     print(f"Wilcoxon statistic: {wilcoxon_statistic}")
     print(f"p-value: {p_value}")
@@ -436,7 +389,7 @@ def prepare_for_plotting(exclude_high_fa: bool, expecon: int):
     df_sdt = calculate_sdt_dataframe(data, "isyes", "sayyes", "ID", "cue")
 
     # create a boolean mask for participants with very high fa rates
-    fa_rate_high_indices = np.where(df_sdt.fa_rate[df_sdt.cue == UP_B] > params.behavioral_cleaning.farate_max)
+    fa_rate_high_indices = np.where(df_sdt.fa_rate[df_sdt.cue == params.high_p] > params.behavioral_cleaning.farate_max)
     # Three participants with fa rates > 0.4
     print(f"Index of participants with high fa-rates: {fa_rate_high_indices}")
 
@@ -499,8 +452,8 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
     df_sdt, conf_con, _, _ = conditions  # _, _ == conf_yes, conf_no
 
     # set colors for both conditions
-    blue = "#0571b0"  # LOW_B=0.25 cue
-    red = "#ca0020"  # UP_B=0.75 cue
+    blue = "#0571b0"  # params.low_p=0.25 cue
+    red = "#ca0020"  # params.high_p=params.high_p cue
 
     colors = [blue, red]
     med_color = ["black", "black"]
@@ -519,10 +472,10 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
     hr_ax = fig.add_subplot(gs[4, 0])
 
     # Plot hit rate
-    for index in range(len(df_sdt.hit_rate[df_sdt.cue == LOW_B])):
+    for index in range(len(df_sdt.hit_rate[df_sdt.cue == params.low_p])):
         hr_ax.plot(
             1,
-            df_sdt.hit_rate[df_sdt.cue == LOW_B].iloc[index],
+            df_sdt.hit_rate[df_sdt.cue == params.low_p].iloc[index],
             marker="",
             markersize=8,
             color=colors[0],
@@ -531,7 +484,7 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         hr_ax.plot(
             2,
-            df_sdt.hit_rate[df_sdt.cue == UP_B].iloc[index],
+            df_sdt.hit_rate[df_sdt.cue == params.high_p].iloc[index],
             marker="",
             markersize=8,
             color=colors[1],
@@ -540,21 +493,22 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         hr_ax.plot(
             [1, 2],
-            [df_sdt.hit_rate[df_sdt.cue == LOW_B].iloc[index], df_sdt.hit_rate[df_sdt.cue == UP_B].iloc[index]],
+            [df_sdt.hit_rate[df_sdt.cue == params.low_p].iloc[index],
+            df_sdt.hit_rate[df_sdt.cue == params.high_p].iloc[index]],
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     hr_box = hr_ax.boxplot(
-        [df_sdt.hit_rate[df_sdt.cue == LOW_B], df_sdt.hit_rate[df_sdt.cue == UP_B]], patch_artist=True
+        [df_sdt.hit_rate[df_sdt.cue == params.low_p], df_sdt.hit_rate[df_sdt.cue == params.high_p]], patch_artist=True
     )
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(hr_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(hr_box["medians"], med_color):
@@ -567,10 +521,10 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
     # Plot fa rate
     fa_rate_ax = fig.add_subplot(gs[5, 0])
 
-    for index in range(len(df_sdt.fa_rate[df_sdt.cue == LOW_B])):
+    for index in range(len(df_sdt.fa_rate[df_sdt.cue == params.low_p])):
         fa_rate_ax.plot(
             1,
-            df_sdt.fa_rate[df_sdt.cue == LOW_B].iloc[index],
+            df_sdt.fa_rate[df_sdt.cue == params.low_p].iloc[index],
             marker="",
             markersize=8,
             color=colors[0],
@@ -579,7 +533,7 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         fa_rate_ax.plot(
             2,
-            df_sdt.fa_rate[df_sdt.cue == UP_B].iloc[index],
+            df_sdt.fa_rate[df_sdt.cue == params.high_p].iloc[index],
             marker="",
             markersize=8,
             color=colors[1],
@@ -588,21 +542,22 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         fa_rate_ax.plot(
             [1, 2],
-            [df_sdt.fa_rate[df_sdt.cue == LOW_B].iloc[index], df_sdt.fa_rate[df_sdt.cue == UP_B].iloc[index]],
+            [df_sdt.fa_rate[df_sdt.cue == params.low_p].iloc[index],
+            df_sdt.fa_rate[df_sdt.cue == params.high_p].iloc[index]],
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     fa_box = fa_rate_ax.boxplot(
-        [df_sdt.fa_rate[df_sdt.cue == LOW_B], df_sdt.fa_rate[df_sdt.cue == UP_B]], patch_artist=True
+        [df_sdt.fa_rate[df_sdt.cue == params.low_p], df_sdt.fa_rate[df_sdt.cue == params.high_p]], patch_artist=True
     )
 
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(fa_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(fa_box["medians"], med_color):
@@ -616,10 +571,10 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
     dprime_ax = fig.add_subplot(gs[4:, 1])
 
     # Plot individual data points
-    for index in range(len(df_sdt.dprime[df_sdt.cue == LOW_B])):
+    for index in range(len(df_sdt.dprime[df_sdt.cue == params.low_p])):
         dprime_ax.plot(
             1,
-            df_sdt.dprime[df_sdt.cue == LOW_B].iloc[index],
+            df_sdt.dprime[df_sdt.cue == params.low_p].iloc[index],
             marker="",
             markersize=8,
             color=colors[0],
@@ -628,7 +583,7 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         dprime_ax.plot(
             2,
-            df_sdt.dprime[df_sdt.cue == UP_B].iloc[index],
+            df_sdt.dprime[df_sdt.cue == params.high_p].iloc[index],
             marker="",
             markersize=8,
             color=colors[1],
@@ -637,20 +592,21 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         dprime_ax.plot(
             [1, 2],
-            [df_sdt.dprime[df_sdt.cue == LOW_B].iloc[index], df_sdt.dprime[df_sdt.cue == UP_B].iloc[index]],
+            [df_sdt.dprime[df_sdt.cue == params.low_p].iloc[index],
+            df_sdt.dprime[df_sdt.cue == params.high_p].iloc[index]],
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     dprime_box = dprime_ax.boxplot(
-        [df_sdt.dprime[df_sdt.cue == LOW_B], df_sdt.dprime[df_sdt.cue == UP_B]], patch_artist=True
+        [df_sdt.dprime[df_sdt.cue == params.low_p], df_sdt.dprime[df_sdt.cue == params.high_p]], patch_artist=True
     )
 
     for patch, color in zip(dprime_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(dprime_box["medians"], med_color):
@@ -666,10 +622,10 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
     crit_ax = fig.add_subplot(gs[4:, 2])
 
     # Plot individual data points
-    for index in range(len(df_sdt.criterion[df_sdt.cue == LOW_B])):
+    for index in range(len(df_sdt.criterion[df_sdt.cue == params.low_p])):
         crit_ax.plot(
             1,
-            df_sdt.criterion[df_sdt.cue == LOW_B].iloc[index],
+            df_sdt.criterion[df_sdt.cue == params.low_p].iloc[index],
             marker="",
             markersize=8,
             color=colors[0],
@@ -678,7 +634,7 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         crit_ax.plot(
             2,
-            df_sdt.criterion[df_sdt.cue == UP_B].iloc[index],
+            df_sdt.criterion[df_sdt.cue == params.high_p].iloc[index],
             marker="",
             markersize=8,
             color=colors[1],
@@ -687,20 +643,22 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         crit_ax.plot(
             [1, 2],
-            [df_sdt.criterion[df_sdt.cue == LOW_B].iloc[index], df_sdt.criterion[df_sdt.cue == UP_B].iloc[index]],
+            [df_sdt.criterion[df_sdt.cue == params.low_p].iloc[index],
+            df_sdt.criterion[df_sdt.cue == params.high_p].iloc[index]],
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     crit_box = crit_ax.boxplot(
-        [df_sdt.criterion[df_sdt.cue == LOW_B], df_sdt.criterion[df_sdt.cue == UP_B]], patch_artist=True
+        [df_sdt.criterion[df_sdt.cue == params.low_p], df_sdt.criterion[df_sdt.cue == params.high_p]],
+        patch_artist=True
     )
 
     for patch, color in zip(crit_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(crit_box["medians"], med_color):
@@ -740,7 +698,7 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     conf_ax.set_ylabel("high confidence", fontname="Arial", fontsize=14)
@@ -752,7 +710,7 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
     colors = ["white", "black"]
     for patch, color in zip(conf_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     med_color = ["black", "white"]
@@ -770,7 +728,7 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         plots.set_xlim(0.5, 2.5)
         plots.set_xticklabels(["", ""])
         if plots != hr_ax:
-            plots.set_xticklabels([str(LOW_B), str(UP_B)], fontname="Arial", fontsize=12)
+            plots.set_xticklabels([str(params.low_p), str(params.high_p)], fontname="Arial", fontsize=12)
             plots.set_xlabel("P (Stimulus)", fontname="Arial", fontsize=14)
         if plots == conf_ax:
             plots.set_xticklabels(["congruent", "incongruent"], fontname="Arial", fontsize=12, rotation=30)
@@ -804,8 +762,8 @@ def calc_stats(expecon: int):
     cond_list = ["criterion", "hit_rate", "fa_rate", "dprime"]
     for cond in cond_list:
         bootstrap_ci_effect_size_wilcoxon(
-            x1=df_sdt[cond][df_sdt.cue == LOW_B].reset_index(drop=True),
-            x2=df_sdt[cond][df_sdt.cue == UP_B].reset_index(drop=True),
+            x1=df_sdt[cond][df_sdt.cue == params.low_p].reset_index(drop=True),
+            x2=df_sdt[cond][df_sdt.cue == params.high_p].reset_index(drop=True),
         )
 
         bootstrap_ci_effect_size_wilcoxon(
@@ -905,7 +863,7 @@ def supplementary_plots(expecon: int):
     savepath_fig1 = Path(paths.figures.manuscript.figure1) if expecon == 1 else Path(paths.expecon2.figures)
 
     # set colors for both conditions
-    blue = "#2a95ffff"  # LOW_B cue
+    blue = "#2a95ffff"  # params.low_p cue
     red = "#ff2a2aff"
 
     colors = [blue, red]
@@ -927,8 +885,8 @@ def supplementary_plots(expecon: int):
 
     # Calculate mean accuracy for each participant and cue condition
     data_grouped = data.groupby(["ID", "cue"])["correct"].mean()
-    acc_high = data_grouped.unstack()[UP_B].reset_index()
-    acc_low = data_grouped.unstack()[LOW_B].reset_index()
+    acc_high = data_grouped.unstack()[params.high_p].reset_index()
+    acc_low = data_grouped.unstack()[params.low_p].reset_index()
     acc_cue = [acc_low, acc_high]
 
     # accuracy per condition
@@ -957,7 +915,7 @@ def supplementary_plots(expecon: int):
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     acc_box = plt.boxplot([acc_cue[0].iloc[:, 1], acc_cue[1].iloc[:, 1]], patch_artist=True)
@@ -965,14 +923,14 @@ def supplementary_plots(expecon: int):
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(acc_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(acc_box["medians"], med_color):
         patch.set_color(color)
 
     # Set x-axis tick labels
-    plt.xticks([1, 2], [str(LOW_B), str(UP_B)])
+    plt.xticks([1, 2], [str(params.low_p), str(params.high_p)])
     plt.xlabel(xlabel="P (Stimulus)", fontname="Arial", fontsize=14)
     plt.ylabel(ylabel="accuracy", fontname="Arial", fontsize=14)
 
@@ -981,8 +939,8 @@ def supplementary_plots(expecon: int):
 
     # Calculate mean confidence for each participant and cue condition
     data_grouped = data.groupby(["ID", "cue"])["conf"].mean()
-    conf_high = data_grouped.unstack()[UP_B].reset_index()
-    conf_low = data_grouped.unstack()[LOW_B].reset_index()
+    conf_high = data_grouped.unstack()[params.high_p].reset_index()
+    conf_low = data_grouped.unstack()[params.low_p].reset_index()
     conf_cue = [conf_low, conf_high]
 
     # is confidence higher for a certain cue?
@@ -1011,7 +969,7 @@ def supplementary_plots(expecon: int):
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     conf_box = plt.boxplot([conf_cue[0].iloc[:, 1], conf_cue[1].iloc[:, 1]], patch_artist=True)
@@ -1019,14 +977,14 @@ def supplementary_plots(expecon: int):
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(conf_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(conf_box["medians"], med_color):
         patch.set_color(color)
 
     # Set x-axis tick labels
-    plt.xticks([1, 2], [str(LOW_B), str(UP_B)])
+    plt.xticks([1, 2], [str(params.low_p), str(params.high_p)])
     plt.xlabel(xlabel="P (Stimulus)", fontname="Arial", fontsize=14)
     plt.ylabel(ylabel="confidence", fontname="Arial", fontsize=14)
 
@@ -1069,7 +1027,7 @@ def supplementary_plots(expecon: int):
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     conf_con_yes_box = plt.boxplot([conf_con_yes[0].iloc[:, 1], conf_con_yes[1].iloc[:, 1]], patch_artist=True)
@@ -1077,7 +1035,7 @@ def supplementary_plots(expecon: int):
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(conf_con_yes_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(conf_con_yes_box["medians"], med_color):
@@ -1124,7 +1082,7 @@ def supplementary_plots(expecon: int):
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     conf_con_no_box = plt.boxplot([conf_con_no[0].iloc[:, 1], conf_con_no[1].iloc[:, 1]], patch_artist=True)
@@ -1132,7 +1090,7 @@ def supplementary_plots(expecon: int):
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(conf_con_no_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(conf_con_no_box["medians"], med_color):
@@ -1166,7 +1124,7 @@ def supplementary_plots(expecon: int):
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     rt_con_box = plt.boxplot([rt_con[0].iloc[:, 1], rt_con[1].iloc[:, 1]], patch_artist=True)
@@ -1174,7 +1132,7 @@ def supplementary_plots(expecon: int):
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(rt_con_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(rt_con_box["medians"], med_color):
@@ -1220,7 +1178,7 @@ def supplementary_plots(expecon: int):
             marker="",
             markersize=0,
             color="gray",
-            alpha=LOW_B,
+            alpha=params.low_p,
         )
 
     rt_con_in_box = plt.boxplot([rt_con_incorrect[0].iloc[:, 1], rt_con_incorrect[1].iloc[:, 1]], patch_artist=True)
@@ -1228,7 +1186,7 @@ def supplementary_plots(expecon: int):
     # Set the face color and alpha for the boxes in the plot
     for patch, color in zip(rt_con_in_box["boxes"], colors):
         patch.set_facecolor(color)
-        patch.set_alpha(UP_B)
+        patch.set_alpha(params.high_p)
 
     # Set the color for the medians in the plot
     for patch, color in zip(rt_con_in_box["medians"], med_color):
@@ -1243,8 +1201,8 @@ def supplementary_plots(expecon: int):
     plt.show()
 
     # Plot relationship between dprime and criterion
-    x = df_sdt.criterion[df_sdt.cue == UP_B]
-    y = df_sdt.dprime[df_sdt.cue == UP_B]
+    x = df_sdt.criterion[df_sdt.cue == params.high_p]
+    y = df_sdt.dprime[df_sdt.cue == params.high_p]
 
     reg = sns.regplot(x=x, y=y)
 
@@ -1267,8 +1225,8 @@ def supplementary_plots(expecon: int):
     plt.annotate(equation, xy=(0.05, 0.9), xycoords="axes fraction", fontproperties=font)
     plt.annotate(p_value_text, xy=(0.05, 0.8), xycoords="axes fraction", fontproperties=font)
 
-    plt.xlabel(xlabel=f"dprime {UP_B}", fontname=params.plot.font.sans_serif, fontsize=params.plot.font.size)
-    plt.ylabel(ylabel=f"c {UP_B}", fontname=params.plot.font.sans_serif, fontsize=params.plot.font.size)
+    plt.xlabel(xlabel=f"dprime {params.high_p}", fontname=params.plot.font.sans_serif, fontsize=params.plot.font.size)
+    plt.ylabel(ylabel=f"c {params.high_p}", fontname=params.plot.font.sans_serif, fontsize=params.plot.font.size)
 
     plt.savefig(savepath_fig1 / "dprime_c.svg", dpi=300, bbox_inches="tight", format="svg")
 
