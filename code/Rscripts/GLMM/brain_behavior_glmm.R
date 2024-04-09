@@ -4,7 +4,8 @@
 
 # author: Carina Forster
 # email: forster@mpg.cbs.de
-# date: 2021-06-01
+ 
+Sys.Date()
 
 # libraries
 library(lme4) # mixed models
@@ -25,19 +26,21 @@ library(ggplot2)
 # Set the font family and size
 par(family = "Arial", cex = 1.2)
 
-# which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
-
-expecon <- 2
-
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
 
-filename = paste("brain_behav_cleaned_", expecon, ".csv", sep="")
-brain_behav_path <- file.path("data", "behav", filename)
+filename_1 = paste("brain_behav_cleaned_1.csv", sep="")
+filename_2 = paste("brain_behav_cleaned_2.csv", sep="")
+brain_behav_path_1 <- file.path("data", "behav", filename_1)
+brain_behav_path_2 <- file.path("data", "behav", filename_2)
 
-behav = read.csv(brain_behav_path)
-  
+behav_1 = read.csv(brain_behav_path_1)
+behav_2 = read.csv(brain_behav_path_2)
 ################################prepare variables for linear mixed modelling #######################
+
+# which dataset do you want to analyze?
+
+behav = behav_2
 
 # make factors for categorical variables:
 behav$ID = as.factor(behav$ID) # subject ID
@@ -46,13 +49,13 @@ behav$cue = as.factor(behav$cue) # probability for a signal
 behav$prevresp = as.factor(behav$prevresp) # previous response
 behav$previsyes = as.factor(behav$previsyes) # previous stimulus
 behav$prevconf = as.factor(behav$prevconf) # previous confidence
-behav$correct = as.factor(behav$correct) # performance
+#behav$correct = as.factor(behav$correct) # performance
 behav$prevcue = as.factor(behav$prevcue) # previous probability
 behav$congruency <- as.integer(as.logical(behav$congruency))
 behav$congruency_stim <- as.integer(as.logical(behav$congruency_stim))
 
-# Remove NaN trials for model comparision (models neeed to have same amount of data)(first row for
-# previous trial factor)
+# Remove NaN trials for model comparision (models neeed to have same amount of data)
+# (first row for previous trial factor)
 behav <- na.omit(behav) 
 
 #rename alpha and beta power variables
@@ -69,6 +72,13 @@ summary(alpha_stim)
 beta_stim <- glm(isyes ~ -1 + beta,
                   data = behav, family=binomial(link='probit'))
 summary(beta_stim)
+
+# does beta predict reaction times?
+
+beta_rt <- lmer(respt1 ~ beta + (1|ID),
+                 data = behav)
+summary(beta_stim)
+
 
 # replace stimulus probability regressor with beta or alpha power per trial 
 # (neural correlate of stimulus probability)
@@ -184,16 +194,16 @@ check_convergence(alpha_int_glm)
 summary(alpha_int_glm)
 
 # beta interaction
-beta_int_glm_2 <- glmer(sayyes ~ isyes + beta*cue*prevresp +
-                        (isyes + prevresp + cue + beta| ID),
+beta_int_glm1 <- glmer(sayyes ~ isyes*beta*cue*prevresp +
+                        (isyes + prevresp + cue + sayyes| ID),
                       data = behav, family=binomial(link='probit'), 
                       control=glmerControl(optimizer="bobyqa",
                                            optCtrl=list(maxfun=2e5)))
 
-check_collinearity(beta_int_glm) # VIF should be < 3
-check_convergence(beta_int_glm)
+check_collinearity(beta_int_glm2) # VIF should be < 3
+check_convergence(beta_int_glm2)
 
-summary(beta_int_glm)
+summary(beta_int_glm2)
 
 # Post hoc tests for behavior interaction
 emm_model <- emmeans(beta_int_glm, "beta", by = "prevresp")
@@ -211,6 +221,114 @@ filename = paste("beta_int_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filename)
 saveRDS(beta_int_glm, cue_model_path)
 beta_int_glm <- readRDS(cue_model_path)
+
+
+################################ fit confidence with beta power ####################################
+
+behav$sayyes = as.factor(behav$sayyes)
+
+conf_full_model_1 = glmer(conf ~ isyes*sayyes*cue + prevresp + prevconf +
+                                 (isyes + sayyes + prevresp + prevconf + cue|ID), data=behav, 
+                               family=binomial(link='probit'),
+                               control=glmerControl(optimizer="bobyqa",
+                                                    optCtrl=list(maxfun=2e5)))
+
+check_collinearity(conf_full_model_1)
+check_convergence(conf_full_model_1)
+
+summary(conf_full_model_1)
+
+# Post hoc tests for behavior interaction, 3way
+contrast(emmeans(conf_full_model_1, "sayyes", by = c("isyes", "cue")))
+
+
+# Post hoc tests for behavior interaction
+contrast(emmeans(conf_full_model_1, "sayyes", by = c("cue")))
+
+# plot estimates
+p1<-plot_model(conf_full_model_1,  
+               show.values = TRUE, 
+               value.offset = .5,
+               axis.labels = rev(c("stimulus", "yes response", 'high probability', 
+                                   'previous yes response', 
+                                   'previous high confidence', 'stimulus*yes', 
+                                   'stimulus * high prob.',
+                                   'yes response * high prob.',
+                                   'stimulus * yes response * high prob.')),
+               auto.label = FALSE)
+p1
+
+# now replace the cue with beta power
+
+conf_full_model_beta_1 = glmer(conf ~ isyes*sayyes*beta + prevresp + prevconf +
+                            (isyes + sayyes + prevresp + prevconf|ID), data=behav, 
+                          family=binomial(link='probit'),
+                          control=glmerControl(optimizer="bobyqa",
+                                               optCtrl=list(maxfun=2e5)))
+
+check_collinearity(conf_full_model_beta_1)
+check_convergence(conf_full_model_beta_1)
+
+summary(conf_full_model_beta_1)
+
+# plot estimates
+p1<-plot_model(conf_full_model_beta_1,  
+               show.values = TRUE, 
+               value.offset = .5,
+               axis.labels = rev(c("stimulus", "yes response", 'beta', 
+                                   'previous yes response', 
+                                   'previous high confidence', 'stimulus*yes', 
+                                   'stimulus*beta.',
+                                   'yes response* beta.',
+                                   'stimulus*yes response* beta.')),
+               auto.label = FALSE)
+p1
+
+# plot interactions
+p2 <- plot_model(conf_full_model_beta_1, type = 'int', mdrt.values = "meansd")
+p2
+
+
+plot_model(conf_full_model_beta_1, type='int', terms = c("beta", 'sayyes')) #mdrt.values = "meansd")
+
+# Define the levels of beta you want to compare
+beta_values <- c(-3.17, 3.43)  # Replace level1_value and level2_value with your desired values
+
+
+# Post hoc tests for behavior interaction, 3way
+contrast(emmeans(conf_full_model_beta_1, "sayyes", by = c("isyes", "beta"), at = list(beta=beta_values)))
+
+# Post hoc tests for behavior interaction
+contrast(emmeans(conf_full_model_beta_1, "sayyes", by = c("beta"), at = list(beta=beta_values)))
+
+expecon = 2
+
+filename = paste("conf_cue_expecon", expecon, ".html", sep="_")
+output_file_path_beta <- file.path("figs", "manuscript_figures", "Tables", filename)
+
+sjPlot::tab_model(conf_full_model_1,
+                  show.aic=TRUE, show.loglik=TRUE,
+                  file = output_file_path_beta)
+
+
+filename = paste("conf_beta_expecon", expecon, ".html", sep="_")
+output_file_path_beta <- file.path("figs", "manuscript_figures", "Tables", filename)
+
+sjPlot::tab_model(conf_full_model_beta_1,
+                  show.aic=TRUE, show.loglik=TRUE,
+                  file = output_file_path_beta)
+
+# save to disk
+filename = paste("conf_model_full_model", expecon, ".rda", sep="_")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", filename)
+saveRDS(conf_full_model_1, cue_model_path)
+cue_prev_int_model <- readRDS(cue_model_path)
+
+filename = paste("conf_model_full_model_beta", expecon, ".rda", sep="_")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", filename)
+saveRDS(conf_full_model_beta_1, cue_model_path)
+cue_prev_int_model <- readRDS(cue_model_path)
+
 ############################################### Model comparision ##################################
 
 # Likelihood ratio tests

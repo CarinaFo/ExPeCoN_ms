@@ -15,6 +15,7 @@
 
 # libraries
 library(lme4) # mixed models
+library(ggplot2)
 library(lmerTest) # no p values without this package for linear mixed mdoels
 library(dplyr)# pandas style
 library(tidyr)
@@ -35,7 +36,7 @@ par(family = "Arial", cex = 1.2)
 setwd("E:/expecon_ms")
 
 # which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
-expecon <- 1
+expecon <- 2
 
 if (expecon == 1) {
   
@@ -54,7 +55,7 @@ if (expecon == 1) {
   ID_to_exclude <- 13
   
   # Excluding the ID from the dataframe
-  behav_2 <- behav[behav$ID != ID_to_exclude, ]
+  behav_2 <- behav_2[behav_2$ID != ID_to_exclude, ]
   
 }
 
@@ -75,7 +76,7 @@ behav_1$study <- environment_list1
 behav_2$study <- environment_list2
 
 # change IDs for the second study (add 43 to each ID)
-behav_2$ID <- behav_2$ID + 43
+behav_2$ID <- behav_2$ID + 49
 
 # combine both dataframes
 behav = rbind(behav_1, behav_2)
@@ -90,7 +91,7 @@ setwd("E:/expecon_ms")
 behav_path = file.path("data", "behav", "prepro_behav_data_expecon1_2.csv")
 behav = read.csv(behav_path)
 
-################################ linear mixed modelling ###########################################
+################################ prep for modelling ###########################################
 
 # make factors for categorical variables:
 behav$ID = as.factor(behav$ID) # subject ID
@@ -110,114 +111,13 @@ behav$correct[behav$correct == 2] <- 1
 
 # Remove NaN trials for model comparision (models neeed to have same amount of data)
 behav <- na.omit(behav) 
-################################descriptive analysis###############################################
-
-# Calculate accuracy for each cue condition and stimulus and each study and plot
-mean_acc <- behav %>%
-  group_by(ID, cue, isyes, study) %>%
-  summarize(acc = mean(correct))
-
-mean_acc$cue = as.factor(mean_acc$cue)
-mean_acc$stimulus = as.factor(mean_acc$isyes)
-
-ggplot(mean_acc, aes(x = cue, y = acc, fill = stimulus)) +
-  geom_boxplot(position = position_dodge(0.8)) +
-  facet_grid(~ study) +
-  labs(x = "Cue Condition", y = "accuracy'")
-
-# stimulus and response must be coded as 0 and 1 
-calc_sdt_params <- function(response, stimulus) {
-  # Calculate hit rate, false alarm rate, and overall mean
-  hit_rate <- sum(response == 1 & stimulus == 1) / sum(stimulus == 1)
-  false_alarm_rate <- sum(response == 1 & stimulus == 0) / sum(stimulus == 0)
-  overall_mean <- (sum(response == 1) + sum(stimulus == 1)) / length(response)
-  
-  # Apply Hautus correction to prevent undefined values
-  hit_rate = ifelse(hit_rate == 1, 1 - 1 / (2 * sum(stimulus == 1)), hit_rate)
-  hit_rate = ifelse(hit_rate == 0, 1 / (2 * sum(stimulus == 1)), hit_rate)
-  false_alarm_rate = ifelse(false_alarm_rate == 1, 1 - 1 / (2 * sum(stimulus == 0)), false_alarm_rate)
-  false_alarm_rate = ifelse(false_alarm_rate == 0, 1 / (2 * sum(stimulus == 0)), false_alarm_rate)
-  
-  
-  # Calculate Z-scores
-  z_hit <- qnorm(hit_rate)
-  z_false_alarm <- qnorm(false_alarm_rate)
-  z_overall_mean <- qnorm(overall_mean)
-  
-  # Calculate d' and criterion
-  d_prime <- z_hit - z_false_alarm
-  criterion <- -0.5 * (z_hit + z_false_alarm)
-  
-  # Return the results as a list
-  return(list(d_prime = d_prime, criterion = criterion))
-}
-
-# calc_sdt_params function is at the end of the script
-
-# Calculate d' and criterion for each participant, previous response, and cue condition
-results <- behav %>%
-  group_by(ID, prevresp, cue, study) %>%
-  summarize(d_prime = calc_sdt_params(sayyes, isyes)$d_prime,
-            criterion = calc_sdt_params(sayyes, isyes)$criterion)
-
-# convert to factor
-results$prevresp = as.factor(results$prevresp)
-results$cue = as.factor(results$cue)
-results$study = as.factor(results$study)
-
-# Plot boxplots for d' and criterion based on cue condition, previous response, and study
-plot_d_prime <- ggplot(results, aes(x = cue, y = d_prime, fill = prevresp)) +
-  geom_boxplot(position = position_dodge(0.8)) +
-  facet_grid(~ study) +
-  labs(title = "Boxplot of d' by Cue Condition, Previous Response, and Study",
-       x = "Cue Condition", y = "d'") +
-  scale_fill_manual(values = c(col_prevno, col_prevyes))
-
-plot_criterion <- ggplot(results, aes(x = cue, y = criterion, fill = prevresp)) +
-  geom_boxplot(position = position_dodge(0.8)) +
-  facet_grid(~ study) +
-  labs(title = "Boxplot of Criterion by Cue Condition, Previous Response, and Study",
-       x = "Cue Condition", y = "Criterion") +
-  scale_fill_manual(values = c(col_prevno, col_prevyes))
-
-# Display the plots
-plot_d_prime
-plot_criterion
-
-# plot mean over all participants
-# plot mean reaction time for correct and error trials based on confidence level
-
-# Calculate mean rts for each participant, accuracy, and confidence
-mean_rts <- behav %>%
-  group_by(ID, correct, conf, study) %>%
-  summarize(mean_rts = mean(respt1))
-
-# plot boxplots
-rt_boxplot <- ggplot(mean_rts, aes(x = as.factor(correct), y = mean_rts, fill = as.factor(conf))) +
-  geom_boxplot() +
-  facet_wrap(~ study) +
-  scale_fill_manual(values = c(col_correct, col_incorrect)) +
-  labs(title = "Mean response time Based on accuracy and confidence", x = "Accuracy", 
-       y = "Mean RTs", fill = "Confidence")
-
-# Calculate mean confidence for each participant, accuracy, and stimulus
-mean_confidence <- behav %>%
-  group_by(ID, correct, isyes, study) %>%
-  summarize(mean_rating = mean(conf))
-
-# Plot boxplots
-confidence_boxplot <- ggplot(mean_confidence, aes(x = as.factor(correct), y = mean_rating, 
-                                                  fill = as.factor(isyes))) +
-  geom_boxplot() +
-  facet_wrap(~ study) +
-  scale_fill_manual(values = c(col_correct, col_incorrect)) +
-  labs(title = "Mean Confidence Based on Accuracy and Stimulus", x = "Accuracy", 
-       y = "Mean Confidence", fill = "Stimulus")
-
-confidence_boxplot
-rt_boxplot
 
 ##################################GLMMers###########################################################
+
+# study 1: block design
+# study 2: trial by trial cues
+
+expecon = 2
 
 behav = filter(behav, study == expecon)
 
@@ -258,8 +158,8 @@ saveRDS(cue_model, cue_model_path)
 cue_model <- readRDS(cue_model_path)
 
 ########################### add previous choice predictor###########################################
-cue_prev_model = glmer(sayyes ~ isyes + cue + prevresp + prevresp*isyes
-                         + (cue+prevresp*isyes|ID), data=behav_1, 
+cue_prev_model = glmer(sayyes ~ isyes + cue + prevresp + 
+                         + (cue+prevresp+isyes|ID), data=behav, 
                        family=binomial(link='probit'),
                        control=glmerControl(optimizer="bobyqa",
                                             optCtrl=list(maxfun=2e5)),
@@ -271,7 +171,7 @@ check_collinearity(cue_prev_model)
 check_convergence(cue_prev_model)
 
 # Post hoc tests for behavior interaction
-emm_model <- emmeans(cue_prev_model, "isyes", by = "prevresp", infer=TRUE)
+emm_model <- emmeans(cue_prev_model, "cue", by = "prevresp", infer=TRUE)
 con <- contrast(emm_model)
 con
 
@@ -308,14 +208,16 @@ ggplot(plot_data, aes(beta_probcue, beta_previouschoice)) +
 
 cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevresp + prevresp*cue + 
                            + cue*isyes +
-                             (isyes + cue*prevresp|ID), data=behav, 
+                             (isyes + cue*prevresp|ID), data=behav_2, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
 )
 
+behav_2 = filter(behav, behav$study==2)
+behav_1 = filter(behav, behav$study==1)
+
 summary(cue_prev_int_model)
-report(cue_prev_int_model)
 
 check_collinearity(cue_prev_int_model)
 check_convergence(cue_prev_int_model)
@@ -331,10 +233,36 @@ emm_model <- emmeans(cue_prev_int_model, "prevresp", by = "cue", infer=TRUE)
 con <- contrast(emm_model)
 con
 
-# Post hoc tests for interaction for both studies
-emm_model <- emmeans(cue_prev_int_model, "cue", by = c("prevresp", "study"), infer=TRUE)
+# Post hoc tests for behavior interaction
+emm_model <- emmeans(cue_prev_int_model, "cue", by = 'prevresp', infer=TRUE)
 con <- contrast(emm_model)
 con
+
+# fit full confidence model
+
+behav$sayyes = as.factor(behav$sayyes)
+behav_2 = filter(behav, behav$study==2)
+behav_1 = filter(behav, behav$study==1)
+
+conf_full_model_1 = glmer(conf ~ isyes + cue + prevresp + sayyes + 
+                            isyes*sayyes + cue*isyes +
+                          (isyes + cue + prevresp + sayyes|ID), data=behav_1, 
+                           family=binomial(link='probit'),
+                           control=glmerControl(optimizer="bobyqa",
+                                                optCtrl=list(maxfun=2e5)))
+
+check_collinearity(conf_full_model_1)
+check_convergence(conf_full_model_1)
+
+summary(conf_full_model_1)
+
+plot_model(conf_full_model_1)
+
+# save to disk
+filename = paste("conf_model_full", expecon, ".rda", sep="_")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", filename)
+saveRDS(cue_prev_int_model, cue_model_path)
+cue_prev_int_model <- readRDS(cue_model_path)
 ###########################check interaction in study 2 if you condition on prev cue #############
 
 # Create a column that indexes wether the current cue had the same cue in the trial before (==1)
