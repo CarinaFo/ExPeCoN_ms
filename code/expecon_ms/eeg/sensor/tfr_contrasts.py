@@ -669,14 +669,13 @@ def plot_mirrored_data(subj: str):
     Args:
     ----
     subj: str, info: participant ID
-
     Returns:
     -------
     None
 
     """
     # load epochs for a single participant
-    # TODO: which dir_clean_epochs here?
+    # load data for a single participant from a single study (doesn't matter which one, we just need the data structure)
     epochs = mne.read_epochs(Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, f"P{subj}_icacorr_0.1Hz-epo.fif"))
 
     # crop the data in the pre-stimulus window
