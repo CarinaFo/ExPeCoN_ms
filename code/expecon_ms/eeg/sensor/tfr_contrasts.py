@@ -209,14 +209,33 @@ def compute_tfr(
                 cond_b_name = f"{cond_b_name}_mirror"
 
         elif cond == "prev_resp":
-            epochs_a = epochs[
-                ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == UP_B))
-            ]
-            epochs_b = epochs[
-                ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == UP_B))
-            ]
-            cond_a_name = "prevyesresp_highprob_stim"
-            cond_b_name = "prevnoresp_highprob_stim"
+            if study == 1:
+                epochs_a = epochs[
+                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == high_p))
+                ]
+                epochs_b = epochs[
+                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == high_p))
+                ]
+                cond_a_name = "prevyesresp_highprob_stim"
+                cond_b_name = "prevnoresp_highprob_stim"
+            elif study == 2:
+
+                epochs_a = epochs[
+                    (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
+                     (epochs.metadata.cue == 0.75)))
+                ]
+
+                epochs_b = epochs[
+                    (((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
+                     (epochs.metadata.cue == 0.75)))
+                ]
+                #epochs_a = epochs[
+                #   ((epochs.metadata.prevresp == 1) & (epochs.metadata.cue == 0.75))]
+                #epochs_a = epochs[
+                #   (epochs.metadata.prevresp == 1)]
+
+                cond_a_name = "prevyesresp_samecue_highprob"
+                cond_b_name = "prevnoresp_samecue_highprob"
 
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
@@ -350,17 +369,28 @@ def load_tfr_conds(
             for subj in id_list:
                 if study == 2 and subj == "013":  # noqa: PLR2004
                     continue
-                # load tfr data
-                tfr_a = mne.time_frequency.read_tfrs(
-                    fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"),
-                    condition=0,
-                )
-                tfr_b = mne.time_frequency.read_tfrs(
-                    fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}-tfr.h5"),
-                    condition=0,
-                )
-                tfr_a_all.append(tfr_a)
-                tfr_b_all.append(tfr_b)
+                if study == 1:
+                    tfr_a = mne.time_frequency.read_tfrs(
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_names}_{study!s}-tfr.h5"),
+                        condition=0,
+                    )
+                    tfr_b = mne.time_frequency.read_tfrs(
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_names}_{study!s}-tfr.h5"),
+                        condition=0,
+                    )
+                    tfr_a_all.append(tfr_a)
+                    tfr_b_all.append(tfr_b)
+                else:
+                    tfr_a = mne.time_frequency.read_tfrs(
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"),
+                        condition=0,
+                    )
+                    tfr_b = mne.time_frequency.read_tfrs(
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}-tfr.h5"),
+                        condition=0,
+                    )
+                    tfr_a_all.append(tfr_a)
+                    tfr_b_all.append(tfr_b)
 
         tfr_a_cond.append(tfr_a_all)
         tfr_b_cond.append(tfr_b_all)
@@ -504,7 +534,7 @@ def plot_tfr_cluster_test_output(
     for fm in ["svg", "png"]:
         fig.savefig(
             Path(
-                paths.figures.manuscript.figure4, f"fig4_tfr_tvals_{cond_a_name}_{cond_b_name}_{channel_names[0]}.{fm}"
+                paths.figures.manuscript.figure4, f"fig4_tfr_tvals_{cond_a_name}_{cond_b_name}_coolwarm_robust_samevminvmax_{channel_names[0]}.{fm}"
             ),
             dpi=300,
             format=fm,
@@ -571,8 +601,12 @@ def plot_cluster_contours(
 
     t_val = np.squeeze(res[0])
 
-    # Plot tmap as heatmap
-    sns.heatmap(t_val, cbar=True, cmap="viridis", ax=axs[idx])
+    # Plot tmap as heatmap, use the same vmin and vmax for all plots
+    sns.heatmap(t_val, cbar=True, cmap="coolwarm", robust=True, ax=axs[idx], vmin=-3, vmax=1)
+
+    # Customize the font size and family for various elements
+    plt.rcParams['font.family'] = 'Arial'  # Set the font family for the entire plot to Arial
+    plt.rcParams['font.size'] = 12  # Set the default font size to 12
 
     # Draw the cluster outline
     for i in range(mask.shape[0]):  # frequencies
@@ -591,14 +625,23 @@ def plot_cluster_contours(
     axs[idx].axvline([t_obs.shape[1]], color="white", linestyle="dotted", linewidth=5)  # stimulation onset
     axs[idx].set(xlabel="Time (s)", ylabel="Frequency (Hz)")
     # Set the font size for xlabel and ylabel
-    axs[idx].xaxis.label.set_fontsize(20)  # Adjust the font size for the xlabel
-    axs[idx].yaxis.label.set_fontsize(20)  # Adjust the font size for the ylabel
+    axs[idx].xaxis.label.set_fontsize(16)  # Adjust the font size for the xlabel
+    axs[idx].yaxis.label.set_fontsize(16)  # Adjust the font size for the ylabel
 
     # Set custom the x and y-axis ticks and labels
     axs[idx].set_xticks(x_ticks)
-    axs[idx].set_xticklabels(x_labels, fontsize=20)
+    axs[idx].set_xticklabels(x_labels)
     axs[idx].set_yticks(y_ticks)
-    axs[idx].set_yticklabels(y_labels, fontsize=20)
+    axs[idx].set_yticklabels(y_labels, rotation=0)
+    axs[idx].yaxis.labelpad = 15  # Adjust the distance between the y-axis label and the y-axis ticks
+    axs[idx].xaxis.labelpad = 15  # Adjust the distance between the x-axis label and the y-axis ticks
+
+    # Create a colorbar for the current subplot
+    # cbar = axs[idx].collections[0].colorbar
+    # Set the colorbar ticks to only include the minimum and maximum values of the data
+    # min_val = np.ceil(min(map(min, t_val)))
+    # max_val = np.ceil(max(map(max, t_val)))
+    # cbar.set_ticks([min_val, max_val])
 
     return "Plotted and saved figure"
 
