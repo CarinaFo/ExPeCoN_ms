@@ -263,14 +263,26 @@ def run_source_reco(
                 cond_b_name = f"{cond_b_name}_mirror"
 
         elif cond == "prev_resp":
-            epochs_a = epochs[
-                ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == params.high_p))
-            ]
-            epochs_b = epochs[
-                ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == params.high_p))
-            ]
-            cond_a_name = "prevyesresp_highprob_stim"
-            cond_b_name = "prevnoresp_highprob_stim"
+            if study == 1:
+                epochs_a = epochs[
+                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == params.high_p))
+                ]
+                epochs_b = epochs[
+                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == params.high_p))
+                ]
+            else:
+                epochs_a = epochs[
+                    (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
+                     (epochs.metadata.cue == 0.75)))
+                ]
+
+                epochs_b = epochs[
+                    (((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
+                     (epochs.metadata.cue == 0.75)))
+                ]
+
+            cond_a_name = "prevyesresp_samecue"
+            cond_b_name = "prevnoresp_samecue"
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
                 cond_b_name = f"{cond_b_name}_mirror"
@@ -436,12 +448,20 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
     elif (study == 2) & (cond == "probability"):  # noqa: PLR2004
         stc_array = create_source_contrast_array(study=study, cond_a="high_mirror", cond_b="low_mirror", method=method)
     elif cond == "prev_resp":
-        stc_array = create_source_contrast_array(
-            study=study,
-            cond_a="prevyesresp_highprob_stim_mirror",
-            cond_b="prevnoresp_highprob_stim_mirror",
-            method=method,
-        )
+        if study == 1:
+            stc_array = create_source_contrast_array(
+                study=study,
+                cond_a="prevyesresp_highprob_stim_mirror",
+                cond_b="prevnoresp_highprob_stim_mirror",
+                method=method,
+            )
+        else:
+            stc_array = create_source_contrast_array(
+                study=study,
+                cond_a="prevyesresp_samecue_mirror",
+                cond_b="prevnoresp_samecue_mirror",
+                method=method,
+            )
 
     # get rid of zero-dimension
     stc_array = np.squeeze(stc_array)
@@ -476,14 +496,13 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
                     hemi=hemi,
                     views=view,
                     subjects_dir=subjects_dir,
-                    subject="fsaverage",
                     time_viewer=False,
                     backend=backend,
                     background="white",
                     colorbar=colbar,
                 )
                 if save_plots:
-                    brain.save_image(
+                    brain.savefig(
                         Path(
                             paths.figures.manuscript.figure4_source,
                             f"grand_average_{cond}_{method}_{study}_{view}_{hemi}_{colbar}.png",
@@ -543,13 +562,14 @@ def run_and_plot_cluster_test(study: int = 1, jobs: int = -1, n_perm: int = 1000
     # fetch fsaverage files and the save path
     subjects_dir = fetch_fsaverage()
 
-    # Let's actually plot the first "time point" in the SourceEstimate, which
+ # Let's actually plot the first "time point" in the SourceEstimate, which
     # shows all the clusters, weighted by duration.
     # blue blobs are for condition A < condition B, red for A > B
     brain = stc_all_cluster_vis.plot(
         hemi="rh",
         views="lateral",
         subjects_dir=subjects_dir,
+        subject = 'fsaverage',
         time_label="temporal extent (ms)",
         size=(800, 800),
         smoothing_steps=5,
