@@ -219,23 +219,18 @@ def compute_tfr(
                 cond_a_name = "prevyesresp_highprob_stim"
                 cond_b_name = "prevnoresp_highprob_stim"
             elif study == 2:
-
                 epochs_a = epochs[
                     (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == 0.75)))
+                     (epochs.metadata.cue == 0.25)))
                 ]
 
                 epochs_b = epochs[
                     (((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == 0.75)))
+                     (epochs.metadata.cue == 0.25)))
                 ]
-                #epochs_a = epochs[
-                #   ((epochs.metadata.prevresp == 1) & (epochs.metadata.cue == 0.75))]
-                #epochs_a = epochs[
-                #   (epochs.metadata.prevresp == 1)]
 
-                cond_a_name = "prevyesresp_samecue_highprob"
-                cond_b_name = "prevnoresp_samecue_highprob"
+                cond_a_name = "prevyesresp_samecue_lowprob"
+                cond_b_name = "prevnoresp_samecue_lowprob"
 
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
@@ -366,21 +361,28 @@ def load_tfr_conds(
                     tfr_b_all.append(tfr_b)
 
         elif cond == "prev_resp":
-            for subj in id_list:
-                if study == 2 and subj == "013":  # noqa: PLR2004
-                    continue
-                if study == 1:
-                    tfr_a = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_names}_{study!s}-tfr.h5"),
-                        condition=0,
-                    )
-                    tfr_b = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_names}_{study!s}-tfr.h5"),
-                        condition=0,
-                    )
-                    tfr_a_all.append(tfr_a)
-                    tfr_b_all.append(tfr_b)
-                else:
+            if study == 2:
+                for subj in id_list:
+                    if subj == "013":
+                        continue
+                    tfr_a_all_conds, tfr_b_all_conds = [], []  # store the conditions
+                    for c_a, c_b in zip(cond_a_names, cond_b_names):
+                        # load tfr data
+                        tfr_a = mne.time_frequency.read_tfrs(
+                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_a}_{study!s}-tfr.h5"),
+                            condition=0,
+                        )
+                        tfr_b = mne.time_frequency.read_tfrs(
+                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_b}_{study!s}-tfr.h5"),
+                            condition=0,
+                        )
+                        tfr_a_all_conds.append(tfr_a)
+                        tfr_b_all_conds.append(tfr_b)
+                    tfr_a_all.append(tfr_a_all_conds)
+                    tfr_b_all.append(tfr_b_all_conds)
+            elif study == 1:  # noqa: PLR2004
+                for subj in id_list:
+                    # load tfr data
                     tfr_a = mne.time_frequency.read_tfrs(
                         fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"),
                         condition=0,
@@ -498,13 +500,30 @@ def plot_tfr_cluster_test_output(
                         for h, l_ in zip(tfr_a_cond[idx], tfr_b_cond[idx])
                     ])
             elif cond == "prev_resp":
-                # contrast data
-                x = np.array([
-                    h.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names).data
-                    - l_.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names).data
-                    for h, l_ in zip(tfr_a_cond[idx], tfr_b_cond[idx])
-                ])
+                if idx == 1:
+                    tfr_a = np.array(tfr_a_cond[idx])
+                    tfr_b = np.array(tfr_b_cond[idx])
+                    x_conds = []
+                    for conds in range(tfr_a.shape[1]):  # exclude prevfa
+                        # contrast data
+                        x = np.array([
+                            h.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names).data
+                            - l_.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names).data
+                            for h, l_ in zip(tfr_a[:, conds], tfr_b[:, conds])
+                        ])
+                        x_conds.append(x)
 
+                    # average across conditions (get rid of previous trial response)
+                    x = np.mean(
+                        np.array(list(x_conds)), axis=0
+                    )  # should be shape participants x frequencies x timepoints
+                else:
+                    # contrast data
+                    x = np.array([
+                        h.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names).data
+                        - l_.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names).data
+                        for h, l_ in zip(tfr_a_cond[idx], tfr_b_cond[idx])
+                    ])
             # pick channel or average over channels
             x = np.mean(x, axis=1) if len(channel_names) > 1 else np.squeeze(x)
             print(f"Shape of array for cluster test should be participants x frequencies x timepoints: {x.shape}")
@@ -526,8 +545,8 @@ def plot_tfr_cluster_test_output(
 
             # plot t contrast and sign. cluster contour
             plot_cluster_contours(
-                data=x, t_obs=t_obs, tfr_a_cond=tfr_a_cond, fmin=3, fmax=35, idx=idx, t=t, axs=axs, mask=mask
-            )
+                data=x, t_obs=t_obs, tfr_a_cond=tfr_a_cond, fmin=3, fmax=35, idx=idx, t=t, axs=axs, mask=mask,
+            cond=cond)
 
     plt.tight_layout()
     # now save the figure to disk as png and svg
@@ -554,6 +573,7 @@ def plot_cluster_contours(
     t: float,
     axs: tuple,
     mask: np.ndarray,
+    cond: str,
 ) -> str:
     """
     Plot cluster permutation test output.
@@ -574,8 +594,11 @@ def plot_cluster_contours(
     mask: array, info: mask for the cluster
 
     """
-    # Define timepoints and frequencies
-    times = tfr_a_cond[1][5].copy().crop(tmin=t[0], tmax=t[1]).times
+    if cond == "probability":
+        # Define timepoints and frequencies
+        times = tfr_a_cond[1][5].copy().crop(tmin=t[0], tmax=t[1]).times
+    else:
+        times = tfr_a_cond[0][5].copy().crop(tmin=t[0], tmax=t[1]).times
 
     freqs = np.arange(fmin, fmax, 1)
 
@@ -601,8 +624,11 @@ def plot_cluster_contours(
 
     t_val = np.squeeze(res[0])
 
+    vmin_val = np.min(t_val)
+    vmax_val = abs(vmin_val)
+
     # Plot tmap as heatmap, use the same vmin and vmax for all plots
-    sns.heatmap(t_val, cbar=True, cmap="coolwarm", robust=True, ax=axs[idx], vmin=-3, vmax=1)
+    sns.heatmap(t_val, cbar=True, cmap="coolwarm", robust=True, ax=axs[idx], vmin=vmin_val, vmax=vmax_val)
 
     # Customize the font size and family for various elements
     plt.rcParams['font.family'] = 'Arial'  # Set the font family for the entire plot to Arial
