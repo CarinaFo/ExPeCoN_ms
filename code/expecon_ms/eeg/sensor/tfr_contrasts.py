@@ -656,7 +656,7 @@ def plot_cluster_contours(
 
     # Set custom the x and y-axis ticks and labels
     axs[idx].set_xticks(x_ticks)
-    axs[idx].set_xticklabels(x_labels)
+    axs[idx].set_xticklabels(x_labels, rotation=0)
     axs[idx].set_yticks(y_ticks)
     axs[idx].set_yticklabels(y_labels, rotation=0)
     axs[idx].yaxis.labelpad = 15  # Adjust the distance between the y-axis label and the y-axis ticks
