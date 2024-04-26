@@ -21,7 +21,6 @@ import scipy
 import seaborn as sns
 
 from expecon_ms.behav import figure1
-from expecon_ms.behav.corr_sdt import LOW_B, UP_B
 from expecon_ms.configs import PROJECT_ROOT, config, params, paths
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -164,11 +163,11 @@ def power_criterion_corr(study: int) -> None:
     for f in freqs:
         power = df_brain_behav.groupby(["ID", "cue"])[f].mean()
 
-        low = power.unstack()[LOW_B].reset_index()
-        high = power.unstack()[UP_B].reset_index()
+        low = power.unstack()[low_p].reset_index()
+        high = power.unstack()[high_p].reset_index()
 
         # log transform and calculate the difference
-        diff_p = np.log(np.array(low[LOW_B])) - np.log(np.array(high[UP_B]))
+        diff_p = np.log(np.array(low[low_p])) - np.log(np.array(high[high_p]))
 
         diff_p_list.append(diff_p)
 
@@ -182,10 +181,10 @@ def power_criterion_corr(study: int) -> None:
     sdt = out[0][0]
 
     # calculate criterion difference between conditions
-    c_diff = np.array(sdt.criterion[sdt.cue == LOW_B]) - np.array(sdt.criterion[sdt.cue == UP_B])
+    c_diff = np.array(sdt.criterion[sdt.cue == low_p]) - np.array(sdt.criterion[sdt.cue == high_p])
 
     # dprime difference between conditions
-    dprime_diff = np.array(sdt.dprime[sdt.cue == LOW_B]) - np.array(sdt.dprime[sdt.cue == UP_B])
+    dprime_diff = np.array(sdt.dprime[sdt.cue == low_p]) - np.array(sdt.dprime[sdt.cue == high_p])
 
     # add the sdt data to a dictionary
     sdt_params = {"dprime": dprime_diff, "criterion": c_diff}
