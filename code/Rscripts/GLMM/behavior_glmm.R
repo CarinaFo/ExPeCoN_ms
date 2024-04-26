@@ -19,11 +19,8 @@ library(ggplot2)
 library(lmerTest) # no p values without this package for linear mixed mdoels
 library(dplyr)# pandas style
 library(tidyr)
-library(data.table) # for shift function
-library(htmlTable)
 library(emmeans)
 library(performance)
-library(broom)
 
 # don't forget to give credit to the amazing authors of those packages
 #citation("emmeans")
@@ -36,7 +33,7 @@ par(family = "Arial", cex = 1.2)
 setwd("E:/expecon_ms")
 
 # which dataset to analyze (1 => mini-block, 2 => trial-by-trial design)
-expecon <- 2
+expecon <- 1
 
 if (expecon == 1) {
   
@@ -158,7 +155,7 @@ saveRDS(cue_model, cue_model_path)
 cue_model <- readRDS(cue_model_path)
 
 ########################### add previous choice predictor###########################################
-cue_prev_model = glmer(sayyes ~ isyes + cue + prevresp + 
+cue_prev_model = glmer(sayyes ~ isyes*cue + prevresp +
                          + (cue+prevresp+isyes|ID), data=behav, 
                        family=binomial(link='probit'),
                        control=glmerControl(optimizer="bobyqa",
@@ -169,11 +166,6 @@ summary(cue_prev_model)
 
 check_collinearity(cue_prev_model)
 check_convergence(cue_prev_model)
-
-# Post hoc tests for behavior interaction
-emm_model <- emmeans(cue_prev_model, "cue", by = "prevresp", infer=TRUE)
-con <- contrast(emm_model)
-con
 
 
 # save the model to disk
@@ -206,16 +198,14 @@ ggplot(plot_data, aes(beta_probcue, beta_previouschoice)) +
 
 ################ including interaction between cue and previous choice#############################
 
+
 cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevresp + prevresp*cue + 
                            + cue*isyes +
-                             (isyes + cue*prevresp|ID), data=behav_2, 
+                             (isyes+cue+prevresp|ID), data=behav, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
 )
-
-behav_2 = filter(behav, behav$study==2)
-behav_1 = filter(behav, behav$study==1)
 
 summary(cue_prev_int_model)
 
@@ -239,7 +229,6 @@ con <- contrast(emm_model)
 con
 
 # fit full confidence model
-
 behav$sayyes = as.factor(behav$sayyes)
 behav_2 = filter(behav, behav$study==2)
 behav_1 = filter(behav, behav$study==1)
@@ -263,7 +252,7 @@ filename = paste("conf_model_full", expecon, ".rda", sep="_")
 cue_model_path = file.path("data", "behav", "mixed_models", "behavior", filename)
 saveRDS(cue_prev_int_model, cue_model_path)
 cue_prev_int_model <- readRDS(cue_model_path)
-###########################check interaction in study 2 if you condition on prev cue #############
+###########################check interaction in study 2 if you condition on prev cue################
 
 # Create a column that indexes wether the current cue had the same cue in the trial before (==1)
 behav <- behav %>%
@@ -298,7 +287,6 @@ anova(cue_model, cue_prev_model)
 anova(cue_prev_int_model, cue_prev_model)
 
 # difference in AIC and BIC
-
 diff_aic_1 = AIC(cue_prev_model) - AIC(cue_model)
 diff_bic_1 = BIC(cue_prev_model) - BIC(cue_model)
 print(diff_aic_1)
@@ -313,19 +301,24 @@ print(diff_bic_2)
 # save table to html
 # crop the file and save as png or pdf
 
-filename = paste("expecon", expecon, ".html", sep="_")
+filename = paste("expecon", expecon, ".docx", sep="_")
 output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
 
-sjPlot::tab_model(simple_sdt_model, cue_model, cue_prev_model, cue_prev_int_model, 
-                           show.aic=TRUE, show.loglik=TRUE,
-                           file=output_file_path)
+models = list("base" = simple_sdt_model, "add cue" = cue_model, "add prev resp" = cue_prev_model,
+              "interaction" = cue_prev_int_model)
+
+modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
+                           statistic = NULL,  output = output_file_path)
 ###########################separate models for signal and noise trials#############################
 
-signal = filter(behav, isyes==1)
-noise = filter(behav, isyes==0)
+signal = filter(behav, isyes ==1)
+noise = filter(behav, isyes ==0)
 
-cue_prev_int_model_signal = glmer(sayyes ~ prevresp + cue + prevresp*cue +
-                                    (prevresp+cue|ID), data=signal, 
+prevsignal = filter(behav, previsyes ==1)
+prevnoise = filter(behav, previsyes ==0)
+
+cue_prev_int_model_signal = glmer(sayyes ~ prevresp*cue + isyes*cue +
+                                    (prevresp+cue+isyes|ID), data=prevsignal, 
                                   family=binomial(link='probit'),
                                   control=glmerControl(optimizer="bobyqa",
                                                        optCtrl=list(maxfun=2e5)),
@@ -337,13 +330,13 @@ check_collinearity(cue_prev_int_model_signal)
 check_convergence(cue_prev_int_model_signal)
 
 #only fitted for expecon 1
-cue_model_path = file.path("data", "behav", "mixed_models", "behavior", "cue_prev_int_model_signal_1.rda")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", "cue_prev_int_model_prevsignal_1.rda")
 saveRDS(cue_prev_int_model_signal, cue_model_path)
 cue_prev_int_model_signal <- readRDS(cue_model_path)
 
 # noise model
-cue_prev_int_model_noise = glmer(sayyes ~ prevresp + cue + prevresp*cue +
-                                   (prevresp*cue|ID), data=noise, 
+cue_prev_int_model_noise = glmer(sayyes ~ prevresp*cue + isyes*cue +
+                                   (prevresp+cue+isyes|ID), data=prevnoise, 
                                  family=binomial(link='probit'),
                                  control=glmerControl(optimizer="bobyqa",
                                                       optCtrl=list(maxfun=2e5)),
@@ -354,23 +347,30 @@ summary(cue_prev_int_model_noise)
 check_collinearity(cue_prev_int_model_noise)
 check_convergence(cue_prev_int_model_noise)
 
-cue_model_path = file.path("data", "behav", "mixed_models", "behavior", "cue_prev_int_model_noise_1.rda")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", "cue_prev_int_model_prevnoise_1.rda")
 saveRDS(cue_prev_int_model_noise, cue_model_path)
 cue_prev_int_model_noise <- readRDS(cue_model_path)
 
 ##################separate model for confident/unconfident previous response#######
-acc_conf_model = glmer(correct ~ conf + (conf|ID), data=behav, 
+
+behav$conf = as.factor(behav$conf)
+
+acc_conf_model = glmer(correct ~ conf*isyes + (conf*isyes|ID), data=behav, 
                        family=binomial(link='probit'),
                        control=glmerControl(optimizer="bobyqa",
                                             optCtrl=list(maxfun=2e5)))
 
 summary(acc_conf_model)
 
-conf = filter(behav, prevconf==1)
-unconf = filter(behav, prevconf==0)
+# Post hoc tests for behavior interaction
+emm_model <- emmeans(acc_conf_model, "isyes", by = "conf", infer=TRUE)
+con <- contrast(emm_model)
+con
 
-cue_prev_int_model_conf = glmer(sayyes ~ isyes + prevresp + cue + isyes*cue+prevresp*cue +
-                                  (isyes + prevresp+cue|ID), data=conf, 
+
+cue_prev_int_model_conf = glmer(sayyes ~ prevresp*prevconf 
+                                + cue*prevresp + isyes*cue+
+                                  (isyes + prevresp +cue + prevconf|ID), data=behav, 
                                 family=binomial(link='probit'),
                                 control=glmerControl(optimizer="bobyqa",
                                                      optCtrl=list(maxfun=2e5)),
@@ -381,7 +381,7 @@ check_convergence(cue_prev_int_model_conf)
 
 summary(cue_prev_int_model_conf)
 
-cue_model_path = file.path("data", "behav", "mixed_models", "behavior", "cue_prev_int_model_conf_1.rda")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", "cue_prev_int_model_prevconf_1.rda")
 saveRDS(cue_prev_int_model_conf, cue_model_path)
 cue_prev_int_model_conf <- readRDS(cue_model_path)
 
@@ -408,6 +408,7 @@ cue_prev_int_model_unconf <- readRDS(cue_model_path)
 filename = paste("expecon_interaction_control_models", expecon, ".html", sep="_")
 output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
 
-sjPlot::tab_model(cue_prev_int_model_signal, cue_prev_int_model_noise,
-                           cue_prev_int_model_conf, cue_prev_int_model_unconf, 
-                           show.aic=TRUE, show.loglik=TRUE, file = output_file_path)
+models = list("signal" = cue_prev_int_model_signal, "noise" = cue_prev_int_model_noise)
+
+modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
+                           statistic = NULL,  output = output_file_path)

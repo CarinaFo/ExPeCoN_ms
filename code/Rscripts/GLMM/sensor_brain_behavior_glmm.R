@@ -35,7 +35,7 @@ behav_2 = read.csv(brain_behav_path_2)
 ################################prepare variables for linear mixed modelling #######################
 
 # which dataset do you want to analyze?
-
+expecon=2
 behav = behav_2
 
 # make factors for categorical variables:
@@ -89,7 +89,7 @@ summary(beta_cue)
 
 beta_base_glm <- glmer(sayyes ~ isyes + beta + cue +
                          beta*isyes + cue*isyes +
-                    (isyes*cue|ID),
+                    (isyes+cue|ID),
                   data = behav, family=binomial(link='probit'), 
                   control=glmerControl(optimizer="bobyqa",
                                        optCtrl=list(maxfun=2e5)))
@@ -111,7 +111,7 @@ beta_base_glm <- readRDS(cue_model_path)
 # add previous response
 beta_prev_glm <- glmer(sayyes ~ isyes + beta + cue + prevresp + 
                      beta*isyes + cue*isyes +
-                     (isyes + prevresp|ID),
+                     (isyes+cue + prevresp|ID),
                    data = behav, family=binomial(link='probit'), 
                    control=glmerControl(optimizer="bobyqa",
                                         optCtrl=list(maxfun=2e5)))
@@ -127,11 +127,10 @@ cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filen
 saveRDS(beta_prev_glm, cue_model_path)
 beta_prev_glm <- readRDS(cue_model_path)
 
-
 ##### no we fit the interaction between prestimulus power and previous choice
 # beta interaction
 beta_int_glm <- glmer(sayyes ~ isyes*beta+ isyes*cue + beta*prevresp + cue*prevresp +
-                        (isyes*cue + prevresp| ID),
+                        (isyes+cue + prevresp| ID),
                       data = behav, family=binomial(link='probit'), 
                       control=glmerControl(optimizer="bobyqa",
                                            optCtrl=list(maxfun=2e5)))
@@ -259,8 +258,8 @@ anova(beta_base_glm, beta_prev_glm)
 anova(beta_prev_glm, beta_int_glm)
 
 # difference in AIC and BIC
-diff_aic_1 = AIC(beta_prev_model) - AIC(beta_beta_glm)
-diff_bic_1 = BIC(beta_prev_model) - BIC(beta_base_glm)
+diff_aic_1 = AIC(beta_prev_glm) - AIC(beta_base_glm)
+diff_bic_1 = BIC(beta_prev_glm) - BIC(beta_base_glm)
 print(diff_aic_1)
 print(diff_bic_1)
 
@@ -279,6 +278,15 @@ models = list("base" = beta_base_glm, "add previous response" = beta_prev_glm,
 
 modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
                            statistic = NULL,  output = output_file_path_beta)
+
+filename_conf = paste("conf_expecon", expecon, ".docx", sep="_")
+output_file_path_conf<- file.path("figs", "manuscript_figures", "Tables", filename_conf)
+
+
+models = list("prob" = conf_full_model_1, "beta" = conf_full_model_beta_1)
+
+modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
+                           statistic = NULL,  output = output_file_path_conf)
 ##########################congruency###############################################################
 
 # does beta power per trial predict congruent responses in both probability conditions?
