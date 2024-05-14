@@ -56,11 +56,13 @@ behav <- na.omit(behav)
 
 #rename beta power variable
 behav$beta <- behav$pre_beta
+behav$alpha <- behav$pre_alpha
 
 hist(behav$beta)
 
 # Subsetting to keep rows where source_s1 values are within the desired range
 behav <- behav[!(behav$beta > 3 | behav$beta < -3), ]
+behav <- behav[!(behav$alpha > 3 | behav$alpha < -3), ]
 ########################### Brain behavior GLMMs ###################################################
 
 # does beta predict the stimulus? control analysis:
@@ -84,6 +86,18 @@ beta_cue = lmer(beta ~ cue+ (cue|ID),
             optCtrl=list(maxfun=2e5)))
 
 summary(beta_cue)
+
+alpha_cue = lmer(alpha ~ cue+ (cue|ID), 
+                data=behav, control=lmerControl(optimizer="bobyqa",
+                                                optCtrl=list(maxfun=2e5)))
+
+summary(alpha_cue)
+
+alpha_cue = lmer(beta ~ prevresp + (prevresp|ID), 
+                 data=behav, control=lmerControl(optimizer="bobyqa",
+                                                 optCtrl=list(maxfun=2e5)))
+
+summary(alpha_cue)
 ###################################################################################################
 ### does prestimulus power predict detection, while controlling for previous choice
 
@@ -109,8 +123,8 @@ saveRDS(beta_base_glm, cue_model_path)
 beta_base_glm <- readRDS(cue_model_path)
 
 # add previous response
-beta_prev_glm <- glmer(sayyes ~ isyes + beta + cue + prevresp + 
-                     beta*isyes + cue*isyes +
+beta_prev_glm <- glmer(sayyes ~ isyes + alpha + cue + prevresp + 
+                    alpha*isyes + cue*isyes +
                      (isyes+cue + prevresp|ID),
                    data = behav, family=binomial(link='probit'), 
                    control=glmerControl(optimizer="bobyqa",
@@ -154,7 +168,7 @@ beta_int_glm <- readRDS(cue_model_path)
 
 behav$sayyes = as.factor(behav$sayyes)
 
-conf_full_model_1 = glmer(conf ~ isyes*sayyes*cue + prevresp + prevconf +
+conf_full_model_2 = glmer(conf ~ isyes*sayyes*cue + prevresp + prevconf +
                                  (isyes + sayyes + prevresp + prevconf + cue|ID), data=behav, 
                                family=binomial(link='probit'),
                                control=glmerControl(optimizer="bobyqa",
@@ -186,7 +200,7 @@ p1
 
 # now replace the cue with beta power
 
-conf_full_model_beta_1 = glmer(conf ~ isyes*sayyes*beta + prevresp + prevconf +
+conf_full_model_beta_2 = glmer(conf ~ isyes*sayyes*beta + prevresp + prevconf +
                             (isyes + sayyes + prevresp + prevconf|ID), data=behav, 
                           family=binomial(link='probit'),
                           control=glmerControl(optimizer="bobyqa",
@@ -221,22 +235,25 @@ p1<-plot_model(conf_full_model_beta_1,
                auto.label = FALSE)
 p1
 
-# plot interactions
-p2 <- plot_model(conf_full_model_beta_1, type = 'int', mdrt.values = "meansd")
-p2
+# change the order of predictors (x and label)
+plot_model(conf_full_model_1, type='pred',terms = c("sayyes", 'cue'), show.legend = TRUE,
+                     colors = c("#357db8ff", "#e31919ff"),  title=" ")
 
+# change the order of predictors (x and label)
+plot_model(conf_full_model_beta_1, type='pred',terms = c("sayyes", 'beta'), show.legend = TRUE,
+           colors = c("#357db8ff", "#e31919ff"),  title=" ")
 
-plot_model(conf_full_model_beta_1, type='int', terms = c("beta", 'sayyes')) #mdrt.values = "meansd")
+# stable env
+beta_values = c(0.83, -1.13)
 
-# Define the levels of beta you want to compare
-beta_values <- c(-3.17, 3.43)  # Replace level1_value and level2_value with your desired values
-
+# volatile env
+beta_values = c(0.88, -1.08)
 
 # Post hoc tests for behavior interaction, 3way
-contrast(emmeans(conf_full_model_beta_1, "sayyes", by = c("isyes", "beta"), at = list(beta=beta_values)))
+contrast(emmeans(conf_full_model_2, "cue", by = "sayyes", at = list(beta=beta_values)))
 
 # Post hoc tests for behavior interaction
-contrast(emmeans(conf_full_model_beta_1, "sayyes", by = c("beta"), at = list(beta=beta_values)))
+contrast(emmeans(conf_full_model_beta_2, "beta", by = "sayyes", at = list(beta=beta_values)))
 
 filename = paste("conf_beta_expecon", expecon, ".html", sep="_")
 output_file_path_beta <- file.path("figs", "manuscript_figures", "Tables", filename)
