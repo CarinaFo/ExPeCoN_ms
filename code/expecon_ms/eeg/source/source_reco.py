@@ -84,17 +84,17 @@ fname_labelS2 = subjects_dir + '\\fsaverage\\label\\%s.label' % label_S2
 label_S2 = mne.read_label(fname_labelS2)
 
 # load functional labels for volatile env.
-func_labels_prob= mne.read_label(Path(paths.data.templates, f"func_label_probability_2-rh.label"), color='magenta')
-func_labels_prevresp = mne.read_label(Path(paths.data.templates, f"func_label_prev_resp_2-rh.label"), color='cyan')
+func_labels_prob2 = mne.read_label(Path(paths.data.templates, f"func_label_probability_2_-700-rh.label"), color='magenta')
+func_labels_prevresp2 = mne.read_label(Path(paths.data.templates, f"func_label_prev_resp_2_-700-rh.label"), color='cyan')
 
 # load functional labels for stable env.
-func_labels_prob1= mne.read_label(Path(paths.data.templates, f"func_label_probability_1-rh.label"), color='magenta')
-func_labels_prevresp1 = mne.read_label(Path(paths.data.templates, f"func_label_prev_resp_1-rh.label"), color='cyan')
+func_labels_prob1= mne.read_label(Path(paths.data.templates, f"func_label_probability_1_-700-rh.label"), color='magenta')
+func_labels_prevresp1 = mne.read_label(Path(paths.data.templates, f"func_label_prev_resp_1_-700-rh.label"), color='cyan')
 
 # which areas are part of the label?
-mne.vertex_to_mni(func_labels_prob.get_vertices_used(), hemis=1, subject='fsaverage')
-func_labels_prob.compute_area('fsaverage', subjects_dir)
-func_labels_prevresp.compute_area('fsaverage', subjects_dir)
+mne.vertex_to_mni(func_labels_prob1.get_vertices_used(), hemis=1, subject='fsaverage')
+func_labels_prob2.compute_area('fsaverage', subjects_dir)
+func_labels_prevresp2.compute_area('fsaverage', subjects_dir)
 # data_cleaning parameters defined in config.toml
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -205,16 +205,16 @@ def run_source_reco(
 
         if cond == "probability":
             # set condition names
-            cond_a_name = "high_prevcr"
-            cond_b_name = "low_prevcr"
+            cond_a_name = f"high_prevhit_{tmin}_{tmax}"
+            cond_b_name = f"low_prevhit_{tmin}_{tmax}"
             # add mirror to filename if data is mirrored
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
                 cond_b_name = f"{cond_b_name}_mirror"
         elif cond == "prev_resp":
             # set condition names
-            cond_a_name = "prevyesresp"
-            cond_b_name = "prevnoresp"
+            cond_a_name = f"prevyesresp_{tmin}_{tmax}"
+            cond_b_name = f"prevnoresp_{tmin}_{tmax}"
             # add mirror to filename if data is mirrored
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
@@ -296,8 +296,8 @@ def run_source_reco(
             epochs.metadata = metadata
 
         if cond == "probability":
-            epochs_a = epochs[((epochs.metadata.cue == params.high_p) & (epochs.metadata.previsyes == 0) & (epochs.metadata.prevresp == 0))]
-            epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.previsyes == 0) & (epochs.metadata.prevresp == 0))]
+            epochs_a = epochs[((epochs.metadata.cue == params.high_p) & (epochs.metadata.previsyes == 1) & (epochs.metadata.prevresp == 1))]
+            epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.previsyes == 1) & (epochs.metadata.prevresp == 1))]
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
                 cond_b_name = f"{cond_b_name}_mirror"
@@ -313,12 +313,12 @@ def run_source_reco(
             else:
                 epochs_a = epochs[
                     (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == 0.75)))
+                     (epochs.metadata.cue == params.high_p)))
                 ]
 
                 epochs_b = epochs[
                     (((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == 0.75)))
+                     (epochs.metadata.cue == params.high_p)))
                 ]
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
@@ -443,10 +443,14 @@ def run_source_reco_per_trial(
         id_list = participants.ID_list_expecon1
         # load behavioral data
         data = pd.read_csv(Path(paths.data.behavior, "prepro_behav_data_1.csv"))
+        label_prob = func_labels_prob1
+        label_prev = func_labels_prevresp1
     elif study == 2:  # noqa: PLR2004
         id_list = participants.ID_list_expecon2
         # load behavioral data
         data = pd.read_csv(Path(paths.data.behavior, "prepro_behav_data_2.csv"))
+        label_prob = func_labels_prob2
+        label_prev = func_labels_prevresp2
     else:
         raise ValueError("input should be 1 or 2 for the respective study")
 
@@ -517,8 +521,6 @@ def run_source_reco_per_trial(
         # set the cycles for the Morlet wavelet
         ncycles = freqs / 4.0
 
-        source_power_alltrials_S1, source_power_alltrials_S2 = [], []
-
         # Compute CSD for all epochs
         csd_allepochs = mne.time_frequency.csd_morlet(epochs, freqs, tmin=tmin, tmax=tmax, n_cycles=ncycles,
                                             verbose=None)
@@ -531,13 +533,13 @@ def run_source_reco_per_trial(
         # Computing DICS spatial filters using the CSD that was computed for all epochs
         filter_prevresp = mne.beamformer.make_dics(
             info, fwd, csd_allepochs, noise_csd=None, pick_ori="max-power", reduce_rank=True, real_filter=True,
-            label=func_labels_prevresp1, verbose=None
+            label=label_prev, verbose=None
         )
 
         # Computing DICS spatial filters using the CSD that was computed for all epochs
         filter_prob = mne.beamformer.make_dics(
             info, fwd, csd_allepochs, noise_csd=None, pick_ori="max-power", reduce_rank=True, real_filter=True,
-            label=func_labels_prob1, verbose=None
+            label=label_prob, verbose=None
         )
 
         source_power_alltrials_prob, source_power_alltrials_prevresp = [], []
@@ -573,7 +575,7 @@ def run_source_reco_per_trial(
     data['beta_source_prob'] = flat_list_prob
     data['beta_source_prev'] = flat_list_prev
 
-    data.to_csv(Path(paths.data.behavior, f"brain_behav_source_700ms{study}.csv"))
+    data.to_csv(Path(paths.data.behavior, f"brain_behav_source_-700-100_{study}.csv"))
 
     return source_power_allsubs_prob, source_power_allsubs_prevresp
 
@@ -645,13 +647,13 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
     """
     if (study == 1) & (cond == "probability"):
         stc_array_hit = create_source_contrast_array(
-            study=study, cond_a="high_prevhit", cond_b="low_prevhit", method=method
+            study=study, cond_a="high_prevhit_-0.7_-0.1", cond_b="low_prevhit_-0.7_-0.1", method=method
         )
         stc_array_miss = create_source_contrast_array(
-            study=study, cond_a="high_prevmiss", cond_b="low_prevmiss", method=method
+            study=study, cond_a="high_prevmiss_-0.7_-0.1", cond_b="low_prevmiss_-0.7_-0.1", method=method
         )
         stc_array_cr = create_source_contrast_array(
-            study=study, cond_a="high_prevcr", cond_b="low_prevcr", method=method
+            study=study, cond_a="high_prevcr_-0.7_-0.1", cond_b="low_prevcr_-0.7_-0.1", method=method
         )
         stc_array_conds = np.array([stc_array_hit, stc_array_miss, stc_array_cr])
         # mean over conditions (previous hit, previous miss, previous cr)
@@ -660,8 +662,15 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
         stc_array = create_source_contrast_array(study=study, cond_a="high", cond_b="low", method=method)
 
     elif cond == "prev_resp":
-            
+        if study == 1:
             stc_array = create_source_contrast_array(
+                study=study,
+                cond_a="prevyesresp_-0.7_-0.1",
+                cond_b="prevnoresp_-0.7_-0.1",
+                method=method,
+            )
+        elif study == 2:  # noqa: PLR2004
+                      stc_array = create_source_contrast_array(
                 study=study,
                 cond_a="prevyesresp",
                 cond_b="prevnoresp",
@@ -693,23 +702,24 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
 
     # put contrast (average) or p values in source space
     fsave_vertices = [s["vertno"] for s in src]
-    stc = mne.SourceEstimate(t_obs, tmin=-0.4, tstep=0.0001, vertices=fsave_vertices, subject="fsaverage")
+    stc = mne.SourceEstimate(t_obs, tmin=-0.7, tstep=0.0001, vertices=fsave_vertices, subject="fsaverage")
 
-    # get the data
-    data = stc.data
+    right_hemi_data = stc.data[-len(stc.vertices[1]):]
 
-    if study == 2:
-        if cond == "probability":
-            # set threshold to get only significant voxels
-            stc.data[data > -3] = 0.0
-        elif cond == "prev_resp":
-            stc.data[data > -2] = 0.0
-    else:
-        if cond == "probability":
-            # set threshold to get only significant voxels
-            stc.data[data > -2] = 0.0
-        elif cond == "prev_resp":
-            stc.data[data > -2] = 0.0
+    # Sort the array in ascending order
+    sorted_stc = np.sort(right_hemi_data)
+
+    # Determine the threshold index for the 10% most negative values
+    threshold_index = int(0.1 * len(sorted_stc))
+
+    # Find the threshold value
+    threshold_value = sorted_stc[threshold_index]
+
+    # Create a mask for values below the threshold
+    mask = stc.data > threshold_value
+
+    # Set values below the threshold to 0
+    stc.data[mask] = 0
 
     # create functional labels
     func_labels = mne.stc_to_label(
@@ -717,22 +727,11 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
         src=src,
         smooth=True,
         subjects_dir=subjects_dir,
-        connected=True,
+        connected=False,
         verbose="error",
     )
-    if cond == "probability":
-        if study == 2:
-            # extract labels for right hemisphere
-            label_prob = func_labels[1][0]
-            mne.write_label(Path(paths.data.templates, f"func_label_{cond}_{study}"), label_prob)
-        else:
-            label_prob = func_labels[1][0] + func_labels[1][1] + func_labels[1][2]
-            mne.write_label(Path(paths.data.templates, f"func_label_{cond}_{study}"), label_prob)
-      
-    elif cond == "prev_resp":
-        label_prevresp = func_labels[1][0] + func_labels[1][1] + func_labels[1][2] + func_labels[1][3] + func_labels[1][4]
-        # save the functional label
-        mne.write_label(Path(paths.data.templates, f"func_label_{cond}_{study}"), label_prevresp)
+    
+    mne.write_label(Path(paths.data.templates, f"func_label_{cond}_{study}_-700"), func_labels[1])
 
     print(min(t_obs), max(t_obs))
 
@@ -761,7 +760,6 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
             #brain.add_label("BA3a", borders=True, color="green", alpha=0.7)
             #brain.add_label("BA3b", borders=True, color="blue", alpha=0.7)
             brain.add_label(label_postcentral[0], borders=True, color="red", alpha=0.7)
-            #brain.add_label(label_supm[0], borders=True, color="pink", alpha=0.7)
             if save_plots:
                 brain.savefig(
                     Path(
@@ -788,7 +786,7 @@ def run_and_plot_cluster_test(study: int = 1, jobs: int = -1, n_perm: int = 1000
 
     """
     stc_array = create_source_contrast_array(
-        study=study, cond_a="high", cond_b="low", path_to_source=Path(paths.data.eeg.source.beamformer)
+        study=study, cond_a="high", cond_b="low", method="beamformer"
     )
 
     print("Computing adjacency.")
