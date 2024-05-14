@@ -199,11 +199,18 @@ def compute_tfr(
         df_all.append(epochs.metadata)
 
         if cond == "probability":
-            epochs_a = epochs[(epochs.metadata.cue == params.high_p)]
-            epochs_b = epochs[(epochs.metadata.cue == params.low_p)]
-            cond_a_name = "high"
-            cond_b_name = "low"
-
+            if study == 1:
+                epochs_a = epochs[((epochs.metadata.cue == params.high_p)  & (epochs.metadata.previsyes == 0) & 
+                                (epochs.metadata.prevresp == 0))]
+                epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.previsyes == 0) & 
+                                (epochs.metadata.prevresp == 0))]
+                cond_a_name =f"high_prevcr_{tmin}_{tmax}"
+                cond_b_name = f"low_prevcr_{tmin}_{tmax}"
+            elif study == 2:  # noqa: PLR2004
+                epochs_a = epochs[((epochs.metadata.cue == params.high_p) & (epochs.metadata.prevcue == params.high_p))]
+                epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.prevcue == params.low_p))]
+                cond_a_name = f"high_{tmin}_{tmax}"
+                cond_b_name = f"low_{tmin}_{tmax}"
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
                 cond_b_name = f"{cond_b_name}_mirror"
@@ -211,26 +218,28 @@ def compute_tfr(
         elif cond == "prev_resp":
             if study == 1:
                 epochs_a = epochs[
-                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == high_p))
+                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) &
+                      (epochs.metadata.cue == params.high_p))
                 ]
                 epochs_b = epochs[
-                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == high_p))
+                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) &
+                     (epochs.metadata.cue == params.high_p))
                 ]
-                cond_a_name = "prevyesresp_highprob_stim"
-                cond_b_name = "prevnoresp_highprob_stim"
+                cond_a_name = f"prevyesresp_highprob_stim_{tmin}_{tmax}"
+                cond_b_name = f"prevnoresp_highprob_stim_{tmin}_{tmax}"
             elif study == 2:
                 epochs_a = epochs[
                     (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == 0.25)))
+                     (epochs.metadata.cue == params.high_p)))
                 ]
 
                 epochs_b = epochs[
                     (((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == 0.25)))
+                     (epochs.metadata.cue == params.high_p)))
                 ]
 
-                cond_a_name = "prevyesresp_samecue_lowprob"
-                cond_b_name = "prevnoresp_samecue_lowprob"
+                cond_a_name = f"prevyesresp_samecue_highprob_{tmin}_{tmax}"
+                cond_b_name = f"prevnoresp_samecue_highprob_{tmin}_{tmax}"
 
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
@@ -440,7 +449,7 @@ def plot_tfr_cluster_test_output(
     # Adjust the space between the subplots
     plt.subplots_adjust(wspace=0.7)
     # which time windows to plot
-    time_windows = [(-0.4, 0.0), (-0.4, 0.0)]
+    time_windows = [(-0.7, 0.0), (-0.7, 0.0)]
 
     # loop over time windows and axes
     for idx, t in enumerate(time_windows):
