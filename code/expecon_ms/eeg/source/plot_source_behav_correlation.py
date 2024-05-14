@@ -16,7 +16,7 @@ plt.rcParams['xtick.labelsize'] = 12  # X-axis ticks
 plt.rcParams['ytick.labelsize'] = 12  # Y-axis ticks
 
 # Read the CSV file into a DataFrame
-file_path = Path("E:", "expecon_ms", "data", "behav", "source_model_est_2.csv")
+file_path = Path("E:\\expecon_ms", "data", "behav", "source_model_est_2.csv")
 df = pd.read_csv(file_path)
 
 # Function to calculate the correlation coefficient and p-value
