@@ -15,6 +15,8 @@ library(tidyr)
 library(emmeans)
 library(sjPlot)
 library(ggplot2)
+library(performance)
+library(gridExtra)
 
 # don't forget to give credit to the amazing authors of those packages
 #citation("emmeans")
@@ -25,8 +27,8 @@ par(family = "Arial", cex = 1.2)
 ####################################brain behav#####################################################
 setwd("E:/expecon_ms")
 
-filename_1 = paste("brain_behav_cleaned_1.csv", sep="")
-filename_2 = paste("brain_behav_cleaned_2.csv", sep="")
+filename_1 = paste("brain_behav_cleaned_source_1.csv", sep="")
+filename_2 = paste("brain_behav_cleaned_source_2.csv", sep="")
 brain_behav_path_1 <- file.path("data", "behav", filename_1)
 brain_behav_path_2 <- file.path("data", "behav", filename_2)
 
@@ -55,28 +57,13 @@ behav$congruency_stim <- as.integer(as.logical(behav$congruency_stim))
 behav <- na.omit(behav) 
 
 #rename beta power variable
-behav$beta <- behav$pre_beta
-behav$alpha <- behav$pre_alpha
+behav$beta <- behav$beta_source_prob
 
 hist(behav$beta)
 
-# Subsetting to keep rows where source_s1 values are within the desired range
+# kick out very high or low beta values
 behav <- behav[!(behav$beta > 3 | behav$beta < -3), ]
-behav <- behav[!(behav$alpha > 3 | behav$alpha < -3), ]
 ########################### Brain behavior GLMMs ###################################################
-
-# does beta predict the stimulus? control analysis:
-
-beta_stim <- glm(isyes ~ -1 + beta,
-                  data = behav, family=binomial(link='probit'))
-summary(beta_stim)
-
-# does beta predict reaction times?
-
-beta_rt <- lmer(respt1 ~ beta + (1|ID),
-                 data = behav)
-summary(beta_stim)
-
 
 # replace stimulus probability regressor with beta power per trial 
 # (neural correlate of stimulus probability)
@@ -86,18 +73,6 @@ beta_cue = lmer(beta ~ cue+ (cue|ID),
             optCtrl=list(maxfun=2e5)))
 
 summary(beta_cue)
-
-alpha_cue = lmer(alpha ~ cue+ (cue|ID), 
-                data=behav, control=lmerControl(optimizer="bobyqa",
-                                                optCtrl=list(maxfun=2e5)))
-
-summary(alpha_cue)
-
-alpha_cue = lmer(beta ~ prevresp + (prevresp|ID), 
-                 data=behav, control=lmerControl(optimizer="bobyqa",
-                                                 optCtrl=list(maxfun=2e5)))
-
-summary(alpha_cue)
 ###################################################################################################
 ### does prestimulus power predict detection, while controlling for previous choice
 
@@ -123,9 +98,9 @@ saveRDS(beta_base_glm, cue_model_path)
 beta_base_glm <- readRDS(cue_model_path)
 
 # add previous response
-beta_prev_glm <- glmer(sayyes ~ isyes + alpha + cue + prevresp + 
-                    alpha*isyes + cue*isyes +
-                     (isyes+cue + prevresp|ID),
+beta_prev_glm <- glmer(sayyes ~ isyes + beta + cue + prevresp + 
+                    beta*isyes + cue*isyes +
+                     (isyes+cue+prevresp|ID),
                    data = behav, family=binomial(link='probit'), 
                    control=glmerControl(optimizer="bobyqa",
                                         optCtrl=list(maxfun=2e5)))
@@ -143,33 +118,115 @@ beta_prev_glm <- readRDS(cue_model_path)
 
 ##### no we fit the interaction between prestimulus power and previous choice
 # beta interaction
-beta_int_glm <- glmer(sayyes ~ isyes*beta+ isyes*cue + beta*prevresp + cue*prevresp +
+beta_int_glm1 <- glmer(sayyes ~ isyes*beta+ isyes*cue + beta*prevresp + cue*prevresp +
                         (isyes+cue + prevresp| ID),
                       data = behav, family=binomial(link='probit'), 
                       control=glmerControl(optimizer="bobyqa",
                                            optCtrl=list(maxfun=2e5)))
 
-check_collinearity(beta_int_glm) # VIF should be < 3
-check_convergence(beta_int_glm)
+check_collinearity(beta_int_glm2) # VIF should be < 3
+check_convergence(beta_int_glm2)
 
-summary(beta_int_glm)
+summary(beta_int_glm2)
 
 # Post hoc tests for behavior interaction
-emm_model <- emmeans(beta_int_glm, "beta", by = "prevresp")
-con <- contrast(emm_model)
-con
+emm_model <- contrast(emmeans(beta_int_glm1, "prevresp", by = "cue"))
+emm_model
 
 # save models to disk
 filename = paste("beta_int_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filename)
-saveRDS(beta_int_glm, cue_model_path)
-beta_int_glm <- readRDS(cue_model_path)
+saveRDS(beta_int_glm1, cue_model_path)
+beta_int_glm1 <- readRDS(cue_model_path)
+
+# now plot figure 4
+
+# Define the plots with custom theme and axis labels
+plot1 <- plot_model(beta_int_glm1, type='pred', terms = c("beta", 'prevresp'), 
+                    show.legend = FALSE, colors = c("#e319d0ff", "#35b85bff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Pre-stimulus Beta Power", 
+       y = "Predicted Probability\nof Yes Response") +
+  scale_y_continuous(labels = function(x) paste0(x*100))  # Remove percentage sign
+
+plot2 <- plot_model(beta_int_glm1, type='pred', terms = c("beta", 'isyes'), 
+                    show.legend = FALSE, colors = c("#fba72aff", "#9c57c1ff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Pre-stimulus Beta Power", 
+       y = "Predicted Probability\nof Yes Response") +
+  scale_y_continuous(labels = function(x) paste0(x*100))  # Remove percentage sign
+
+plot3 <- plot_model(beta_int_glm1, type='pred', terms = c("cue", 'prevresp'), 
+                    show.legend = FALSE, colors = c("#e319d0ff", "#35b85bff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Stimulus Probability", 
+       y = "Predicted Probability\nof Yes Response") +
+  scale_y_continuous(labels = function(x) paste0(x*100)) +  # Remove percentage sign
+  scale_x_continuous(breaks = c(0.25, 0.75), labels = c("low", "high"))
+
+# volatile env.
+plot4 <- plot_model(beta_int_glm2, type='pred', terms = c("beta", 'prevresp'), 
+                    show.legend = FALSE, colors = c("#e319d0ff", "#35b85bff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Pre-stimulus Beta Power", 
+       y = "Predicted Probability\nof Yes Response") +
+  scale_y_continuous(labels = function(x) paste0(x*100))  # Remove percentage sign
+
+plot5 <- plot_model(beta_int_glm2, type='pred', terms = c("beta", 'isyes'), 
+                    show.legend = FALSE, colors = c("#fba72aff", "#9c57c1ff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Pre-stimulus Beta Power", 
+       y = "Predicted Probability\nof Yes Response") +
+  scale_y_continuous(labels = function(x) paste0(x*100))  # Remove percentage sign
+
+plot6 <- plot_model(beta_int_glm2, type='pred', terms = c("cue", 'prevresp'), 
+                    show.legend = FALSE, colors = c("#e319d0ff", "#35b85bff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Stimulus Probability", 
+       y = "Predicted Probability\nof Yes Response") +
+  scale_y_continuous(labels = function(x) paste0(x*100)) +  # Remove percentage sign
+  scale_x_continuous(breaks = c(0.25, 0.75), labels = c("low", "high"))
+
+# Arrange plots into a grid
+fig4 = grid.arrange(plot2, plot3, plot1, plot5, plot6, plot4, ncol = 3, nrow = 2)
+
+# Define the directory path
+directory <- "E:\\expecon_ms\\figs\\manuscript_figures\\figure4_detection_modelling"
+
+# Set the dimensions for an A4 page
+a4_width <- 8.3  # Width in inches
+a4_height <- 6 # Height in inches
+
+# Save the arranged grid of plots as PNG with 300 DPI
+ggsave(file.path(directory, "figure4.png"), plot = fig4, 
+       width = a4_width, height = a4_height, dpi = 300)
+
+# Save the arranged grid of plots as SVG with 300 DPI
+ggsave(file.path(directory, "figure.svg"), plot = fig4, 
+       width = a4_width, height = a4_height, dpi = 300)
+
+# save table to docx
+filename = paste("beta_expecon", expecon, ".docx", sep="_")
+output_file_path_beta <- file.path("figs", "manuscript_figures", "Tables", filename)
+
+models = list("base" = beta_base_glm, "add previous response" = beta_prev_glm,
+              "interaction" = beta_int_glm1)
+
+modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
+                           statistic = NULL,  output = output_file_path_beta)
+
 ################################ fit confidence with beta power ####################################
 
 behav$sayyes = as.factor(behav$sayyes)
 
-conf_full_model_2 = glmer(conf ~ isyes*sayyes*cue + prevresp + prevconf +
-                                 (isyes + sayyes + prevresp + prevconf + cue|ID), data=behav, 
+conf_full_model_1 = glmer(conf ~ sayyes*cue + prevconf + correct + 
+                                 (sayyes*cue + prevconf + correct|ID), data=behav, 
                                family=binomial(link='probit'),
                                control=glmerControl(optimizer="bobyqa",
                                                     optCtrl=list(maxfun=2e5)))
@@ -179,29 +236,13 @@ check_convergence(conf_full_model_1)
 
 summary(conf_full_model_1)
 
-# Post hoc tests for behavior interaction, 3way
-contrast(emmeans(conf_full_model_1, "sayyes", by = c("isyes", "cue")))
-
 # Post hoc tests for behavior interaction
 contrast(emmeans(conf_full_model_1, "sayyes", by = c("cue")))
 
-# plot estimates
-p1<-plot_model(conf_full_model_1,  
-               show.values = TRUE, 
-               value.offset = .5,
-               axis.labels = rev(c("stimulus", "yes response", 'high probability', 
-                                   'previous yes response', 
-                                   'previous high confidence', 'stimulus*yes', 
-                                   'stimulus * high prob.',
-                                   'yes response * high prob.',
-                                   'stimulus * yes response * high prob.')),
-               auto.label = FALSE)
-p1
-
 # now replace the cue with beta power
 
-conf_full_model_beta_2 = glmer(conf ~ isyes*sayyes*beta + prevresp + prevconf +
-                            (isyes + sayyes + prevresp + prevconf|ID), data=behav, 
+conf_full_model_beta_1 = glmer(conf ~ sayyes*beta + prevconf + correct +
+                            (sayyes+ prevconf + correct|ID), data=behav, 
                           family=binomial(link='probit'),
                           control=glmerControl(optimizer="bobyqa",
                                                optCtrl=list(maxfun=2e5)))
@@ -211,52 +252,131 @@ check_convergence(conf_full_model_beta_1)
 
 summary(conf_full_model_beta_1)
 
+# save to disk
+filename = paste("conf_model_full_model", expecon, ".rda", sep="_")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", filename)
+saveRDS(conf_full_model_1, cue_model_path)
+conf_full_model_1 <- readRDS(cue_model_path)
+
+filename = paste("conf_model_full_model_beta", expecon, ".rda", sep="_")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", filename)
+saveRDS(conf_full_model_beta_1, cue_model_path)
+conf_full_model_beta_1 <- readRDS(cue_model_path)
+
+# now for volatile env.
+conf_full_model_2 = glmer(conf ~ sayyes*cue + prevconf + correct +
+                            (sayyes*cue + prevconf + correct|ID), data=behav, 
+                          family=binomial(link='probit'),
+                          control=glmerControl(optimizer="bobyqa",
+                                               optCtrl=list(maxfun=2e5)))
+
+check_collinearity(conf_full_model_2)
+check_convergence(conf_full_model_2)
+
+summary(conf_full_model_2)
+
+# Post hoc tests for behavior interaction
+contrast(emmeans(conf_full_model_2, "sayyes", by = c("cue")))
+
+# now replace the cue with beta power
+
+conf_full_model_beta_2 = glmer(conf ~ sayyes*beta + prevconf + correct +
+                                 (sayyes+ prevconf + correct|ID), data=behav, 
+                               family=binomial(link='probit'),
+                               control=glmerControl(optimizer="bobyqa",
+                                                    optCtrl=list(maxfun=2e5)))
+
+check_collinearity(conf_full_model_beta_2)
+check_convergence(conf_full_model_beta_2)
+
+summary(conf_full_model_beta_2)
+
+# save to disk
+filename = paste("conf_model_full_model", expecon, ".rda", sep="_")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", filename)
+saveRDS(conf_full_model_2, cue_model_path)
+conf_full_model_2 <- readRDS(cue_model_path)
+
+filename = paste("conf_model_full_model_beta", expecon, ".rda", sep="_")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", filename)
+saveRDS(conf_full_model_beta_2, cue_model_path)
+conf_full_model_beta_2 <- readRDS(cue_model_path)
+
 # save models as tables for manuscript
 #https://modelsummary.com/articles/modelsummary.html
 
-filename = paste("conf_beta_expecon", expecon, ".html", sep="_")
-output_file_path_beta <- file.path("figs", "manuscript_figures", "Tables", filename)
+filename_conf = paste("conf_expecon", expecon, ".docx", sep="_")
+output_file_path_conf<- file.path("figs", "manuscript_figures", "Tables", filename_conf)
 
-models = list("probability" = conf_full_model_1, "beta power" = conf_full_model_beta_1)
+models = list("prob" = conf_full_model_2, "beta" = conf_full_model_beta_2)
 
 modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
-                           statistic = NULL,  output = output_file_path_beta)
+                           statistic = NULL,  output = output_file_path_conf)
 
-# plot estimates
-p1<-plot_model(conf_full_model_beta_1,  
-               show.values = TRUE, 
-               value.offset = .5,
-               axis.labels = rev(c("stimulus", "yes response", 'beta', 
-                                   'previous yes response', 
-                                   'previous high confidence', 'stimulus*yes', 
-                                   'stimulus*beta.',
-                                   'yes response* beta.',
-                                   'stimulus*yes response* beta.')),
-               auto.label = FALSE)
-p1
+# plot figure 5
+# Define the common y-axis limits
+common_ylim <- c(0, 1)  # Adjust the range as needed
 
-# change the order of predictors (x and label)
-plot_model(conf_full_model_1, type='pred',terms = c("sayyes", 'cue'), show.legend = TRUE,
-                     colors = c("#357db8ff", "#e31919ff"),  title=" ")
+# Define the plots with custom theme
+plot1 <- plot_model(conf_full_model_1, type='pred',terms = c("sayyes", 'cue'), 
+                    show.legend = TRUE, colors = c("#357db8ff", "#e31919ff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Detection Response", 
+       y = "Predicted Probability of\nHigh Confidence Rating") +
+  scale_x_continuous(breaks = c(0, 1), labels = c("no", "yes")) +  # Custom x-axis labels
+  scale_y_continuous(labels = function(x) paste0(x*100)) +  # Remove percentage sign
+ coord_cartesian(ylim = common_ylim)  # Set common y-axis limits
 
-# change the order of predictors (x and label)
-plot_model(conf_full_model_beta_1, type='pred',terms = c("sayyes", 'beta'), show.legend = TRUE,
-           colors = c("#357db8ff", "#e31919ff"),  title=" ")
+plot2 <- plot_model(conf_full_model_beta_1, type='pred',terms = c("sayyes", 'beta [1, -1]'), 
+                    show.legend = TRUE, colors = c("#357db8ff", "#e31919ff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Detection Response", 
+       y = "Predicted Probability of\nHigh Confidence Rating") +
+  scale_x_continuous(breaks = c(0, 1), labels = c("no", "yes")) +  # Custom x-axis labels
+  scale_y_continuous(labels = function(x) paste0(x*100)) +  # Remove percentage sign
+  coord_cartesian(ylim = common_ylim)  # Set common y-axis limits
 
-# stable env
-beta_values = c(0.83, -1.13)
+plot3 <- plot_model(conf_full_model_2, type='pred',terms = c("sayyes", 'cue'), 
+                    show.legend = TRUE, colors = c("#357db8ff", "#e31919ff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Detection Response", 
+       y = "Predicted Probability of\nHigh Confidence Rating") +
+  scale_x_continuous(breaks = c(0, 1), labels = c("no", "yes")) +  # Custom x-axis labels
+  scale_y_continuous(labels = function(x) paste0(x*100)) +  # Remove percentage sign
+  coord_cartesian(ylim = common_ylim)  # Set common y-axis limits
 
-# volatile env
-beta_values = c(0.88, -1.08)
+plot4 <- plot_model(conf_full_model_beta_2, type='pred',terms = c("sayyes", 'beta [1, -1]'), 
+                    show.legend = TRUE, colors = c("#357db8ff", "#e31919ff"), title=" ") +
+  theme(axis.text = element_text(size = 13),
+        axis.title = element_text(size = 16)) +
+  labs(x = "Detection response", 
+       y = "Predicted Probability of\nHigh Confidence Rating") +
+  scale_x_continuous(breaks = c(0, 1), labels = c("no", "yes")) +  # Custom x-axis labels
+  scale_y_continuous(labels = function(x) paste0(x*100)) +  # Remove percentage sign
+  coord_cartesian(ylim = common_ylim)  # Set common y-axis limits
 
-# Post hoc tests for behavior interaction, 3way
-contrast(emmeans(conf_full_model_2, "cue", by = "sayyes", at = list(beta=beta_values)))
+# Arrange plots into a grid
+fig5 <- grid.arrange(plot1, plot3, plot2, plot4, ncol = 2, nrow = 2)
+
+# Define the directory path
+fig5_path <- "E:\\expecon_ms\\figs\\manuscript_figures\\figure5_confidence_modelling"
+
+# Save the arranged grid of plots as PNG with 300 DPI
+ggsave(file.path(fig5_path, "fig5.png"), plot = fig5, width = a4_width, height = a4_height,
+        dpi = 300)
+
+# Save the arranged grid of plots as SVG with 300 DPI
+ggsave(file.path(fig5_path, "fig5.svg"), plot = fig5, 
+       width = a4_width, height = a4_height, dpi = 300)
+
+beta_values = c(1, -1)
 
 # Post hoc tests for behavior interaction
 contrast(emmeans(conf_full_model_beta_2, "beta", by = "sayyes", at = list(beta=beta_values)))
-
-filename = paste("conf_beta_expecon", expecon, ".html", sep="_")
-output_file_path_beta <- file.path("figs", "manuscript_figures", "Tables", filename)
+contrast(emmeans(conf_full_model_2, "cue", by = "sayyes"))
 
 # save to disk
 filename = paste("conf_model_full_model", expecon, ".rda", sep="_")
@@ -272,7 +392,7 @@ cue_prev_int_model <- readRDS(cue_model_path)
 
 # Likelihood ratio tests
 anova(beta_base_glm, beta_prev_glm)
-anova(beta_prev_glm, beta_int_glm)
+anova(beta_prev_glm, beta_int_glm2)
 
 # difference in AIC and BIC
 diff_aic_1 = AIC(beta_prev_glm) - AIC(beta_base_glm)
@@ -280,30 +400,12 @@ diff_bic_1 = BIC(beta_prev_glm) - BIC(beta_base_glm)
 print(diff_aic_1)
 print(diff_bic_1)
 
-diff_aic_2 = AIC(beta_int_glm) - AIC(beta_prev_glm)
-diff_bic_2 = BIC(beta_int_glm) - BIC(beta_prev_glm)
+diff_aic_2 = AIC(beta_int_glm2) - AIC(beta_prev_glm)
+diff_bic_2 = BIC(beta_int_glm1) - BIC(beta_prev_glm)
 
 print(diff_aic_2)
 print(diff_bic_2)
 
-# save table to html
-filename = paste("beta_expecon", expecon, ".docx", sep="_")
-output_file_path_beta <- file.path("figs", "manuscript_figures", "Tables", filename)
-
-models = list("base" = beta_base_glm, "add previous response" = beta_prev_glm,
-              "interaction" = beta_int_glm)
-
-modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
-                           statistic = NULL,  output = output_file_path_beta)
-
-filename_conf = paste("conf_expecon", expecon, ".docx", sep="_")
-output_file_path_conf<- file.path("figs", "manuscript_figures", "Tables", filename_conf)
-
-
-models = list("prob" = conf_full_model_1, "beta" = conf_full_model_beta_1)
-
-modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
-                           statistic = NULL,  output = output_file_path_conf)
 ##########################congruency###############################################################
 
 # does beta power per trial predict congruent responses in both probability conditions?
