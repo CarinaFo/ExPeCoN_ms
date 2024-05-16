@@ -1,7 +1,6 @@
 # libraries
 library(lme4) # mixed models
 library(ggplot2)
-library(lmerTest) # no p values without this package for linear mixed mdoels
 library(mediation)
 library(dplyr)# pandas style
 library(tidyr)
@@ -9,6 +8,7 @@ library(emmeans)
 library(ggeffects)
 library(sjPlot)
 library(modelsummary)
+library(performance)
 
 # don't forget to give credit to the amazing authors of those packages
 #citation("emmeans")
@@ -22,8 +22,8 @@ options(scipen=999)
 ###################load csv including data from both studies#######################################
 # set base directory
 setwd("E:/expecon_ms")
-
-behav_path = file.path("data", "behav", "brain_behav_cleaned_source_tvals2.csv")
+expecon=1
+behav_path = file.path("data", "behav", "brain_behav_cleaned_source_1.csv")
 behav = read.csv(behav_path)
 
 ################################ prep for modelling ###########################################
@@ -60,9 +60,8 @@ summary(lmer(beta_source_prob ~ cue + (cue|ID), data=behav))
 summary(lmer(beta_source_prev ~ prevresp + (1|ID), data=behav))
 
 # does the cue predict beta source prob?
-
-sdt_glm_prevresp = glmer(sayyes ~ isyes + cue + isyes*cue + prevresp+prevconf + cue*prevresp +
-                                       (isyes*cue+prevresp+prevconf|ID), data=behav, 
+sdt_glm_prevresp = glmer(sayyes ~ isyes*cue + prevresp*cue +
+                                       (isyes+cue*prevresp|ID), data=behav, 
                                      family=binomial(link='probit'),
                                      control=glmerControl(optimizer="bobyqa",
                                                           optCtrl=list(maxfun=2e5)),
@@ -73,11 +72,13 @@ summary(sdt_glm_prevresp)
 check_collinearity(sdt_glm_prevresp)
 check_convergence(sdt_glm_prevresp)
 
+# extract random effects for each parameter (only works if the parameter was fit as a random effect)
 ranef = ranef(sdt_glm_prevresp)
 choice_bias = ranef$ID$prevresp
 crit_change = ranef$ID$cue
-
-
+# singularity warning
+prev_cue_int = ranef$ID$`cue:prevresp`
+  
 # Group by ID
 df_grouped <- behav %>%
   group_by(ID) %>%
@@ -139,47 +140,27 @@ crit_diff =
 beta_pow_change_prev <- df_grouped$difference
 
 cor.test(beta_pow_change_prev, choice_bias)
-cor.test(beta_pow_change_prob, crit_diff)
-cor.test(beta_pow_change_prob, crit_change)
+cor.test(beta_pow_change_prob, crit_diff) # from manual calculation
+cor.test(beta_pow_change_prob, crit_change) # model estimates
+cor.test(beta_pow_change_prev, prev_cue_int)
+cor.test(beta_pow_change_prob, prev_cue_int)
 
 # control analysis:
 cor.test(beta_pow_change_prob, choice_bias)
 cor.test(beta_pow_change_prev, crit_change)
 
 # Combine the lists into a data frame
-df <- data.frame(beta_pow_change_prev, beta_pow_change_prob, choice_bias, crit_change)
+df <- data.frame(beta_pow_change_prev, beta_pow_change_prob, choice_bias, crit_change, prev_cue_int)
 
 # Rename the columns (optional)
-colnames(df) <- c("beta_power_prev", "beta_power_prob", "choice_bias", "crit_change")
+colnames(df) <- c("beta_power_prev", "beta_power_prob", "choice_bias", "crit_change", "interaction")
 
-save_path = file.path("data", "behav", "source_model_est_1.csv")
+# save csv
+filename = paste("source_model_est_", expecon, ".csv", sep="")
+save_path = file.path("data", "behav", filename)
 
 # Save the data frame to a CSV file
 write.csv(df, save_path, row.names = FALSE)
-
-summary(lmerTest::lmer(beta_source_prob ~ cue + (cue|ID), data=behav))
-
-# does source beta predict the detection response?
-
-beta_prob = glmer(sayyes ~ isyes*beta_source_prob +
-                             + beta_source_prob*isyes +
-                             (isyes*beta_source_prob|ID), data=behav, 
-                           family=binomial(link='probit'),
-                           control=glmerControl(optimizer="bobyqa",
-                                                optCtrl=list(maxfun=2e5)),
-)
-
-plot_model(beta_prob, type='pred', terms=c('beta_source_prob', 'isyes'))
-
-beta_prev = glmer(sayyes ~ isyes*cue+beta_source_prev*cue +
-                    (isyes+beta_source_prev+cue|ID), data=behav, 
-                  family=binomial(link='probit'),
-                  control=glmerControl(optimizer="bobyqa",
-                                       optCtrl=list(maxfun=2e5)),
-)
-
-plot_model(beta_prev, type='pred', terms=c('beta_source_prev', 'isyes'))
-
 ############################## mediation model ####################################################
 
 # does beta power mediate probability and/or previous response?
@@ -202,16 +183,16 @@ behav$cue <- ifelse(behav$cue == 0.25, 0, 1)
 ####################################### volatile env.##############################################
 
 # without p-values, model for mediation function
-med.model_beta <- lme4::lmer(beta_source_prob ~  isyes + cue + isyes*cue+prevresp +
-                               (cue+prevresp+isyes|ID), 
-                             data = behav,
-                             control=lmerControl(optimizer="bobyqa",
-                                                 optCtrl=list(maxfun=2e5))) # significant 
-summary(med.model_beta)
+med.model_beta_prob <- lme4::lmer(beta_source_prob ~ cue + prevresp +
+                                     (prevresp+cue|ID), 
+                                   data = behav,
+                                   control=lmerControl(optimizer="bobyqa",
+                                                       optCtrl=list(maxfun=2e5)))
+summary(med.model_beta_prob)
 
 
-med.model_beta_prev <- lme4::lmer(beta_source_prev ~  isyes + cue + isyes*cue+prevresp +
-                                    (cue+prevresp+isyes|ID), 
+med.model_beta_prev <- lme4::lmer(beta_source_prev ~  prevresp + cue +
+                                    (prevresp+cue|ID), 
                              data = behav,
                              control=lmerControl(optimizer="bobyqa",
                                                  optCtrl=list(maxfun=2e5))) # significant 
@@ -220,8 +201,8 @@ summary(med.model_beta_prev)
 # fit outcome model: do the mediator (beta) and the IV (stimulus probability cue) predict the
 # detection response? included stimulus and previous choice at a given trial as covariates,
 # but no interaction between prev. resp and cue
-out.model_beta_prob <- glmer(sayyes ~ isyes + cue + beta_source_prob + prevresp +isyes*cue+
-                          (cue+isyes+prevresp|ID),
+out.model_beta_prob <- glmer(sayyes ~ beta_source_prob + prevresp + cue + isyes +
+                          (isyes+prevresp+cue|ID),
                         data = behav,
                         control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e5)),
@@ -229,8 +210,8 @@ out.model_beta_prob <- glmer(sayyes ~ isyes + cue + beta_source_prob + prevresp 
 
 summary(out.model_beta_prob)
 
-out.model_beta_prev <- glmer(sayyes ~ isyes + cue + beta_source_prev + prevresp +isyes*cue+
-                          (cue+isyes+prevresp|ID),
+out.model_beta_prev <- glmer(sayyes ~ beta_source_prev + prevresp + cue + isyes +
+                          (isyes+prevresp+cue|ID),
                         data = behav,
                         control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e5)),
@@ -240,7 +221,6 @@ summary(out.model_beta_prev)
 
 # save models as tables for manuscript
 #https://modelsummary.com/articles/modelsummary.html
-expecon = 2
 
 filename_med = paste("mediation_expecon", expecon, ".docx", sep="_")
 output_file_path_med<- file.path("figs", "manuscript_figures", "Tables", filename_med)
@@ -250,7 +230,7 @@ models = list("probability" = out.model_beta_prob, "previous_response" = out.mod
 modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
                            statistic = NULL,  output = output_file_path_med)
 
-mediation_cue_beta_prob <- mediate(med.model_beta, out.model_beta_prob, treat='cue', 
+mediation_cue_beta_prob <- mediate(med.model_beta_prob, out.model_beta_prob, treat='cue', 
                               mediator='beta_source_prob')
 
 summary(mediation_cue_beta_prob)
@@ -261,6 +241,7 @@ mediation_cue_beta_prev <- mediate(med.model_beta_prev, out.model_beta_prev, tre
 summary(mediation_cue_beta_prev)
 
 ############################confidence modelling ##################################################
+# not included in manuscript
 
 conf.model_beta <- lme4::lmer(beta_source_prob ~  isyes*sayyes + cue + prevresp + prevconf +
                                    (isyes + sayyes + prevresp + prevconf|ID), 
