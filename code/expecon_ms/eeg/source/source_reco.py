@@ -54,9 +54,6 @@ Path(paths.data.eeg.source.beamformer).mkdir(parents=True, exist_ok=True)
 # save paths for mne
 Path(paths.data.eeg.source.mne).mkdir(parents=True, exist_ok=True)
 
-# save source space figures
-Path(paths.figures.manuscript.figure4_source).mkdir(parents=True, exist_ok=True)
-
 # participant IDs
 participants = config.participants
 
