@@ -49,7 +49,7 @@ plt.rcParams.update({
 # Save tfr solutions
 Path(paths.data.eeg.sensor.tfr.tfr_contrasts).mkdir(parents=True, exist_ok=True)
 
-Path(paths.figures.manuscript.figure4).mkdir(parents=True, exist_ok=True)
+Path(paths.figures.manuscript.figure3).mkdir(parents=True, exist_ok=True)
 
 # Participant IDs
 participants = config.participants
@@ -562,7 +562,7 @@ def plot_tfr_cluster_test_output(
     for fm in ["svg", "png"]:
         fig.savefig(
             Path(
-                paths.figures.manuscript.figure4, f"fig4_tfr_tvals_{cond_a_name}_{cond_b_name}_coolwarm_robust_samevminvmax_{channel_names[0]}.{fm}"
+                paths.figures.manuscript.figure3, f"fig3_tfr_tvals_{cond_a_name}_{cond_b_name}_coolwarm_robust_samevminvmax_{channel_names[0]}.{fm}"
             ),
             dpi=300,
             format=fm,
