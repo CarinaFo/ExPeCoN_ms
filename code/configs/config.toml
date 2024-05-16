@@ -63,11 +63,8 @@ mne = "./data/eeg/source/MNE"
 figure1 = "./figs/manuscript_figures/figure1_expecon1_paradigm_behav"
 figure2 = "./figs/manuscript_figures/figure2_expecon2_paradigm_behav"
 figure2_suppl = "./figs/manuscript_figures/figure2_expecon2_paradigm_behav/supplfig"
-figure3 = "./figs/manuscript_figures/figure3_ssroi"
-figure4 = "./figs/manuscript_figures/figure4_tfr"
-figure4_suppl = "./figs/manuscript_figures/figure4_tfr/suppl.fig"
-figure4_source = "./figs/manuscript_figures/figure4_tfr/source"
-figure6 = "./figs/manuscript_figures/brain_behavior"
+figure3 = "./figs/manuscript_figures/figure3_tfr"
+figure6 = "./figs/manuscript_figures/figure6_correlation_mediation"
 
 # alpha level for all tests
 [params]
