@@ -210,8 +210,8 @@ def run_source_reco(
                 cond_b_name = f"{cond_b_name}_mirror"
         elif cond == "prev_resp":
             # set condition names
-            cond_a_name = f"prevyesresp_{tmin}_{tmax}"
-            cond_b_name = f"prevnoresp_{tmin}_{tmax}"
+            cond_a_name = f"prevyesresp_stimprevcurrent_{tmin}_{tmax}"
+            cond_b_name = f"prevnoresp_stimprevcurrent_{tmin}_{tmax}"
             # add mirror to filename if data is mirrored
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
@@ -302,19 +302,25 @@ def run_source_reco(
         elif cond == "prev_resp":
             if study == 1:
                 epochs_a = epochs[
-                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == params.high_p))
+                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & 
+                     (epochs.metadata.isyes == 1) & (epochs.metadata.cue == params.high_p))
                 ]
                 epochs_b = epochs[
-                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) & (epochs.metadata.cue == params.high_p))
+                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) &
+                     (epochs.metadata.isyes == 1) & (epochs.metadata.cue == params.high_p))
                 ]
             else:
                 epochs_a = epochs[
                     (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
+                     (epochs.metadata.previsyes == 1) &
+                     (epochs.metadata.isyes == 1) &
                      (epochs.metadata.cue == params.high_p)))
                 ]
 
                 epochs_b = epochs[
-                    (((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
+                    (((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue)  & 
+                      (epochs.metadata.previsyes == 1) &
+                     (epochs.metadata.isyes == 1) &
                      (epochs.metadata.cue == params.high_p)))
                 ]
             if mirror:
@@ -662,15 +668,15 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
         if study == 1:
             stc_array = create_source_contrast_array(
                 study=study,
-                cond_a="prevyesresp_-0.7_-0.1",
-                cond_b="prevnoresp_-0.7_-0.1",
+                cond_a="prevyesresp_stimprevcurrent_-0.7_-0.1",
+                cond_b="prevnoresp_stimprevcurrent_-0.7_-0.1",
                 method=method,
             )
         elif study == 2:  # noqa: PLR2004
                       stc_array = create_source_contrast_array(
                 study=study,
-                cond_a="prevyesresp",
-                cond_b="prevnoresp",
+                cond_a="prevyesresp_stimprevcurrent_-0.7_-0.1",
+                cond_b="prevnoresp_stimprevcurrent_-0.7_-0.1",
                 method=method,
             )
     elif cond == "control":
@@ -687,6 +693,7 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
     # permutation test to get sign. vertices
     t_obs, p, _ = mne.stats.permutation_t_test(stc_array)  # _, p, _ = t, p, h
     print(f"% of significant vertices: {np.sum(p < params.alpha) / len(p)}")
+    print(f"Number of significant vertices: {np.sum(p < params.alpha)}")
 
     # mean over participants
     x_avg = np.mean(stc_array, axis=0)
