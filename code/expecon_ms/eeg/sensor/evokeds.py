@@ -298,8 +298,15 @@ def get_significant_channel(data: np.ndarray, tmin: float, tmax: float, tmin_bas
 
 
 def plot_cluster_output_2d(
-    study: int, data: np.ndarray,
-    tmin: float, tmax: float, tmin_base: float, tmax_base: float, good_cluster_inds: int, t_obs: int, clusters: int
+    study: int,
+    data: np.ndarray,
+    tmin: float,
+    tmax: float,
+    tmin_base: float,
+    tmax_base: float,
+    good_cluster_inds: int,
+    t_obs: int,
+    clusters: int,
 ):
     """
     Plot cluster output of 2D cluster permutation test.
