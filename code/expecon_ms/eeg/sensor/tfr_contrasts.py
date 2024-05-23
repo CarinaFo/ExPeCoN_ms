@@ -219,28 +219,22 @@ def compute_tfr(
             if study == 1:
                 epochs_a = epochs[
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) &
-                     (epochs.metadata.isyes == 1) &
                       (epochs.metadata.cue == params.high_p))
                 ]
                 epochs_b = epochs[
                     ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) &
-                     (epochs.metadata.isyes == 1) &
                      (epochs.metadata.cue == params.high_p))
                 ]
                 cond_a_name = f"prevyesresp_highprob_prevandcurrentstim_{tmin}_{tmax}"
                 cond_b_name = f"prevnoresp_highprob_prevandcurrentstim_{tmin}_{tmax}"
             elif study == 2:
                 epochs_a = epochs[
-                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) 
-                     & (epochs.metadata.previsyes == 1) &
-                     (epochs.metadata.isyes == 1) &
+                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
                      (epochs.metadata.cue == params.high_p))
                 ]
 
                 epochs_b = epochs[
-                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) 
-                     & (epochs.metadata.previsyes == 1) &
-                     (epochs.metadata.isyes == 1) &
+                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
                      (epochs.metadata.cue == params.high_p))
                 ]
 

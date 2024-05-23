@@ -303,24 +303,20 @@ def run_source_reco(
             if study == 1:
                 epochs_a = epochs[
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & 
-                     (epochs.metadata.isyes == 1) & (epochs.metadata.cue == params.high_p))
+                     & (epochs.metadata.cue == params.high_p))
                 ]
                 epochs_b = epochs[
                     ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) &
-                     (epochs.metadata.isyes == 1) & (epochs.metadata.cue == params.high_p))
+                     (epochs.metadata.cue == params.high_p))
                 ]
             else:
                 epochs_a = epochs[
-                    (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.previsyes == 1) &
-                     (epochs.metadata.isyes == 1) &
+                    (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue)
                      (epochs.metadata.cue == params.high_p)))
                 ]
 
                 epochs_b = epochs[
                     (((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue)  & 
-                      (epochs.metadata.previsyes == 1) &
-                     (epochs.metadata.isyes == 1) &
                      (epochs.metadata.cue == params.high_p)))
                 ]
             if mirror:
@@ -675,8 +671,8 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
         elif study == 2:  # noqa: PLR2004
                       stc_array = create_source_contrast_array(
                 study=study,
-                cond_a="prevyesresp_stimprevcurrent_-0.7_-0.1",
-                cond_b="prevnoresp_stimprevcurrent_-0.7_-0.1",
+                cond_a="prevyesresp",
+                cond_b="prevnoresp",
                 method=method,
             )
     elif cond == "control":
