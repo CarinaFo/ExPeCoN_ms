@@ -86,6 +86,7 @@ def create_contrast(
     # save  evoked data per participant
     evokeds_signal_all, evokeds_noise_all = [], []
     evokeds_hit_all, evokeds_miss_all = [], []
+    evokeds_all = []
 
     # metadata after epoch cleaning
     metadata_all_subs = []
@@ -149,7 +150,7 @@ def create_contrast(
             epochs.metadata = subj_data
 
         if subtract_evoked:
-            epochs.subtract_evoked()
+            epochs = epochs.subtract_evoked()
 
         # reject epochs that exceed a certain threshold (amplitude)
         if drop_bads:
@@ -176,6 +177,7 @@ def create_contrast(
         mne.epochs.equalize_epoch_counts([epochs_hit, epochs_miss])
 
         # average over
+        evokeds_all.append(epochs.average())
         evokeds_hit_all.append(epochs_hit.average())
         evokeds_miss_all.append(epochs_miss.average())
         evokeds_signal_all.append(epochs_signal.average())
@@ -195,7 +197,7 @@ def create_contrast(
         pd.DataFrame(trials_removed).to_csv(dir_clean_epochs / f"trials_removed_{study!s}.csv")
         pd.DataFrame(all_trials).to_csv(dir_clean_epochs / f"trials_per_subject_{study!s}.csv")
 
-    return [evokeds_signal_all, evokeds_noise_all, evokeds_hit_all, evokeds_miss_all]
+    return [evokeds_all, evokeds_signal_all, evokeds_noise_all, evokeds_hit_all, evokeds_miss_all]
 
 
 def plot_roi(study: int, data: np.ndarray, tmin: float, tmax: float, tmin_base: float, tmax_base: float):
@@ -217,14 +219,17 @@ def plot_roi(study: int, data: np.ndarray, tmin: float, tmax: float, tmin_base: 
 
     """
     # baseline correct and crop the data for each participant
-    signal = [s.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for s in data[0]]
-    noise = [n.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for n in data[1]]
+    signal = [s.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for s in data[1]]
+    noise = [n.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for n in data[2]]
 
     # combine evokeds (subtract noise from signal)
     x = [mne.combine_evoked([s, n], weights=[1, -1]) for s, n in zip(signal, noise)]
 
     # mean of contrast over participants
     x_gra = mne.grand_average(x)
+
+    # mean of epochs over participants
+    e_gra = mne.grand_average(data[0])
 
     # Figure 3: Sensory region of interest definition.
     # Create a 1x2 grid of subplots
@@ -234,12 +239,17 @@ def plot_roi(study: int, data: np.ndarray, tmin: float, tmax: float, tmin_base: 
     x_gra.plot_topomap(times=[0.05], average=[0.02], axes=axs[0], show=False, colorbar=False, show_names=False)
 
     # plot contrast over time for CP4 (the strongest effect)
-    x_gra.plot(axes=axs[1], show=False, picks=["C4"])
+    x_gra.plot(axes=axs[1], show=False, picks=["CP4"])
 
     # save image
     plt.tight_layout()
     plt.savefig(Path(paths.figures.manuscript.figure3, f"fig3_ssroi_{study!s}.svg"), dpi=300)
     plt.show()
+
+    # plot all epochs in CP4
+    e_gra.copy().crop(-1,0).plot(picks=['CP4'])
+    plt.savefig(Path(paths.figures.manuscript.figure3, f"prestim_allepochs_{study!s}_CP4.svg"), dpi=300)
+    
 
 
 def get_significant_channel(data: np.ndarray, tmin: float, tmax: float, tmin_base: float, tmax_base: float):
