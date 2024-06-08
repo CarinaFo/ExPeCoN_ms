@@ -200,17 +200,17 @@ def compute_tfr(
 
         if cond == "probability":
             if study == 1:
-                epochs_a = epochs[((epochs.metadata.cue == params.high_p)  & (epochs.metadata.previsyes == 0) & 
+                epochs_a = epochs[((epochs.metadata.cue == params.high_p)  & (epochs.metadata.previsyes == 1) & 
                                 (epochs.metadata.prevresp == 0))]
-                epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.previsyes == 0) & 
+                epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.previsyes == 1) & 
                                 (epochs.metadata.prevresp == 0))]
-                cond_a_name =f"high_prevcr_{tmin}_{tmax}"
-                cond_b_name = f"low_prevcr_{tmin}_{tmax}"
+                cond_a_name =f"high_prevmiss_{tmin}_{tmax}_induced"
+                cond_b_name = f"low_prevmiss_{tmin}_{tmax}_induced"
             elif study == 2:  # noqa: PLR2004
                 epochs_a = epochs[((epochs.metadata.cue == params.high_p) & (epochs.metadata.prevcue == params.high_p))]
                 epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.prevcue == params.low_p))]
-                cond_a_name = f"high_{tmin}_{tmax}"
-                cond_b_name = f"low_{tmin}_{tmax}"
+                cond_a_name = f"high_{tmin}_{tmax}_induced"
+                cond_b_name = f"low_{tmin}_{tmax}_induced"
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
                 cond_b_name = f"{cond_b_name}_mirror"
@@ -225,8 +225,8 @@ def compute_tfr(
                     ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) &
                      (epochs.metadata.cue == params.high_p))
                 ]
-                cond_a_name = f"prevyesresp_highprob_prevandcurrentstim_{tmin}_{tmax}"
-                cond_b_name = f"prevnoresp_highprob_prevandcurrentstim_{tmin}_{tmax}"
+                cond_a_name = f"prevyesresp_highprob_prevstim_{tmin}_{tmax}_induced"
+                cond_b_name = f"prevnoresp_highprob_prevstim_{tmin}_{tmax}_induced"
             elif study == 2:
                 epochs_a = epochs[
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
@@ -238,8 +238,8 @@ def compute_tfr(
                      (epochs.metadata.cue == params.high_p))
                 ]
 
-                cond_a_name = f"prevyesresp_samecue_highprob_prevandcurrentstim_{tmin}_{tmax}"
-                cond_b_name = f"prevnoresp_samecue_highprob_prevandcurrentstim_{tmin}_{tmax}"
+                cond_a_name = f"prevyesresp_samecue_highprob_{tmin}_{tmax}_induced"
+                cond_b_name = f"prevnoresp_samecue_highprob_{tmin}_{tmax}_induced"
 
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
@@ -269,27 +269,6 @@ def compute_tfr(
             # save tfr data
             tfr_a.save(fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"))
             tfr_b.save(fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}-tfr.h5"))
-
-        # calculate tfr for all trials
-        if (
-            Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_single_trial_power_mirror_{study!s}-tfr.h5")
-        ).exists():
-            print("TFR already exists")
-        else:
-            tfr = mne.time_frequency.tfr_multitaper(
-                epochs, freqs=freqs, n_cycles=cycles, return_itc=False, n_jobs=-1, average=False, decim=2
-            )
-            if mirror:
-                tfr.save(
-                    fname=Path(
-                        paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_single_trial_power_mirror_{study!s}-tfr.h5"
-                    )
-                )
-            else:
-                tfr.save(
-                    fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_single_trial_power_{study!s}-tfr.h5"),
-                    overwrite=True,
-                )
 
     # save number of epochs per participant as csv file
     pd.DataFrame(n_ave).to_csv(Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"n_ave_{cond_a_name}_{study!s}.csv"))
