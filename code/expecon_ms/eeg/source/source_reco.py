@@ -9,9 +9,11 @@ Moreover, the script includes functions for statistical analysis in source space
 
 Also, it includes a function to plot contrasts in source space.
 
+This script produces source plots for figure 3 in Forster et al.
+
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2023
+Years: 2024
 """
 
 # %% Import

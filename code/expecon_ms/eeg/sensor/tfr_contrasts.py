@@ -4,11 +4,11 @@ Provide functions that compute time-frequency representations (TFRs).
 
 Moreover, run a cluster test in 2D space (time and frequency)
 
-This script produces figure 4.
+This script produces figure 3 in Forster et al.
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2023
+Years: 2024
 """
 
 # %% Import
