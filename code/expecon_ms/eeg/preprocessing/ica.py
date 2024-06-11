@@ -64,6 +64,7 @@ Path(paths.data.eeg.preprocessed.ica.PSD2).mkdir(parents=True, exist_ok=True)
 id_list_expecon1 = config.participants.ID_list_expecon1
 id_list_expecon2 = config.participants.ID_list_expecon2
 
+
 def run_ica(study: int, infomax: int, save_psd: int):
     """
     Run ICA on epoched data and save the ICA solution.

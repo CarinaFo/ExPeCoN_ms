@@ -200,14 +200,35 @@ def compute_tfr(
 
         if cond == "probability":
             if study == 1:
+
+                epochs_a = epochs[
+                    (
+                        (epochs.metadata.cue == params.high_p)
+                        & (epochs.metadata.previsyes == 0)
+                        & (epochs.metadata.prevresp == 0)
+                    )
+                ]
+                epochs_b = epochs[
+                    (
+                        (epochs.metadata.cue == params.low_p)
+                        & (epochs.metadata.previsyes == 0)
+                        & (epochs.metadata.prevresp == 0)
+                    )
+                ]
+                cond_a_name = f"high_prevcr_{tmin}_{tmax}"
+                cond_b_name = f"low_prevcr_{tmin}_{tmax}"
+
                 epochs_a = epochs[((epochs.metadata.cue == params.high_p)  & (epochs.metadata.previsyes == 1) & 
                                 (epochs.metadata.prevresp == 0))]
                 epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.previsyes == 1) & 
                                 (epochs.metadata.prevresp == 0))]
                 cond_a_name =f"high_prevmiss_{tmin}_{tmax}_induced"
                 cond_b_name = f"low_prevmiss_{tmin}_{tmax}_induced"
+
             elif study == 2:  # noqa: PLR2004
-                epochs_a = epochs[((epochs.metadata.cue == params.high_p) & (epochs.metadata.prevcue == params.high_p))]
+                epochs_a = epochs[
+                    ((epochs.metadata.cue == params.high_p) & (epochs.metadata.prevcue == params.high_p))
+                ]
                 epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.prevcue == params.low_p))]
                 cond_a_name = f"high_{tmin}_{tmax}_induced"
                 cond_b_name = f"low_{tmin}_{tmax}_induced"
@@ -218,6 +239,21 @@ def compute_tfr(
         elif cond == "prev_resp":
             if study == 1:
                 epochs_a = epochs[
+                    (
+                        (epochs.metadata.prevresp == 1)
+                        & (epochs.metadata.previsyes == 1)
+                        & (epochs.metadata.isyes == 1)
+                        & (epochs.metadata.cue == params.high_p)
+                    )
+                ]
+                epochs_b = epochs[
+                    (
+                        (epochs.metadata.prevresp == 0)
+                        & (epochs.metadata.previsyes == 1)
+                        & (epochs.metadata.isyes == 1)
+                        & (epochs.metadata.cue == params.high_p)
+                    )
+
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) &
                       (epochs.metadata.cue == params.high_p))
                 ]
@@ -229,6 +265,23 @@ def compute_tfr(
                 cond_b_name = f"prevnoresp_highprob_prevstim_{tmin}_{tmax}_induced"
             elif study == 2:
                 epochs_a = epochs[
+                    (
+                        (epochs.metadata.prevresp == 1)
+                        & (epochs.metadata.prevcue == epochs.metadata.cue)
+                        & (epochs.metadata.previsyes == 1)
+                        & (epochs.metadata.isyes == 1)
+                        & (epochs.metadata.cue == params.high_p)
+                    )
+                ]
+
+                epochs_b = epochs[
+                    (
+                        (epochs.metadata.prevresp == 0)
+                        & (epochs.metadata.prevcue == epochs.metadata.cue)
+                        & (epochs.metadata.previsyes == 1)
+                        & (epochs.metadata.isyes == 1)
+                        & (epochs.metadata.cue == params.high_p)
+                    )
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
                      (epochs.metadata.cue == params.high_p))
                 ]
@@ -236,6 +289,7 @@ def compute_tfr(
                 epochs_b = epochs[
                     ((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
                      (epochs.metadata.cue == params.high_p))
+
                 ]
 
                 cond_a_name = f"prevyesresp_samecue_highprob_{tmin}_{tmax}_induced"
@@ -368,7 +422,7 @@ def load_tfr_conds(
                         tfr_b_all_conds.append(tfr_b)
                     tfr_a_all.append(tfr_a_all_conds)
                     tfr_b_all.append(tfr_b_all_conds)
-            elif study == 1:  # noqa: PLR2004
+            elif study == 1:
                 for subj in id_list:
                     # load tfr data
                     tfr_a = mne.time_frequency.read_tfrs(
@@ -533,15 +587,25 @@ def plot_tfr_cluster_test_output(
 
             # plot t contrast and sign. cluster contour
             plot_cluster_contours(
-                data=x, t_obs=t_obs, tfr_a_cond=tfr_a_cond, fmin=3, fmax=35, idx=idx, t=t, axs=axs, mask=mask,
-            cond=cond)
+                data=x,
+                t_obs=t_obs,
+                tfr_a_cond=tfr_a_cond,
+                fmin=3,
+                fmax=35,
+                idx=idx,
+                t=t,
+                axs=axs,
+                mask=mask,
+                cond=cond,
+            )
 
     plt.tight_layout()
     # now save the figure to disk as png and svg
     for fm in ["svg", "png"]:
         fig.savefig(
             Path(
-                paths.figures.manuscript.figure3, f"fig3_tfr_tvals_{cond_a_name}_{cond_b_name}_coolwarm_robust_samevminvmax_{channel_names[0]}.{fm}"
+                paths.figures.manuscript.figure3,
+                f"fig3_tfr_tvals_{cond_a_name}_{cond_b_name}_coolwarm_robust_samevminvmax_{channel_names[0]}.{fm}",
             ),
             dpi=300,
             format=fm,
@@ -619,8 +683,8 @@ def plot_cluster_contours(
     sns.heatmap(t_val, cbar=True, cmap="coolwarm", robust=True, ax=axs[idx], vmin=vmin_val, vmax=vmax_val)
 
     # Customize the font size and family for various elements
-    plt.rcParams['font.family'] = 'Arial'  # Set the font family for the entire plot to Arial
-    plt.rcParams['font.size'] = 12  # Set the default font size to 12
+    plt.rcParams["font.family"] = "Arial"  # Set the font family for the entire plot to Arial
+    plt.rcParams["font.size"] = 12  # Set the default font size to 12
 
     # Draw the cluster outline
     for i in range(mask.shape[0]):  # frequencies
@@ -726,6 +790,7 @@ def plot_mirrored_data(subj: str):
     Args:
     ----
     subj: str, info: participant ID
+
     Returns:
     -------
     None
@@ -733,7 +798,9 @@ def plot_mirrored_data(subj: str):
     """
     # load epochs for a single participant
     # load data for a single participant from a single study (doesn't matter which one, we just need the data structure)
-    epochs = mne.read_epochs(Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, f"P{subj}_icacorr_0.1Hz-epo.fif"))
+    epochs = mne.read_epochs(
+        Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, f"P{subj}_icacorr_0.1Hz-epo.fif")
+    )
 
     # crop the data in the pre-stimulus window
     epochs.crop(tmin=-0.4, tmax=0)

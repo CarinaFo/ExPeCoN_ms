@@ -107,9 +107,13 @@ def prepro_behavioral_data(expecon: int):
     # add a column that indicates correct responses & congruency
     data["correct"] = data.sayyes == data.isyes
     # Add a 'congruency' column
-    data["congruency"] = ((data.cue == params.low_p) & (data.sayyes == 0)) | ((data.cue == params.high_p) & (data.sayyes == 1))
+    data["congruency"] = ((data.cue == params.low_p) & (data.sayyes == 0)) | (
+        (data.cue == params.high_p) & (data.sayyes == 1)
+    )
     # Add a 'congruency stimulus' column
-    data["congruency_stim"] = ((data.cue == params.low_p) & (data.isyes == 0)) | ((data.cue == params.high_p) & (data.isyes == 1))
+    data["congruency_stim"] = ((data.cue == params.low_p) & (data.isyes == 0)) | (
+        (data.cue == params.high_p) & (data.isyes == 1)
+    )
 
     # add a column that combines the confidence ratings and the
     # detection response
@@ -135,13 +139,14 @@ def prepro_behavioral_data(expecon: int):
     data["previsyes"] = data.groupby(["ID", "block"])["isyes"].shift(1)
 
     # remove no response trials or super fast responses
-    data = data.drop(data[data.respt1 == params.behavioral_cleaning.rt_max].index)  # noqa: PLR2004
-    data = data.drop(data[data.respt1 < params.behavioral_cleaning.rt_min].index)  # noqa: PLR2004
+    data = data.drop(data[data.respt1 == params.behavioral_cleaning.rt_max].index)
+    data = data.drop(data[data.respt1 < params.behavioral_cleaning.rt_min].index)
 
     # save the preprocessed dataframe
     data.to_csv(Path(paths.data.behavior, f"behav_data_exclrts_{expecon!s}.csv"))
 
     return data
+
 
 def exclude_data(expecon: int):
     """
@@ -242,17 +247,27 @@ def calculate_mean_sdt_param_changes(expecon=1):
     df_sdt = calculate_sdt_dataframe(df_study, "isyes", "sayyes", "ID", "cue")
 
     # calculate hit rate change between conditions per participant
-    diff_hit = df_sdt.hit_rate[df_sdt.cue == params.high_p].reset_index() - df_sdt.hit_rate[df_sdt.cue == params.low_p].reset_index()
+    diff_hit = (
+        df_sdt.hit_rate[df_sdt.cue == params.high_p].reset_index()
+        - df_sdt.hit_rate[df_sdt.cue == params.low_p].reset_index()
+    )
 
     # calculate fa rate change between conditions per participant
-    diff_fa = df_sdt.fa_rate[df_sdt.cue == params.high_p].reset_index() - df_sdt.fa_rate[df_sdt.cue == params.low_p].reset_index()
+    diff_fa = (
+        df_sdt.fa_rate[df_sdt.cue == params.high_p].reset_index()
+        - df_sdt.fa_rate[df_sdt.cue == params.low_p].reset_index()
+    )
 
     # calculate dprime change between conditions per participant
-    diff_dprime = df_sdt.dprime[df_sdt.cue == params.high_p].reset_index() - df_sdt.dprime[df_sdt.cue == params.low_p].reset_index()
+    diff_dprime = (
+        df_sdt.dprime[df_sdt.cue == params.high_p].reset_index()
+        - df_sdt.dprime[df_sdt.cue == params.low_p].reset_index()
+    )
 
     # calculate criterion change between conditions per participant
     diff_crit = (
-        df_sdt.criterion[df_sdt.cue == params.high_p].reset_index() - df_sdt.criterion[df_sdt.cue == params.low_p].reset_index()
+        df_sdt.criterion[df_sdt.cue == params.high_p].reset_index()
+        - df_sdt.criterion[df_sdt.cue == params.low_p].reset_index()
     )
 
     # Filter for correct trials only
@@ -325,7 +340,8 @@ def plot_mean_response_and_confidence(
 
     # Perform the Wilcoxon signed-rank test
     wilcoxon_statistic, p_value = stats.wilcoxon(
-        mean_resp_id_cue[mean_resp_id_cue.cue == params.low_p].sayyes, mean_resp_id_cue[mean_resp_id_cue.cue == params.high_p].sayyes
+        mean_resp_id_cue[mean_resp_id_cue.cue == params.low_p].sayyes,
+        mean_resp_id_cue[mean_resp_id_cue.cue == params.high_p].sayyes,
     )
     print(f"Wilcoxon statistic: {wilcoxon_statistic}")
     print(f"p-value: {p_value}")
@@ -389,7 +405,9 @@ def prepare_for_plotting(exclude_high_fa: bool, expecon: int):
     df_sdt = calculate_sdt_dataframe(data, "isyes", "sayyes", "ID", "cue")
 
     # create a boolean mask for participants with very high fa rates
-    fa_rate_high_indices = np.where(df_sdt.fa_rate[df_sdt.cue == params.high_p] > params.behavioral_cleaning.farate_max)
+    fa_rate_high_indices = np.where(
+        df_sdt.fa_rate[df_sdt.cue == params.high_p] > params.behavioral_cleaning.farate_max
+    )
     # Three participants with fa rates > 0.4
     print(f"Index of participants with high fa-rates: {fa_rate_high_indices}")
 
@@ -493,8 +511,10 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         hr_ax.plot(
             [1, 2],
-            [df_sdt.hit_rate[df_sdt.cue == params.low_p].iloc[index],
-            df_sdt.hit_rate[df_sdt.cue == params.high_p].iloc[index]],
+            [
+                df_sdt.hit_rate[df_sdt.cue == params.low_p].iloc[index],
+                df_sdt.hit_rate[df_sdt.cue == params.high_p].iloc[index],
+            ],
             marker="",
             markersize=0,
             color="gray",
@@ -542,8 +562,10 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         fa_rate_ax.plot(
             [1, 2],
-            [df_sdt.fa_rate[df_sdt.cue == params.low_p].iloc[index],
-            df_sdt.fa_rate[df_sdt.cue == params.high_p].iloc[index]],
+            [
+                df_sdt.fa_rate[df_sdt.cue == params.low_p].iloc[index],
+                df_sdt.fa_rate[df_sdt.cue == params.high_p].iloc[index],
+            ],
             marker="",
             markersize=0,
             color="gray",
@@ -592,8 +614,10 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         dprime_ax.plot(
             [1, 2],
-            [df_sdt.dprime[df_sdt.cue == params.low_p].iloc[index],
-            df_sdt.dprime[df_sdt.cue == params.high_p].iloc[index]],
+            [
+                df_sdt.dprime[df_sdt.cue == params.low_p].iloc[index],
+                df_sdt.dprime[df_sdt.cue == params.high_p].iloc[index],
+            ],
             marker="",
             markersize=0,
             color="gray",
@@ -643,8 +667,10 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
         )
         crit_ax.plot(
             [1, 2],
-            [df_sdt.criterion[df_sdt.cue == params.low_p].iloc[index],
-            df_sdt.criterion[df_sdt.cue == params.high_p].iloc[index]],
+            [
+                df_sdt.criterion[df_sdt.cue == params.low_p].iloc[index],
+                df_sdt.criterion[df_sdt.cue == params.high_p].iloc[index],
+            ],
             marker="",
             markersize=0,
             color="gray",
@@ -653,7 +679,7 @@ def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
 
     crit_box = crit_ax.boxplot(
         [df_sdt.criterion[df_sdt.cue == params.low_p], df_sdt.criterion[df_sdt.cue == params.high_p]],
-        patch_artist=True
+        patch_artist=True,
     )
 
     for patch, color in zip(crit_box["boxes"], colors):

@@ -2,15 +2,13 @@
 
     Author(s): Carina Forster et al. (in prep)
     Contact: forster@cbs.mpg.de
-    Status: Code is not reviewed yet
-    Last update: March 26, 2024
+    Status: code has been formally reviewed
+    Last update: 11.06.2024
 ***
 
 ## Open ToDos before
 
-- [ ] add readme/note to folder `code/experiment_code`, referring to author(s)
 - [ ] review functionality
-- [ ] ...
 
 ## Description
 
@@ -29,7 +27,7 @@ The project structure is based on [`scilaunch`](https://github.com/SHEscher/scil
 
 ### Data
 
-* data will be uploaded to [OSF](https://osf.io) [`TODO`]
+* data is uploaded to Zenodo and will be published after publication
 
 ## Install research code as package
 

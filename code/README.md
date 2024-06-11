@@ -4,7 +4,7 @@
     Author(s): Carina Forster et al.
     Contact: forster@cbs.mpg.de
     Status: work in progress
-    Last update: March 26, 2024
+    Last update: June 11, 2024
 
 ***
 
@@ -52,4 +52,5 @@ api_key = config.service_x.api_key
 ```
 
 ### Experiment code
-The Matlab-based experiment code is stored in `./code/experimental_code/` and was written by Martin Grund et al.
+The Matlab-based experiment code is stored in `./code/experimental_code/` and was written by Martin Grund
+: https://www.cbs.mpg.de/person/44748/2470
