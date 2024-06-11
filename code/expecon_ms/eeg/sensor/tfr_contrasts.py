@@ -215,26 +215,16 @@ def compute_tfr(
                         & (epochs.metadata.prevresp == 0)
                     )
                 ]
-                cond_a_name = f"high_prevcr_{tmin}_{tmax}"
-                cond_b_name = f"low_prevcr_{tmin}_{tmax}"
-
-                epochs_a = epochs[((epochs.metadata.cue == params.high_p)  & (epochs.metadata.previsyes == 1) & 
-                                (epochs.metadata.prevresp == 0))]
-                epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.previsyes == 1) & 
-                                (epochs.metadata.prevresp == 0))]
-                cond_a_name =f"high_prevmiss_{tmin}_{tmax}_induced"
-                cond_b_name = f"low_prevmiss_{tmin}_{tmax}_induced"
+                cond_a_name = f"high_prevcr_{tmin}_{tmax}_induced"
+                cond_b_name = f"low_prevcr_{tmin}_{tmax}_induced"
 
             elif study == 2:  # noqa: PLR2004
                 epochs_a = epochs[
-                    ((epochs.metadata.cue == params.high_p) & (epochs.metadata.prevcue == params.high_p))
+                    (epochs.metadata.cue == params.high_p)
                 ]
-                epochs_b = epochs[((epochs.metadata.cue == params.low_p) & (epochs.metadata.prevcue == params.low_p))]
+                epochs_b = epochs[(epochs.metadata.cue == params.low_p)]
                 cond_a_name = f"high_{tmin}_{tmax}_induced"
                 cond_b_name = f"low_{tmin}_{tmax}_induced"
-            if mirror:
-                cond_a_name = f"{cond_a_name}_mirror"
-                cond_b_name = f"{cond_b_name}_mirror"
 
         elif cond == "prev_resp":
             if study == 1:
@@ -242,7 +232,6 @@ def compute_tfr(
                     (
                         (epochs.metadata.prevresp == 1)
                         & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.isyes == 1)
                         & (epochs.metadata.cue == params.high_p)
                     )
                 ]
@@ -250,38 +239,13 @@ def compute_tfr(
                     (
                         (epochs.metadata.prevresp == 0)
                         & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.isyes == 1)
                         & (epochs.metadata.cue == params.high_p)
                     )
-
-                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) &
-                      (epochs.metadata.cue == params.high_p))
-                ]
-                epochs_b = epochs[
-                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) &
-                     (epochs.metadata.cue == params.high_p))
                 ]
                 cond_a_name = f"prevyesresp_highprob_prevstim_{tmin}_{tmax}_induced"
                 cond_b_name = f"prevnoresp_highprob_prevstim_{tmin}_{tmax}_induced"
             elif study == 2:
                 epochs_a = epochs[
-                    (
-                        (epochs.metadata.prevresp == 1)
-                        & (epochs.metadata.prevcue == epochs.metadata.cue)
-                        & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.isyes == 1)
-                        & (epochs.metadata.cue == params.high_p)
-                    )
-                ]
-
-                epochs_b = epochs[
-                    (
-                        (epochs.metadata.prevresp == 0)
-                        & (epochs.metadata.prevcue == epochs.metadata.cue)
-                        & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.isyes == 1)
-                        & (epochs.metadata.cue == params.high_p)
-                    )
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
                      (epochs.metadata.cue == params.high_p))
                 ]
@@ -294,11 +258,6 @@ def compute_tfr(
 
                 cond_a_name = f"prevyesresp_samecue_highprob_{tmin}_{tmax}_induced"
                 cond_b_name = f"prevnoresp_samecue_highprob_{tmin}_{tmax}_induced"
-
-            if mirror:
-                cond_a_name = f"{cond_a_name}_mirror"
-                cond_b_name = f"{cond_b_name}_mirror"
-
         else:
             raise ValueError("input should be 'probability' or 'prev_resp'")
 

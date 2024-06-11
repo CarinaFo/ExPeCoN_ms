@@ -161,12 +161,13 @@ def run_source_reco(
     study: int,
     cond: str,
     mirror: bool,
-    dics: int,
+    dics: bool,
     fmin: int,
     fmax: int,
     tmin: int,
     tmax: int,
     drop_bads: bool,
+    subtract_evokeds: bool,
     plot_alignment: bool,
 ) -> None:
     """
@@ -186,6 +187,7 @@ def run_source_reco(
     tmax: int, info: upper time bound for DICS beamforming
     dics: 1 for DICS beamforming, 0 for eLoreta
     drop_bads: if True, bad epochs are dropped
+    subtract_evokeds: if True, subtract evoked response from each epoch
     plot_alignment: if True, plot alignment of electrodes with source space
 
     Returns:
@@ -296,6 +298,9 @@ def run_source_reco(
             # drop epochs with abnormal strong signal (> 200 micro-volts)
             epochs.drop_bad(reject=dict(eeg=200e-6))
 
+        if subtract_evokeds:
+            epochs = epochs.subtract_evoked()
+
         # avoid leakage and edge artifacts by zero-padding or mirroring the data
         # on both ends
         if mirror:
@@ -313,23 +318,32 @@ def run_source_reco(
             epochs.metadata = metadata
 
         if cond == "probability":
-            epochs_a = epochs[
-                (
+            if study == 1:
+
+                epochs_a = epochs[
+                    (
+                        (epochs.metadata.cue == params.high_p)
+                        & (epochs.metadata.previsyes == 0)
+                        & (epochs.metadata.prevresp == 0)
+                    )
+                ]
+                epochs_b = epochs[
+                    (
+                        (epochs.metadata.cue == params.low_p)
+                        & (epochs.metadata.previsyes == 0)
+                        & (epochs.metadata.prevresp == 0)
+                    )
+                ]
+                cond_a_name = f"high_prevcr_{tmin}_{tmax}_induced"
+                cond_b_name = f"low_prevcr_{tmin}_{tmax}_induced"
+
+            elif study == 2:  # noqa: PLR2004
+                epochs_a = epochs[
                     (epochs.metadata.cue == params.high_p)
-                    & (epochs.metadata.previsyes == 1)
-                    & (epochs.metadata.prevresp == 1)
-                )
-            ]
-            epochs_b = epochs[
-                (
-                    (epochs.metadata.cue == params.low_p)
-                    & (epochs.metadata.previsyes == 1)
-                    & (epochs.metadata.prevresp == 1)
-                )
-            ]
-            if mirror:
-                cond_a_name = f"{cond_a_name}_mirror"
-                cond_b_name = f"{cond_b_name}_mirror"
+                ]
+                epochs_b = epochs[(epochs.metadata.cue == params.low_p)]
+                cond_a_name = f"high_{tmin}_{tmax}_induced"
+                cond_b_name = f"low_{tmin}_{tmax}_induced"
 
         elif cond == "prev_resp":
             if study == 1:
@@ -347,34 +361,22 @@ def run_source_reco(
                         & (epochs.metadata.cue == params.high_p)
                     )
                 ]
-            else:
+                cond_a_name = f"prevyesresp_highprob_prevstim_{tmin}_{tmax}_induced"
+                cond_b_name = f"prevnoresp_highprob_prevstim_{tmin}_{tmax}_induced"
+            elif study == 2:
                 epochs_a = epochs[
-                    (
-                        (epochs.metadata.prevresp == 1)
-                        & (epochs.metadata.prevcue == epochs.metadata.cue)
-                        & (epochs.metadata.cue == params.high_p)
-                    )
+                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
+                     (epochs.metadata.cue == params.high_p))
                 ]
 
                 epochs_b = epochs[
-                    (
-                        (epochs.metadata.prevresp == 0)
-                        & (epochs.metadata.prevcue == epochs.metadata.cue)
-                        & (epochs.metadata.cue == params.high_p)
-                    )
-                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & 
-                     & (epochs.metadata.cue == params.high_p))
-                ]
-                epochs_b = epochs[
-                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) &
+                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
                      (epochs.metadata.cue == params.high_p))
+
                 ]
-            if mirror:
-                cond_a_name = f"{cond_a_name}_mirror"
-                cond_b_name = f"{cond_b_name}_mirror"
-        elif cond == "control":
-            epochs_a = epochs[(epochs.metadata.isyes == 1)]
-            epochs_b = epochs[(epochs.metadata.isyes == 0)]
+
+                cond_a_name = f"prevyesresp_samecue_highprob_{tmin}_{tmax}_induced"
+                cond_b_name = f"prevnoresp_samecue_highprob_{tmin}_{tmax}_induced"
         else:
             raise ValueError("input should be 'probability' or 'prev_resp'")
 
