@@ -27,7 +27,7 @@ The project structure is based on [`scilaunch`](https://github.com/SHEscher/scil
 
 ### Data
 
-* data will be uploaded to [OSF](https://osf.io) after publication
+* data is uploaded to Zenodo and will be published after publication
 
 ## Install research code as package
 
