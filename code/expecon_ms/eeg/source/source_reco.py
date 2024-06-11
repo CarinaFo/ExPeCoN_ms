@@ -335,7 +335,6 @@ def run_source_reco(
                     (
                         (epochs.metadata.prevresp == 1)
                         & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.isyes == 1)
                         & (epochs.metadata.cue == params.high_p)
                     )
                 ]
@@ -343,7 +342,6 @@ def run_source_reco(
                     (
                         (epochs.metadata.prevresp == 0)
                         & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.isyes == 1)
                         & (epochs.metadata.cue == params.high_p)
                     )
                 ]
@@ -352,8 +350,6 @@ def run_source_reco(
                     (
                         (epochs.metadata.prevresp == 1)
                         & (epochs.metadata.prevcue == epochs.metadata.cue)
-                        & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.isyes == 1)
                         & (epochs.metadata.cue == params.high_p)
                     )
                 ]
@@ -362,10 +358,14 @@ def run_source_reco(
                     (
                         (epochs.metadata.prevresp == 0)
                         & (epochs.metadata.prevcue == epochs.metadata.cue)
-                        & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.isyes == 1)
                         & (epochs.metadata.cue == params.high_p)
                     )
+                    ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & 
+                     & (epochs.metadata.cue == params.high_p))
+                ]
+                epochs_b = epochs[
+                    ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) &
+                     (epochs.metadata.cue == params.high_p))
                 ]
             if mirror:
                 cond_a_name = f"{cond_a_name}_mirror"
@@ -721,6 +721,15 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
                 cond_b="prevnoresp_stimprevcurrent_-0.7_-0.1",
                 method=method,
             )
+
+        elif study == 2:  # noqa: PLR2004
+                      stc_array = create_source_contrast_array(
+                study=study,
+                cond_a="prevyesresp",
+                cond_b="prevnoresp",
+                method=method,
+            )
+
     elif cond == "control":
         stc_array = create_source_contrast_array(
             study=study,
