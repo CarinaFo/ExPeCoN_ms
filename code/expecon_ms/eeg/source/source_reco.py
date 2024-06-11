@@ -11,7 +11,7 @@ Also, it includes a function to plot contrasts in source space.
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2023
+Years: 2024
 """
 
 # %% Import
@@ -147,6 +147,7 @@ def run_source_reco(
     tmin: int,
     tmax: int,
     drop_bads: bool,
+    subtract_evoked: bool,
     plot_alignment: bool,
 ) -> None:
     """
@@ -166,6 +167,7 @@ def run_source_reco(
     tmax: int, info: upper time bound for DICS beamforming
     dics: 1 for DICS beamforming, 0 for eLoreta
     drop_bads: if True, bad epochs are dropped
+    subtract_evoked: if True, subtract evoked response from each epoch
     plot_alignment: if True, plot alignment of electrodes with source space
 
     Returns:
@@ -276,6 +278,10 @@ def run_source_reco(
             # drop epochs with abnormal strong signal (> 200 micro-volts)
             epochs.drop_bad(reject=dict(eeg=200e-6))
 
+        if subtract_evoked:
+            # subtract evoked response from each epoch
+            epochs = epochs.subtract_evoked()
+
         # avoid leakage and edge artifacts by zero-padding or mirroring the data
         # on both ends
         if mirror:
@@ -303,7 +309,7 @@ def run_source_reco(
             if study == 1:
                 epochs_a = epochs[
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.previsyes == 1) & 
-                     & (epochs.metadata.cue == params.high_p))
+                      (epochs.metadata.cue == params.high_p))
                 ]
                 epochs_b = epochs[
                     ((epochs.metadata.prevresp == 0) & (epochs.metadata.previsyes == 1) &
@@ -311,7 +317,7 @@ def run_source_reco(
                 ]
             else:
                 epochs_a = epochs[
-                    (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue)
+                    (((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
                      (epochs.metadata.cue == params.high_p)))
                 ]
 
