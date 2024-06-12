@@ -232,12 +232,8 @@ def run_source_reco(
                 cond_b_name = f"{cond_b_name}_mirror"
         elif cond == "prev_resp":
             # set condition names
-            cond_a_name = f"prevyesresp_stimprevcurrent_{tmin}_{tmax}"
-            cond_b_name = f"prevnoresp_stimprevcurrent_{tmin}_{tmax}"
-            # add mirror to filename if data is mirrored
-            if mirror:
-                cond_a_name = f"{cond_a_name}_mirror"
-                cond_b_name = f"{cond_b_name}_mirror"
+            cond_a_name = f"prevyesresp__{tmin}_{tmax}"
+            cond_b_name = f"prevnoresp__{tmin}_{tmax}"
         elif cond == "control":
             # set condition names
             cond_a_name = "stimulus"
@@ -323,19 +319,19 @@ def run_source_reco(
                 epochs_a = epochs[
                     (
                         (epochs.metadata.cue == params.high_p)
-                        & (epochs.metadata.previsyes == 0)
-                        & (epochs.metadata.prevresp == 0)
+                        & (epochs.metadata.previsyes == 1)
+                        & (epochs.metadata.prevresp == 1)
                     )
                 ]
                 epochs_b = epochs[
                     (
                         (epochs.metadata.cue == params.low_p)
-                        & (epochs.metadata.previsyes == 0)
-                        & (epochs.metadata.prevresp == 0)
+                        & (epochs.metadata.previsyes == 1)
+                        & (epochs.metadata.prevresp == 1)
                     )
                 ]
-                cond_a_name = f"high_prevcr_{tmin}_{tmax}_induced"
-                cond_b_name = f"low_prevcr_{tmin}_{tmax}_induced"
+                cond_a_name = f"high_prevhit_{tmin}_{tmax}_induced"
+                cond_b_name = f"low_prevhit_{tmin}_{tmax}_induced"
 
             elif study == 2:  # noqa: PLR2004
                 epochs_a = epochs[
@@ -366,19 +362,24 @@ def run_source_reco(
             elif study == 2:
                 epochs_a = epochs[
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == params.high_p))
+                     (epochs.metadata.cue == params.low_p))
                 ]
 
                 epochs_b = epochs[
                     ((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == params.high_p))
+                     (epochs.metadata.cue == params.low_p))
 
                 ]
 
-                cond_a_name = f"prevyesresp_samecue_highprob_{tmin}_{tmax}_induced"
-                cond_b_name = f"prevnoresp_samecue_highprob_{tmin}_{tmax}_induced"
+                cond_a_name = f"prevyesresp_samecue_lowprob_{tmin}_{tmax}_induced"
+                cond_b_name = f"prevnoresp_samecue_lowprob_{tmin}_{tmax}_induced"
+        elif cond == "control":
+                epochs_a = epochs[(epochs.metadata.isyes == 1)]
+                epochs_b = epochs[(epochs.metadata.isyes == 0)]
+                cond_a_name = f"stimulus_{tmin}_{tmax}"
+                cond_b_name = f"noise_{tmin}_{tmax}"
         else:
-            raise ValueError("input should be 'probability' or 'prev_resp'")
+                raise ValueError("input should be 'probability' or 'prev_resp' or 'control'")
 
         # make sure we have an equal number of trials in both conditions
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
@@ -703,42 +704,56 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str, save_
     """
     if (study == 1) & (cond == "probability"):
         stc_array_hit = create_source_contrast_array(
-            study=study, cond_a="high_prevhit_-0.7_-0.1", cond_b="low_prevhit_-0.7_-0.1", method=method
+            study=study, cond_a="high_prevhit_-0.7_-0.1_induced", 
+            cond_b="low_prevhit_-0.7_-0.1_induced", method=method
         )
         stc_array_miss = create_source_contrast_array(
-            study=study, cond_a="high_prevmiss_-0.7_-0.1", cond_b="low_prevmiss_-0.7_-0.1", method=method
+            study=study, cond_a="high_prevmiss_-0.7_-0.1_induced", 
+            cond_b="low_prevmiss_-0.7_-0.1_induced", method=method
         )
         stc_array_cr = create_source_contrast_array(
-            study=study, cond_a="high_prevcr_-0.7_-0.1", cond_b="low_prevcr_-0.7_-0.1", method=method
+            study=study, cond_a="high_prevcr_-0.7_-0.1_induced", 
+            cond_b="low_prevcr_-0.7_-0.1_induced", method=method
         )
         stc_array_conds = np.array([stc_array_hit, stc_array_miss, stc_array_cr])
         # mean over conditions (previous hit, previous miss, previous cr)
         stc_array = np.mean(stc_array_conds, axis=0)
     elif (study == 2) & (cond == "probability"):  # noqa: PLR2004
-        stc_array = create_source_contrast_array(study=study, cond_a="high", cond_b="low", method=method)
+        stc_array = create_source_contrast_array(study=study, cond_a="high_-0.7_-0.1_induced", 
+                                                 cond_b="low_-0.7_-0.1_induced", method=method)
 
     elif cond == "prev_resp":
-        if study == 1 or study == 2:
+        if study == 1:
             stc_array = create_source_contrast_array(
                 study=study,
-                cond_a="prevyesresp_stimprevcurrent_-0.7_-0.1",
-                cond_b="prevnoresp_stimprevcurrent_-0.7_-0.1",
+                cond_a="prevyesresp_highprob_prevstim_-0.7_-0.1_induced",
+                cond_b="prevnoresp_highprob_prevstim_-0.7_-0.1_induced",
                 method=method,
             )
 
         elif study == 2:  # noqa: PLR2004
-                      stc_array = create_source_contrast_array(
+            stc_array_high = create_source_contrast_array(
                 study=study,
-                cond_a="prevyesresp",
-                cond_b="prevnoresp",
+                cond_a="prevyesresp_samecue_highprob_-0.7_-0.1_induced",
+                cond_b="prevnoresp_samecue_highprob_-0.7_-0.1_induced",
                 method=method,
             )
+
+            stc_array_low = create_source_contrast_array(
+                study=study,
+                cond_a="prevyesresp_samecue_lowprob_-0.7_-0.1_induced",
+                cond_b="prevnoresp_samecue_lowprob_-0.7_-0.1_induced",
+                method=method,
+            )
+        stc_array_conds = np.array([stc_array_high, stc_array_low])
+        # mean over conditions
+        stc_array = np.mean(stc_array_conds, axis=0)
 
     elif cond == "control":
         stc_array = create_source_contrast_array(
             study=study,
-            cond_a="stimulus",
-            cond_b="noise",
+            cond_a="stimulus_0_0.3",
+            cond_b="noise_0_0.3",
             method=method,
         )
 
