@@ -23,7 +23,7 @@ options(scipen=999)
 # set base directory
 setwd("E:/expecon_ms")
 expecon=1
-behav_path = file.path("data", "behav", "brain_behav_cleaned_source_1.csv")
+behav_path = file.path("data", "behav", "brain_behav_cleaned_source_2.csv")
 behav = read.csv(behav_path)
 
 ################################ prep for modelling ###########################################
@@ -56,6 +56,8 @@ hist(behav$beta_source_prob)
 hist(behav$beta_source_prev)
 ##################################GLMMers###########################################################
 
+glmer(isyes ~ previsyes + (previsyes|ID), data=behav, family=binomial(link='probit'))
+
 summary(lmer(beta_source_prob ~ cue + (cue|ID), data=behav))
 summary(lmer(beta_source_prev ~ prevresp + (1|ID), data=behav))
 
@@ -74,10 +76,10 @@ check_convergence(sdt_glm_prevresp)
 
 # extract random effects for each parameter (only works if the parameter was fit as a random effect)
 ranef = ranef(sdt_glm_prevresp)
-choice_bias = ranef$ID$prevresp
-crit_change = ranef$ID$cue
+choice_bias = ranef$ID$prevresp1
+crit_change = ranef$ID$cue0.75
 # singularity warning
-prev_cue_int = ranef$ID$`cue:prevresp`
+prev_cue_int = ranef$ID$`cue0.75:prevresp1`
   
 # Group by ID
 df_grouped <- behav %>%
