@@ -37,8 +37,8 @@ behav_2 = read.csv(brain_behav_path_2)
 ################################prepare variables for linear mixed modelling #######################
 
 # which dataset do you want to analyze?
-expecon=2
-behav = behav_2
+expecon=1
+behav = behav_1
 
 # make factors for categorical variables:
 behav$ID = as.factor(behav$ID) # subject ID
@@ -118,16 +118,19 @@ beta_prev_glm <- readRDS(cue_model_path)
 
 ##### no we fit the interaction between prestimulus power and previous choice
 # beta interaction
-beta_int_glm1 <- glmer(sayyes ~ isyes*beta+ isyes*cue + beta*prevresp + cue*prevresp +
+beta_int_glm1 <- glmer(sayyes ~ isyes*beta*cue + beta*prevresp + cue*prevresp +
                         (isyes+cue + prevresp| ID),
                       data = behav, family=binomial(link='probit'), 
                       control=glmerControl(optimizer="bobyqa",
                                            optCtrl=list(maxfun=2e5)))
 
-check_collinearity(beta_int_glm2) # VIF should be < 3
-check_convergence(beta_int_glm2)
+check_collinearity(beta_int_glm1) # VIF should be < 3
+check_convergence(beta_int_glm1)
 
-summary(beta_int_glm2)
+summary(beta_int_glm1)
+
+# Simons' comment: beta independent of cue predicting response?
+plot_model(beta_int_glm1, type = 'pred', terms=c('beta', 'isyes', 'cue'))
 
 # Post hoc tests for behavior interaction
 emm_model <- contrast(emmeans(beta_int_glm1, "prevresp", by = "cue"))
@@ -139,6 +142,7 @@ cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filen
 saveRDS(beta_int_glm1, cue_model_path)
 beta_int_glm1 <- readRDS(cue_model_path)
 
+plot_model(beta_int_glm1, type = 'pred', terms=c('beta', 'isyes', 'cue'))
 # now plot figure 4
 
 # Define the plots with custom theme and axis labels
