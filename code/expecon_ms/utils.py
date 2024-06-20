@@ -13,8 +13,8 @@ import string
 from pathlib import Path
 import mne
 import matplotlib.pyplot as plt
-
 import pandas as pd
+from scipy.stats import pearsonr
 
 
 def zero_pad_or_mirror_data(data, zero_pad: bool):
@@ -282,8 +282,110 @@ def plot_mirrored_data(subj: str):
     plt.savefig(Path(paths.figures.manuscript.figure4) / "mirrored_data_CP4.svg", dpi=300)
     plt.show()
 
-    
-# o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END
 
-if __name__ == "__main__":
-    pass
+def compute_acf(sequence, lag=1):
+    """
+    Compute Autocorrelation Function (ACF) for a binary sequence at a given lag.
+    
+    Parameters:
+    sequence (array-like): Binary sequence (0s and 1s).
+    lag (int): Lag at which to compute autocorrelation.
+
+    Returns:
+    float: Autocorrelation coefficient at the specified lag.
+    """
+    # Convert binary sequence to numpy array
+    sequence = np.array(sequence)
+    
+    # Compute ACF using Pearson correlation coefficient
+    acf, _ = pearsonr(sequence[:-lag], sequence[lag:])
+    return acf
+
+def monte_carlo_permutation_test(observed_sequence, num_permutations=1000, lag=1):
+    """
+    Perform Monte Carlo permutation testing to assess autocorrelation using ACF.
+    
+    Parameters:
+    observed_sequence (array-like): Observed binary sequence (0s and 1s).
+    num_permutations (int): Number of permutations to generate (default is 1000).
+    lag (int): Lag at which to compute autocorrelation.
+
+    Returns:
+    float: p-value indicating significance of observed autocorrelation.
+    """
+    # Compute ACF for observed sequence
+    observed_acf = compute_acf(observed_sequence, lag)
+    
+    # Generate random permuted sequences and compute ACF
+    permuted_acfs = []
+    for _ in range(num_permutations):
+        permuted_sequence = np.random.permutation(observed_sequence)
+        permuted_acf = compute_acf(permuted_sequence, lag)
+        permuted_acfs.append(permuted_acf)
+    
+    # Calculate p-value based on how extreme observed_acf is compared to permuted_acfs
+    num_extreme = np.sum(np.abs(permuted_acfs) >= np.abs(observed_acf))
+    p_value = (num_extreme + 1) / (num_permutations + 1)  # Add 1 for continuity correction
+    
+    return p_value
+
+def monte_carlo_permutation_test_by_group(study: int = 1, num_permutations=5000, lag=1):
+    """
+    Perform Monte Carlo permutation testing to assess autocorrelation using ACF for each participant and block.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame containing columns 'block', 'ID', and 'isyes'.
+    num_permutations (int): Number of permutations to generate (default is 1000).
+    lag (int): Lag at which to compute autocorrelation.
+
+    Returns:
+    pd.DataFrame: DataFrame with columns 'block', 'ID', 'p-value'.
+    """
+    # load dataframe
+    df = pd.read_csv(Path(f"E:/expecon_ms/data/behav/behav_cleaned_for_eeg_expecon{study}.csv")) 
+    results = []
+
+    # Group by 'ID' and perform permutation testing for each participant
+    for subject, group in df.groupby('ID'):
+        observed_sequence = group['isyes'].values
+        p_value = monte_carlo_permutation_test(observed_sequence, num_permutations, lag)
+        
+        results.append({
+            'ID': subject,
+            'p-value': p_value
+        })
+    
+    
+    results_df = pd.DataFrame(results)
+    return results_df
+
+def plot_p_values(results_df):
+    """
+    Plot p-values for each participant and block in ascending order, marking p-values < 0.05.
+    
+    Parameters:
+    results_df (pd.DataFrame): DataFrame with columns 'block', 'ID', 'p-value'.
+    """
+    # Sort results by p-value in ascending order
+    results_df_sorted = results_df.sort_values(by='p-value')
+    
+    # Plotting
+    plt.figure(figsize=(10, 6))
+    xticks = np.arange(len(results_df_sorted))
+    plt.bar(xticks, results_df_sorted['p-value'], align='center', alpha=0.7)
+    plt.xticks(xticks, results_df_sorted['ID'], rotation=45, ha='right')
+    plt.ylabel('P-value')
+    plt.title('P-values for Autocorrelation Assessment by Participant')
+    
+    # Mark significant p-values < 0.05
+    significant_indices = results_df_sorted['p-value'] < 0.05
+    plt.plot(xticks[significant_indices], results_df_sorted.loc[significant_indices, 'p-value'], 'ro', label='p < 0.05')
+    
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+results_df = monte_carlo_permutation_test_by_group()  
+plot_p_values(results_df)
+sum(results_df['p-value']<0.05)
