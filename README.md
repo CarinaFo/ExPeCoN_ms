@@ -1,6 +1,6 @@
 # Expectation Perception Confidence Neural Correlates (`ExPeCoN`)
 
-    Author(s): Carina Forster et al., [preprint](https://doi.org/10.1101/2024.06.12.598458)
+    Author(s): Carina Forster et al., 2024
     Contact: forster@cbs.mpg.de
     Status: code has been formally reviewed
     Last update: 11.06.2024
@@ -83,7 +83,7 @@ jupyter lab code/notebooks/expecon_ms.ipynb &
 
 ## Publications
 
-In the case you use this code, please cite the following paper: Forster et al., in prep.
+Forster et al., 2024, [preprint](https://doi.org/10.1101/2024.06.12.598458)
 
 ## Contributors/Collaborators
 * add [`TODO`]
