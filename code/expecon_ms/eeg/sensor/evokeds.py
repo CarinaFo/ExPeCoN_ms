@@ -13,6 +13,7 @@ Years: 2023
 import pickle
 import subprocess
 from pathlib import Path
+from typing import Optional, Union
 
 import matplotlib.pyplot as plt
 import mne
@@ -61,7 +62,8 @@ pilot_counter = config.participants.pilot_counter
 
 
 def create_contrast(
-    study: int, drop_bads: bool, laplace: bool, subtract_evoked: bool, save_data_to_disk: bool, save_drop_log: bool
+    study: int, drop_bads: bool = True, laplace: bool = True, subtract_evoked: bool = False,
+     save_data_to_disk: bool  = False, save_drop_log: bool = True
 ):
     """
     Load cleaned epoched data and create contrasts.
@@ -82,11 +84,15 @@ def create_contrast(
     """
     # store trials remaining and removed per participant
     all_trials, trials_removed = [], []
+    evokeds_hit_high_all, evokeds_hit_low_all = [], []
 
     # save  evoked data per participant
     evokeds_signal_all, evokeds_noise_all = [], []
     evokeds_hit_all, evokeds_miss_all = [], []
     evokeds_all = []
+
+    # append epochs per participant
+    signal_epochs, noise_epochs = [], []
 
     # metadata after epoch cleaning
     metadata_all_subs = []
@@ -174,7 +180,16 @@ def create_contrast(
         epochs_hit = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1))]
         epochs_miss = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0))]
 
+        epochs_hit_high = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1) 
+                            & (epochs.metadata.cue == 0.75) & (epochs.metadata.conf == 1))]
+        epochs_hit_low = epochs[((epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1) 
+                            & (epochs.metadata.cue == 0.25) & (epochs.metadata.conf == 1))]
+
         mne.epochs.equalize_epoch_counts([epochs_hit, epochs_miss])
+        mne.epochs.equalize_epoch_counts([epochs_hit_high, epochs_hit_low])
+
+        signal_epochs.append(epochs_signal)
+        noise_epochs.append(epochs_noise)
 
         # average over
         evokeds_all.append(epochs.average())
@@ -182,6 +197,8 @@ def create_contrast(
         evokeds_miss_all.append(epochs_miss.average())
         evokeds_signal_all.append(epochs_signal.average())
         evokeds_noise_all.append(epochs_noise.average())
+        evokeds_hit_high_all.append(epochs_hit_high.average())
+        evokeds_hit_low_all.append(epochs_hit_low.average())
 
         if save_data_to_disk:
             with Path(paths.data.eeg.sensor.erp.hit).open("wb") as fp:  # pickling
@@ -197,7 +214,8 @@ def create_contrast(
         pd.DataFrame(trials_removed).to_csv(dir_clean_epochs / f"trials_removed_{study!s}.csv")
         pd.DataFrame(all_trials).to_csv(dir_clean_epochs / f"trials_per_subject_{study!s}.csv")
 
-    return [evokeds_all, evokeds_signal_all, evokeds_noise_all, evokeds_hit_all, evokeds_miss_all]
+    return [signal_epochs, noise_epochs, evokeds_all, evokeds_signal_all, evokeds_noise_all, evokeds_hit_all, evokeds_miss_all
+            , evokeds_hit_high_all, evokeds_hit_low_all]
 
 
 def plot_roi(study: int, data: np.ndarray, tmin: float, tmax: float, tmin_base: float, tmax_base: float):
@@ -251,8 +269,9 @@ def plot_roi(study: int, data: np.ndarray, tmin: float, tmax: float, tmin_base: 
     plt.savefig(Path(paths.figures.manuscript.figure3, f"prestim_allepochs_{study!s}_CP4.svg"), dpi=300)
     
 
-
-def get_significant_channel(data: np.ndarray, tmin: float, tmax: float, tmin_base: float, tmax_base: float):
+def get_significant_channel(data_dict: dict, tmin: float, tmax: float, baseline: bool = False,
+                            tmin_base: Union[float, bool] = None, 
+                            tmax_base: Union[float, bool] = None):
     """
     Get significant channels for the contrast of signal - noise trials.
 
@@ -269,12 +288,16 @@ def get_significant_channel(data: np.ndarray, tmin: float, tmax: float, tmin_bas
     None
 
     """
-    # get data from each participant
-    x = np.array([
-        ax.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax).data
-        - bx.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax).data
-        for ax, bx in zip(data[0], data[1])
-    ])
+    if baseline:
+        # get data from each participant
+        x = np.array([
+            ax.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax).data
+            - bx.copy().apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax).data
+            for ax, bx in zip(list(data_dict.values())[0], list(data_dict.values())[1])
+        ])
+    else:
+        x = np.array([ax.copy().crop(tmin, tmax).data - bx.copy().crop(tmin, tmax).data for ax,
+         bx in zip(list(data_dict.values())[0], list(data_dict.values())[1])])
 
     # significant channels (average over time)
     t, p, _ = mne.stats.permutation_t_test(np.squeeze(np.mean(x, axis=2)), n_permutations=10000, n_jobs=-1)
@@ -298,18 +321,24 @@ def get_significant_channel(data: np.ndarray, tmin: float, tmax: float, tmin_bas
 
     # run 2D cluster test ()
     t_obs, clusters, cluster_p_values, h0 = mne.stats.permutation_cluster_1samp_test(
-        x, n_permutations=10000, adjacency=ch_adjacency, tail=0, n_jobs=-1
+        x, n_permutations=1000, adjacency=ch_adjacency, tail=0, n_jobs=-1
     )
 
     # get significant clusters
     good_cluster_inds = np.where(cluster_p_values < params.alpha)[0]
+
+    print(min(cluster_p_values))
+
+    plot_cluster_output_2d(study=2, data_dict=data_dict, tmin=tmin, tmax=tmax,
+                           tmin_base=tmin_base, tmax_base=tmax_base,
+                           good_cluster_inds=good_cluster_inds, t_obs=t_obs, clusters=clusters)
 
     return good_cluster_inds, t_obs, clusters, h0, cluster_p_values
 
 
 def plot_cluster_output_2d(
     study: int,
-    data: np.ndarray,
+    data_dict: dict,
     tmin: float,
     tmax: float,
     tmin_base: float,
@@ -335,8 +364,8 @@ def plot_cluster_output_2d(
 
     """
     # extract data
-    signal = [s.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for s in data[0]]
-    noise = [n.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for n in data[1]]
+    signal = [s.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for s in list(data_dict.values())[0]]
+    noise = [n.apply_baseline((tmin_base, tmax_base)).crop(tmin, tmax) for n in list(data_dict.values())[1]]
 
     # loop over clusters
     for i_clu, clu_idx in enumerate(good_cluster_inds):
@@ -385,10 +414,10 @@ def plot_cluster_output_2d(
         ax_signals = divider.append_axes("right", size="300%", pad=1.2)
         title = f"Cluster #{i_clu + 1}, {len(ch_inds)} sensor"
         if len(ch_inds) > 1:
-            title += "s (mean)"
+            title += "s"
 
         mne.viz.plot_compare_evokeds(
-            [signal, noise],
+            data_dict,
             title=title,
             picks=ch_inds,
             combine="mean",
@@ -403,7 +432,6 @@ def plot_cluster_output_2d(
         ax_signals.fill_betweenx((ymin, ymax), sig_times[0], sig_times[-1], color="grey", alpha=0.3)
 
         # clean up viz
-        mne.viz.tight_layout(fig=fig)
         fig.subplots_adjust(bottom=0.05)
 
         # save the figure before showing it
@@ -493,6 +521,16 @@ def drop_trials(data=None):
 
     return data
 
+# %% run stuff
+
+# Load cleaned epochs and create contrasts
+output = create_contrast(study=1)
+# create dictionary with data
+hit_low = output[-1]
+hit_high = output[-2]
+data_dict = {'high': hit_high, 'low': hit_low}
+# run cluster test and plot sign. cluster (no baseline correction)
+get_significant_channel(data_dict=data_dict, tmin=-1, tmax=1)
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
