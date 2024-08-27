@@ -386,6 +386,5 @@ def plot_p_values(results_df):
     plt.show()
 
 
-results_df = monte_carlo_permutation_test_by_group()  
-plot_p_values(results_df)
-sum(results_df['p-value']<0.05)
+if __name__ == "__main__":
+    pass
