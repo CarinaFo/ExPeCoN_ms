@@ -448,7 +448,7 @@ def plot_cluster_output_2d(
         plt.show()
 
 
-def extract_cluster_from_single_trial_data(study: int):
+def extract_single_trial_erp_from_cluster(study: int):
     """
     Extract cluster information from single trial data and 
     save CPP slope and mean with behavioural dataframe.
@@ -546,7 +546,7 @@ def extract_cluster_from_single_trial_data(study: int):
     metadata_all['CPP_slope_zscore'] = metadata_all.groupby('ID')['CPP_slope'].transform(lambda x: (x - x.mean()) / x.std())
 
     # save to disk
-    metadata_all.to_csv(Path(savepath, "metadata_CPP_slope.csv"))
+    metadata_all.to_csv(Path(savepath, f"metadata_CPP_slope_{study}.csv"))
 
 
 # Helper functions
