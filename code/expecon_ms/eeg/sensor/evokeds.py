@@ -45,12 +45,6 @@ plt.rcParams.update({
     "font.sans-serif": params.plot.font.sans_serif,
 })
 
-# if paths don't exist yet, creat them
-Path(paths.data.eeg.sensor.erp.hit).mkdir(parents=True, exist_ok=True)
-Path(paths.data.eeg.sensor.erp.miss).mkdir(parents=True, exist_ok=True)
-Path(paths.data.eeg.sensor.erp.signal).mkdir(parents=True, exist_ok=True)
-Path(paths.data.eeg.sensor.erp.noise).mkdir(parents=True, exist_ok=True)
-
 # participant IDs
 participants = config.participants
 
@@ -63,7 +57,7 @@ pilot_counter = config.participants.pilot_counter
 
 def create_contrast(
     study: int, drop_bads: bool = True, laplace: bool = True, subtract_evoked: bool = False,
-     save_data_to_disk: bool  = False, save_drop_log: bool = True
+     save_data_to_disk: bool  = False, save_drop_log: bool = False
 ):
     """
     Load cleaned epoched data and create contrasts.
@@ -92,7 +86,7 @@ def create_contrast(
     evokeds_all = []
 
     # append epochs per participant
-    signal_epochs, noise_epochs = [], []
+    signal_epochs, noise_epochs, epochs_all = [], [], []
 
     # metadata after epoch cleaning
     metadata_all_subs = []
@@ -171,6 +165,9 @@ def create_contrast(
 
         if laplace:
             epochs = mne.preprocessing.compute_current_source_density(epochs)
+        
+        # save epochs per participant
+        epochs_all.append(epochs)
 
         # signal vs. noise trials
         epochs_signal = epochs[(epochs.metadata.isyes == 1)]
@@ -190,7 +187,7 @@ def create_contrast(
 
         signal_epochs.append(epochs_signal)
         noise_epochs.append(epochs_noise)
-
+   
         # average over
         evokeds_all.append(epochs.average())
         evokeds_hit_all.append(epochs_hit.average())
@@ -215,7 +212,7 @@ def create_contrast(
         pd.DataFrame(all_trials).to_csv(dir_clean_epochs / f"trials_per_subject_{study!s}.csv")
 
     return [signal_epochs, noise_epochs, evokeds_all, evokeds_signal_all, evokeds_noise_all, evokeds_hit_all, evokeds_miss_all
-            , evokeds_hit_high_all, evokeds_hit_low_all]
+            , evokeds_hit_high_all, evokeds_hit_low_all, epochs_all]
 
 
 def plot_roi(study: int, data: np.ndarray, tmin: float, tmax: float, tmin_base: float, tmax_base: float):
@@ -266,10 +263,10 @@ def plot_roi(study: int, data: np.ndarray, tmin: float, tmax: float, tmin_base: 
 
     # plot all epochs in CP4
     e_gra.copy().crop(-1,0).plot(picks=['CP4'])
-    plt.savefig(Path(paths.figures.manuscript.figure3, f"prestim_allepochs_{study!s}_CP4.svg"), dpi=300)
+    plt.savefig(Path(paths.figures.manuscript.figure3_suppl_erps, f"prestim_allepochs_{study!s}_CP4.svg"), dpi=300)
     
 
-def get_significant_channel(data_dict: dict, tmin: float, tmax: float, baseline: bool = False,
+def get_significant_channel(study: int, data_dict: dict, tmin: float, tmax: float, baseline: bool = False,
                             tmin_base: Union[float, bool] = None, 
                             tmax_base: Union[float, bool] = None):
     """
@@ -329,7 +326,7 @@ def get_significant_channel(data_dict: dict, tmin: float, tmax: float, baseline:
 
     print(min(cluster_p_values))
 
-    plot_cluster_output_2d(study=2, data_dict=data_dict, tmin=tmin, tmax=tmax,
+    plot_cluster_output_2d(study=study, data_dict=data_dict, tmin=tmin, tmax=tmax,
                            tmin_base=tmin_base, tmax_base=tmax_base,
                            good_cluster_inds=good_cluster_inds, t_obs=t_obs, clusters=clusters)
 
@@ -373,6 +370,18 @@ def plot_cluster_output_2d(
         time_inds, space_inds = np.squeeze(clusters[clu_idx])
         ch_inds = np.unique(space_inds)
         time_inds = np.unique(time_inds)
+
+        # convert to numpy array
+        ch_inds_np = np.array(ch_inds)
+        time_inds_np = np.array(time_inds)
+
+        if study == 1:
+            savepath = Path(paths.data.eeg.sensor.erp1)
+        else:
+            savepath = Path(paths.data.eeg.sensor.erp2)
+        # save to disk
+        np.save(Path(savepath, f"cluster_{clu_idx!s}_{study}_ch_inds.npy"), ch_inds_np)
+        np.save(Path(savepath, f"cluster_{clu_idx!s}_{study}_time_inds.npy"), time_inds_np)
 
         # get topography for F stat
         t_map = t_obs[time_inds, ...].mean(axis=0)
@@ -435,13 +444,112 @@ def plot_cluster_output_2d(
         fig.subplots_adjust(bottom=0.05)
 
         # save the figure before showing it
-        plt.savefig(Path(paths.figures.manuscript.figure3, f"{clu_idx!s}.svg"))
+        plt.savefig(Path(paths.figures.manuscript.figure3_suppl_erps, f"{clu_idx!s}_{str(study)}.svg"))
         plt.show()
 
 
+def extract_cluster_from_single_trial_data(study: int):
+    """
+    Extract cluster information from single trial data and 
+    save CPP slope and mean with behavioural dataframe.
+
+    Args:
+    ----
+    study: int: study number (1 or 2), 1 == expecon1, 2 == expecon2
+
+    Returns:
+    -------
+    None
+
+    """
+    from scipy.stats import linregress
+
+    # extract epochs
+    out = create_contrast(study=study)
+
+    # extract epochs
+    epochs_all = out[-1]
+
+    # load cluster information
+    if study == 1:
+        savepath = Path(paths.data.eeg.sensor.erp1)
+        # load time indices
+        time_inds = np.load(Path(savepath, "cluster_93_1_time_inds.npy"))
+        # load channel indices
+        ch_inds = np.load(Path(savepath, "cluster_93_1_ch_inds.npy"))
+    else:
+        savepath = Path(paths.data.eeg.sensor.erp2)
+        # load time indices
+        time_inds = np.load(Path(savepath, "cluster_90_2_time_inds.npy"))
+        # load channel indices
+        ch_inds = np.load(Path(savepath, "cluster_90_2_ch_inds.npy"))
+
+    # average signal over time indices and channel indices for each participant
+    x_all, metadata_all, slopes_sub = [], [], []
+
+    epochs_data = [e.get_data() for e in epochs_all]
+
+    times = epochs_all[0].times
+
+    # for all epochs for all participants average over cluster channels and time indices
+    # loop over participants
+    for sub_idx, epochs_sub in enumerate(epochs_data):
+
+        slopes_epoch = []
+
+        # calculate mean or slope with regression
+        # Average the signal across the selected channels to get the CPP signal
+        x_ch = epochs_sub[:, ch_inds, :].mean(axis=(1))
+
+        # average over time indices and channel indices
+        x = x_ch[:, time_inds].mean(axis=(1))
+
+        # Select the time window of interest
+        cpp_window = x_ch[:,time_inds]
+        time_window_selected = times[time_inds]
+
+        # run a regression per epoch
+        for epoch_idx,e in enumerate(epochs_sub):
+            # Compute the slope using linear regression
+            slope, intercept, r_value, p_value, std_err = linregress(time_window_selected, cpp_window[epoch_idx,:])
+            # Append the slope to the list of epochs
+            slopes_epoch.append(slope)
+
+        # append slopes to list
+        slopes_sub.append(slopes_epoch)
+
+        # save values to participant list
+        x_all.append(x)
+
+        metadata = epochs_all[sub_idx].metadata
+
+        metadata_all.append(metadata)
+
+    # concatenate all participants
+    x_all = np.concatenate(x_all)
+
+    # add to metadata for further analysis
+    metadata_all = pd.concat(metadata_all)
+
+    #drop nan rows if they only contain NaNs
+    metadata_all = metadata_all.dropna(how='all')
+    
+    # unlist
+    slopes_all = [sub for sublist in slopes_sub for sub in sublist]
+
+    # append single trial CPP slope to the data
+    metadata_all['CPP_mean'] = x_all
+    metadata_all['CPP_slope'] = slopes_all
+
+    # Group by 'ID' and standardize 'CPP' for each participant
+    metadata_all['CPP_mean_zscore'] = metadata_all.groupby('ID')['CPP_mean'].transform(lambda x: (x - x.mean()) / x.std())
+    metadata_all['CPP_slope_zscore'] = metadata_all.groupby('ID')['CPP_slope'].transform(lambda x: (x - x.mean()) / x.std())
+
+    # save to disk
+    metadata_all.to_csv(Path(savepath, "metadata_CPP_slope.csv"))
+
+
 # Helper functions
-
-
 def drop_trials(data=None):
     """
     Drop trials based on behavioral data.
@@ -524,13 +632,13 @@ def drop_trials(data=None):
 # %% run stuff
 
 # Load cleaned epochs and create contrasts
-output = create_contrast(study=1)
+#output = create_contrast(study=2)
 # create dictionary with data
-hit_low = output[-1]
-hit_high = output[-2]
-data_dict = {'high': hit_high, 'low': hit_low}
+#hit_low = output[-2]
+#hit_high = output[-3]
+#data_dict = {'high': hit_high, 'low': hit_low}
 # run cluster test and plot sign. cluster (no baseline correction)
-get_significant_channel(data_dict=data_dict, tmin=-1, tmax=1)
+#output_cluster = get_significant_channel(study=2, data_dict=data_dict, tmin=-1, tmax=1)
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
