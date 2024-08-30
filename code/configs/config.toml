@@ -43,11 +43,9 @@ ICA_components1 = "./data/eeg/prepro_ica/ica_comps1"
 ICA_components2 = "./data/eeg/prepro_ica/ica_comps2"
 
 # evoked data for ERP analysis
-[paths.data.eeg.sensor.erp]
-hit = "./data/eeg/sensor/erp/hit"
-miss = "./data/eeg/sensor/erp/miss"
-signal = "./data/eeg/sensor/erp/signal"
-noise = "./data/eeg/sensor/erp/noise"
+[paths.data.eeg.sensor]
+erp1 = "./data/eeg/sensor/erp1"
+erp2 = "./data/eeg/sensor/erp2"
 
 # Time-frequency representations
 [paths.data.eeg.sensor.tfr]
@@ -64,6 +62,7 @@ figure1 = "./figs/manuscript_figures/figure1_expecon1_paradigm_behav"
 figure2 = "./figs/manuscript_figures/figure2_expecon2_paradigm_behav"
 figure2_suppl = "./figs/manuscript_figures/figure2_expecon2_paradigm_behav/supplfig"
 figure3 = "./figs/manuscript_figures/figure3_tfr"
+figure3_suppl_erps = "./figs/manuscript_figures/supplementary_figures/S3"
 
 # alpha level for all tests
 [params]
