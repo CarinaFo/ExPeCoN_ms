@@ -2,11 +2,13 @@
 """
 The script provides functions to analyze cleaned epochs and compute evoked signals from different conditions.
 
-This includes permutation cluster tests.
+This includes cluster-based permutation tests.
+
+Plotting functions  are also provided.
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2023
+Years: 2023-2024
 """
 
 # %% Import
