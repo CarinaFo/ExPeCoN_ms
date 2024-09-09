@@ -64,18 +64,10 @@ if (expecon == 1) {
   columns_to_process <- c("pre_alpha", "pre_beta")}
 }
 
-# https://philippmasur.de/2018/05/23/how-to-center-in-multilevel-models/
+#https://philippmasur.de/2018/05/23/how-to-center-in-multilevel-models/
 
-# Log transform and standardize the 'beta' variable within each participant (grouped by 'ID')
-# cluster centering
-#power <- power %>%
-#  group_by(ID) %>%
-#  mutate(
-#    alpha_scale_log = scale(log10(alpha_150to0)),
-#    beta_scale_log = scale(log10(beta_150to0))
- # )
-
-# grand mean centering (we decided for this approach, see Stephani et al., 2021)
+# standardize and log transform power
+# grand mean centering (same approach, see Stephani et al., 2021)
 standardize_and_log <- function(x) {
   scale(log10(x))
 }
@@ -149,7 +141,7 @@ if (expecon == 1) {
 } else {
   if (source == 1) {
     # define filename for cleaned power
-    filename_cleaned_power = paste("brain_behav_cleaned_source_tvals", expecon, ".csv", sep="")
+    filename_cleaned_power = paste("brain_behav_cleaned_source_", expecon, ".csv", sep="")
     # remove unnecessary variables 
     power <- power[, !(names(power) %in% c("index", "sayyes_y",'X', 'Unnamed..0.2', 'Unnamed..0.1',
                                            'Unnamed..0'))]

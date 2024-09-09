@@ -23,13 +23,16 @@ options(scipen=999)
 # set base directory
 setwd("E:/expecon_ms")
 expecon=1
-behav_path = file.path("data", "behav", "brain_behav_cleaned_source_2.csv")
+behav_path = file.path("data", "behav", "brain_behav_cleaned_source_1.csv")
 behav = read.csv(behav_path)
 
 ################################ prep for modelling ###########################################
 
 # make factors for categorical variables:
 behav$ID = as.factor(behav$ID) # subject ID
+
+# don't create factor variables for mediation model
+
 behav$isyes = as.factor(behav$isyes) # stimulus
 behav$cue = as.factor(behav$cue) # probability for a signal
 behav$prevresp = as.factor(behav$prevresp) # previous response
@@ -56,7 +59,7 @@ hist(behav$beta_source_prob)
 hist(behav$beta_source_prev)
 ##################################GLMMers###########################################################
 
-glmer(isyes ~ previsyes + (previsyes|ID), data=behav, family=binomial(link='probit'))
+summary(glm(isyes ~ previsyes, data=behav, family=binomial(link='probit')))
 
 summary(lmer(beta_source_prob ~ cue + (cue|ID), data=behav))
 summary(lmer(beta_source_prev ~ prevresp + (1|ID), data=behav))
@@ -168,25 +171,24 @@ write.csv(df, save_path, row.names = FALSE)
 # does beta power mediate probability and/or previous response?
 
 # Check the version of a specific package (e.g., "ggplot2")
-package_version <- packageVersion("mediation")
-
+packageVersion("mediation")
 
 ################################prepare variables for linear mixed modelling #######################
 
-# treatment variable can not be a factor for mediation analysis
+# regressor variables can not be a factor for mediation analysis
 
 ######################## mediation #############################################################
 
 # https://towardsdatascience.com/doing-and-reporting-your-first-mediation-analysis-in-r-2fe423b92171
 
 # dummy recode
-behav$cue <- ifelse(behav$cue == 0.25, 0, 1) 
-
+behav$cue <- ifelse(behav$cue == 0.25, 0, 1)
 ####################################### volatile env.##############################################
+any(is.na(behav)) ## returns FALSE
 
 # without p-values, model for mediation function
 med.model_beta_prob <- lme4::lmer(beta_source_prob ~ cue + prevresp +
-                                     (prevresp+cue|ID), 
+                                     (1 + prevresp|ID), 
                                    data = behav,
                                    control=lmerControl(optimizer="bobyqa",
                                                        optCtrl=list(maxfun=2e5)))
@@ -194,7 +196,7 @@ summary(med.model_beta_prob)
 
 
 med.model_beta_prev <- lme4::lmer(beta_source_prev ~  prevresp + cue +
-                                    (prevresp+cue|ID), 
+                                    (1 + prevresp + cue|ID), 
                              data = behav,
                              control=lmerControl(optimizer="bobyqa",
                                                  optCtrl=list(maxfun=2e5))) # significant 
@@ -203,8 +205,8 @@ summary(med.model_beta_prev)
 # fit outcome model: do the mediator (beta) and the IV (stimulus probability cue) predict the
 # detection response? included stimulus and previous choice at a given trial as covariates,
 # but no interaction between prev. resp and cue
-out.model_beta_prob <- glmer(sayyes ~ beta_source_prob + prevresp + cue + isyes +
-                          (isyes+prevresp+cue|ID),
+out.model_beta_prob <- glmer(sayyes ~ beta_source_prob + cue + isyes + prevresp +
+                          (1 + cue + isyes + prevresp|ID),
                         data = behav,
                         control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e5)),
@@ -213,7 +215,7 @@ out.model_beta_prob <- glmer(sayyes ~ beta_source_prob + prevresp + cue + isyes 
 summary(out.model_beta_prob)
 
 out.model_beta_prev <- glmer(sayyes ~ beta_source_prev + prevresp + cue + isyes +
-                          (isyes+prevresp+cue|ID),
+                          (1 + isyes+prevresp+cue|ID),
                         data = behav,
                         control=glmerControl(optimizer="bobyqa",
                                              optCtrl=list(maxfun=2e5)),
