@@ -26,13 +26,13 @@ setwd("E:/expecon_ms")
 if (expecon == 1) {
   if (source == 1) {
     # Identify the relative path from your current working directory to the file
-    relative_path <- file.path("data", "behav", "brain_behav_source_700ms1.csv")
+    relative_path <- file.path("data", "behav", "brain_behav_source_-700-100_1.csv")
     # Use the relative path to read the CSV file
     power <- read.csv(relative_path)
     # add prediction error per trial
     power$PE_abs = abs(power$isyes - power$cue)
     # expecon 2
-    columns_to_process <- c("beta_source_prob", "beta_source_prev")
+    columns_to_process <- c("alpha_source_prob", "alpha_source_prev")
   }else {
   # Identify the relative path from your current working directory to the file
   relative_path <- file.path("data", "behav", "brain_behav_1.csv")
@@ -46,13 +46,13 @@ if (expecon == 1) {
 } else {
   if (source == 1) {
     # Identify the relative path from your current working directory to the file
-    relative_path <- file.path("data", "behav", "brain_behav_source_2.csv")
+    relative_path <- file.path("data", "behav", "brain_behav_source_-700-100_2.csv")
     # Use the relative path to read the CSV file
     power <- read.csv(relative_path)
     # add prediction error per trial
     power$PE_abs = abs(power$isyes - power$cue)
     # expecon 2
-    columns_to_process <- c("beta_source_prob", "beta_source_prev")
+    columns_to_process <- c("alpha_source_prob", "alpha_source_prev")
   }else{
   # Identify the relative path from your current working directory to the file
   relative_path <- file.path("data", "behav", "brain_behav_2.csv")
@@ -108,19 +108,32 @@ for (col in columns_to_process) {
   power <- detrend_within_participants(power, col)
 }
 
-# check whether trend removal has worked (remove trend for trials within block and trend over blocks)
+# Check whether trend removal has worked (remove trend for trials within block and trend over blocks)
+predictors_detrending <- c("trial", "block")
 
-if (expecon == 2 && check_trend_removal == 1 && source == 1) {
-  summary(lmer(beta_source_prob ~ trial + (1|ID), data=power, REML=T))
-} else if (expecon == 2 && check_trend_removal == 1 && source == 1) {
-  summary(lmer(beta_source_prev ~ block + (1|ID), data=power, REML=T))
+trend_removal_model <- function(column_index) {
+  # Create the formula dynamically by converting the predictor name string to a variable
+  formula <- as.formula(paste(columns_to_process[column_index], "~", predictors_detrending[column_index], "+ (1|ID)"))
+  summary(lmer(formula, data = power, REML = TRUE))
 }
 
-if (expecon == 1 && check_trend_removal == 1 && source == 1) {
-  summary(lmer(beta_source_prob ~ trial + (1|ID), data=power, REML=T))
-} else if (expecon == 1 && check_trend_removal == 1) {
-  summary(lmer(beta_source_prev ~ block + (1|ID), data=power, REML=T))
+# Main conditional logic
+if (check_trend_removal == 1) {
+  if (expecon == 2) {
+    if (source == 1) {
+      trend_removal_model(1)
+    } else {
+      trend_removal_model(2)
+    }
+  } else if (expecon == 1) {
+    if (source == 1) {
+      trend_removal_model(1)
+    } else {
+      trend_removal_model(2)
+    }
+  }
 }
+
 
 # define filename for cleaned power
 filename_cleaned_power = paste("brain_behav_cleaned_", expecon, ".csv", sep="")
@@ -128,7 +141,7 @@ filename_cleaned_power = paste("brain_behav_cleaned_", expecon, ".csv", sep="")
 if (expecon == 1) {
   if (source == 1) {
     # define filename for cleaned power
-    filename_cleaned_power = paste("brain_behav_cleaned_source_", expecon, ".csv", sep="")
+    filename_cleaned_power = paste("brain_behav_cleaned_source_alpha_", expecon, ".csv", sep="")
     # remove unnecessary variables 
     power <- power[, !(names(power) %in% c("index", "sayyes_y",'X', 'Unnamed..0.1',
                                            'Unnamed..0', "level_0"))]
@@ -141,7 +154,7 @@ if (expecon == 1) {
 } else {
   if (source == 1) {
     # define filename for cleaned power
-    filename_cleaned_power = paste("brain_behav_cleaned_source_", expecon, ".csv", sep="")
+    filename_cleaned_power = paste("brain_behav_cleaned_source_alpha_", expecon, ".csv", sep="")
     # remove unnecessary variables 
     power <- power[, !(names(power) %in% c("index", "sayyes_y",'X', 'Unnamed..0.2', 'Unnamed..0.1',
                                            'Unnamed..0'))]
