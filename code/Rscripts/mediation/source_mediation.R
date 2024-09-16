@@ -9,6 +9,7 @@ library(ggeffects)
 library(sjPlot)
 library(modelsummary)
 library(performance)
+library(r2mlm) # for R2 (power estimates and model comparision for mixed models)
 
 # don't forget to give credit to the amazing authors of those packages
 #citation("emmeans")
@@ -20,12 +21,20 @@ par(family = "Arial", cex = 1.2)
 options(scipen=999)
 
 ###################load csv including data from both studies#######################################
-# set base directory
+# Set base directory
 setwd("E:/expecon_ms")
-expecon=1
-behav_path = file.path("data", "behav", "brain_behav_cleaned_source_1.csv")
+
+# Define expecon variable
+expecon = 1
+freq_band = 'alpha'
+
+# Construct the file path using the expecon variable
+behav_path = file.path("data", "behav", paste0("brain_behav_cleaned_source_", freq_band, "_", expecon, ".csv"))
+
+# Read the CSV file
 behav = read.csv(behav_path)
 
+pow_variables = c(paste0(freq_band, '_source_prob'), paste0(freq_band, '_source_prev'))
 ################################ prep for modelling ###########################################
 
 # make factors for categorical variables:
@@ -34,6 +43,8 @@ behav$ID = as.factor(behav$ID) # subject ID
 # don't create factor variables for mediation model
 
 behav$isyes = as.factor(behav$isyes) # stimulus
+# dummy recode
+behav$cue <- ifelse(behav$cue == 0.25, 0, 1)
 behav$cue = as.factor(behav$cue) # probability for a signal
 behav$prevresp = as.factor(behav$prevresp) # previous response
 behav$previsyes = as.factor(behav$previsyes) # previous stimulus
@@ -50,27 +61,43 @@ behav$correct[behav$correct == 2] <- 1
 # Remove NaN trials for model comparision (models neeed to have same amount of data)
 behav <- na.omit(behav) 
 
-# Subsetting to keep rows where source_s1 values are within the desired range
-behav <- behav[!(behav$beta_source_prob > 3 | behav$beta_source_prob < -3), ]
-behav <- behav[!(behav$beta_source_prev > 3 | behav$beta_source_prev < -3), ]
+# remove outlier trials based on pre-stim power
+behav <- behav[!(behav[[pow_variables[1]]] > 3 | behav[[pow_variables[1]]] < -3), ]
+behav <- behav[!(behav[[pow_variables[2]]] > 3 | behav[[pow_variables[2]]] < -3), ]
 
-
-hist(behav$beta_source_prob)
-hist(behav$beta_source_prev)
+hist(behav[[pow_variables[1]]])
+hist(behav[[pow_variables[2]]])
 ##################################GLMMers###########################################################
 
 summary(glm(isyes ~ previsyes, data=behav, family=binomial(link='probit')))
 
-summary(lmer(beta_source_prob ~ cue + (cue|ID), data=behav))
-summary(lmer(beta_source_prev ~ prevresp + (1|ID), data=behav))
+null_model_beta = lmer(beta_source_prob ~ 1 + (1|ID), data=behav)
+
+beta_by_cue_fixed = lmer(beta_source_prob ~ cue + (1|ID), data=behav)
+
+beta_by_cue = lmer(beta_source_prob ~ cue + (cue|ID), data=behav, 
+                   control=lmerControl(optimizer="bobyqa",
+                    optCtrl=list(maxfun=2e5)))
+
+beta_by_prevchoice = lmer(beta_source_prev ~ prevresp + (prevresp|ID), data=behav)
+
+alpha_by_cue = lmer(alpha_source_prob ~ cue + (cue|ID), data=behav)
+summary(alpha_by_cue)
+
+alpha_by_prevchoice = lmer(alpha_source_prev ~ prevresp + (prevresp|ID), data=behav)
+
+# get R2
+r2mlm(null_model_beta)
+r2mlm(beta_by_cue_fixed)
+r2mlm(alpha_by_cue)
+r2mlm(beta_by_cue)
 
 # does the cue predict beta source prob?
 sdt_glm_prevresp = glmer(sayyes ~ isyes*cue + prevresp*cue +
                                        (isyes+cue*prevresp|ID), data=behav, 
                                      family=binomial(link='probit'),
                                      control=glmerControl(optimizer="bobyqa",
-                                                          optCtrl=list(maxfun=2e5)),
-)
+                                                          optCtrl=list(maxfun=2e5)))
 
 summary(sdt_glm_prevresp)
 
@@ -181,8 +208,6 @@ packageVersion("mediation")
 
 # https://towardsdatascience.com/doing-and-reporting-your-first-mediation-analysis-in-r-2fe423b92171
 
-# dummy recode
-behav$cue <- ifelse(behav$cue == 0.25, 0, 1)
 ####################################### volatile env.##############################################
 any(is.na(behav)) ## returns FALSE
 
