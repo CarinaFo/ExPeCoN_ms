@@ -633,15 +633,15 @@ def run_source_reco_per_trial(study: int, fmin: int, fmax: int, tmin: int, tmax:
     flat_list_prob = [item for sublist in source_power_allsubs_prob for item in sublist]
     flat_list_prev = [item for sublist in source_power_allsubs_prevresp for item in sublist]
 
-    data[f"{freq_band}_source_prob"] = flat_list_prob
-    data[f"{freq_band}_source_prev"] = flat_list_prev
+    data[f"{freq_band}_prob"] = flat_list_prob
+    data[f"{freq_band}_prev"] = flat_list_prev
 
-    data.to_csv(Path(paths.data.behavior, f"brain_behav_source_-700-100_{study}.csv"))
+    data.to_csv(Path(paths.data.behavior, f"brain_behav_source_{freq_band}{tmin}_{tmax}_{study}.csv"))
 
     return source_power_allsubs_prob, source_power_allsubs_prevresp
 
 
-def create_source_contrast_array(study: int, cond_a: str, cond_b: str, freq_band: str = 'alpha', 
+def create_source_contrast_array(study: int, cond_a: str, cond_b: str,
                                     method: str = 'beamformer'):
     """
     Load source estimates per participant.
@@ -651,7 +651,6 @@ def create_source_contrast_array(study: int, cond_a: str, cond_b: str, freq_band
     Args:
     ----
     study: int, info: which study to analyze: 1 (block, stable environment) or 2 (trial)
-    cond: str, info: which condition to analyze: "probability" or "prev_resp"
     cond_a: str, info: name of condition a
     cond_b: str, info: name of condition b
     method: str, info: which method to analyze: "beamformer" or "mne"
@@ -680,8 +679,8 @@ def create_source_contrast_array(study: int, cond_a: str, cond_b: str, freq_band
         if (study == 2) and (subj == "013"):  # noqa: PLR2004
             continue
         # load source estimates
-        stc_high = mne.read_source_estimate(path_to_source / f"{cond_a}_{freq_band}_{subj}_{study}")
-        stc_low = mne.read_source_estimate(path_to_source / f"{cond_b}_{freq_band}_{subj}_{study}")
+        stc_high = mne.read_source_estimate(path_to_source / f"{cond_a}_{subj}_{study}")
+        stc_low = mne.read_source_estimate(path_to_source / f"{cond_b}_{subj}_{study}")
         # compute difference between conditions
         stc_diff = stc_high.data - stc_low.data
         # append to list
@@ -691,7 +690,7 @@ def create_source_contrast_array(study: int, cond_a: str, cond_b: str, freq_band
     return np.array(stc_all)
 
 
-def plot_grand_average_source_contrast(study: int, cond: str, freq_band: str, method: str = 'beamformer',
+def plot_grand_average_source_contrast(study: int, cond: str, method: str = 'beamformer',
                                          save_plots: bool = True):
     """
     Run a cluster-based permutation test over space and time.
@@ -708,52 +707,44 @@ def plot_grand_average_source_contrast(study: int, cond: str, freq_band: str, me
     cluster output
 
     """
-    if (study == 1) & (cond == "probability"):
-        stc_array_hit = create_source_contrast_array(
-            study=study, cond_a=f"high_prevhit_-0.7_-0.1_induced", 
-            cond_b=f"low_prevhit_-0.7_-0.1_induced", method=method
-        )
-        stc_array_miss = create_source_contrast_array(
-            study=study, cond_a=f"high_prevmiss_-0.7_-0.1_induced", 
-            cond_b=f"low_prevmiss_-0.7_-0.1_induced", method=method
-        )
-        stc_array_cr = create_source_contrast_array(
-            study=study, cond_a=f"high_prevcr_-0.7_-0.1_induced", 
-            cond_b=f"low_prevcr_-0.7_-0.1_induced", method=method
-        )
-        stc_array_conds = np.array([stc_array_hit, stc_array_miss, stc_array_cr])
-        # mean over conditions (previous hit, previous miss, previous cr)
-        stc_array = np.mean(stc_array_conds, axis=0)
-    elif (study == 2) & (cond == "probability"):  # noqa: PLR2004
-        stc_array = create_source_contrast_array(study=study, cond_a=f"high_-0.7_-0.1_induced", 
-                                                 cond_b=f"low_-0.7_-0.1_induced", method=method)
+    if cond == "probability":
+        if study == 1:
+            stc_array_hit = create_source_contrast_array(
+                study=study, cond_a=f"high_prevhit_-0.7_-0.1_induced", 
+                cond_b=f"low_prevhit_-0.7_-0.1_induced", method=method
+            )
+            stc_array_miss = create_source_contrast_array(
+                study=study, cond_a=f"high_prevmiss_-0.7_-0.1_induced", 
+                cond_b=f"low_prevmiss_-0.7_-0.1_induced", method=method
+            )
+            stc_array_cr = create_source_contrast_array(
+                study=study, cond_a=f"high_prevcr_-0.7_-0.1_induced", 
+                cond_b=f"low_prevcr_-0.7_-0.1_induced", method=method
+            )
+            stc_array_conds = np.array([stc_array_hit, stc_array_miss, stc_array_cr])
+            # mean over conditions (previous hit, previous miss, previous cr)
+            stc_array = np.mean(stc_array_conds, axis=0)
 
+        elif (study == 2):  # noqa: PLR2004
+            stc_array = create_source_contrast_array(study=study, cond_a=f"high_-0.7_-0.1_induced", 
+                                                    cond_b=f"low_-0.7_-0.1_induced", method=method)
+    # previous response contrast
     elif cond == "prev_resp":
         if study == 1:
             stc_array = create_source_contrast_array(
                 study=study,
-                cond_a=f"prevyesresp_highprob_prevstim_alpha_-0.7_-0.1_induced",
-                cond_b=f"prevnoresp_highprob_prevstim_alpha_-0.7_-0.1_induced",
+                cond_a=f"prevyesresp_highprob_prevstim_-0.7_-0.1_induced",
+                cond_b=f"prevnoresp_highprob_prevstim_-0.7_-0.1_induced",
                 method=method,
             )
 
         elif study == 2:  # noqa: PLR2004
-            stc_array_high = create_source_contrast_array(
+            stc_array = create_source_contrast_array(
                 study=study,
-                cond_a=f"prevyesresp_samecue_highprob_alpha_-0.7_-0.1_induced",
-                cond_b=f"prevnoresp_samecue_highprob_alpha_-0.7_-0.1_induced",
+                cond_a=f"prevyesresp_samecue_highprob_-0.7_-0.1_induced",
+                cond_b=f"prevnoresp_samecue_highprob_-0.7_-0.1_induced",
                 method=method,
             )
-
-            stc_array_low = create_source_contrast_array(
-                study=study,
-                cond_a=f"prevyesresp_samecue_lowprob_alpha_-0.7_-0.1_induced",
-                cond_b=f"prevnoresp_samecue_lowprob_alpha_-0.7_-0.1_induced",
-                method=method,
-            )
-        stc_array_conds = np.array([stc_array_high, stc_array_low])
-        # mean over conditions
-        stc_array = np.mean(stc_array_conds, axis=0)
 
     elif cond == "control":
         stc_array = create_source_contrast_array(
@@ -762,6 +753,8 @@ def plot_grand_average_source_contrast(study: int, cond: str, freq_band: str, me
             cond_b=f"noise_{freq_band}_0_0.3",
             method=method,
         )
+    else:
+        raise ValueError("input should be 'probability' or 'prev_resp' or 'control'")
 
     # get rid of zero-dimension
     stc_array = np.squeeze(stc_array)
@@ -782,9 +775,10 @@ def plot_grand_average_source_contrast(study: int, cond: str, freq_band: str, me
 
     # put contrast (average) or p values in source space
     fsave_vertices = [s["vertno"] for s in src]
-    stc = mne.SourceEstimate(t_obs, tmin=-0.7, tstep=0.0001, vertices=fsave_vertices, subject="fsaverage")
+    stc = mne.SourceEstimate(t_obs, tmin=-0.7, tstep=0.0001, vertices=fsave_vertices, 
+                                subject="fsaverage")
 
-    right_hemi_data = stc.data[-len(stc.vertices[1]) :]
+    right_hemi_data = stc.rh_data
 
     # Sort the array in ascending order
     sorted_stc = np.sort(right_hemi_data)
@@ -811,7 +805,7 @@ def plot_grand_average_source_contrast(study: int, cond: str, freq_band: str, me
         verbose="error",
     )
 
-    mne.write_label(Path(paths.data.templates, f"func_label_{cond}_{freq_band}_{study}_-700"), func_labels[1])
+    mne.write_label(Path(paths.data.templates, f"func_label_{cond}_{study}_-700"), func_labels[1])
 
     print(min(t_obs), max(t_obs))
 
