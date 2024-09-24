@@ -401,6 +401,83 @@ def load_tfr_conds(
     return tfr_a_cond, tfr_b_cond
 
 
+def plot_freq_bands_over_time():
+    ""
+    # load the tfr data for each condition for probability conds.
+    tfr_a_cond, tfr_b_cond = load_tfr_conds(
+        studies=[1, 2],
+        cond="probability",
+        cond_a_name="high_-0.7_0_induced",
+        cond_b_name="low_-0.7_0_induced",
+        cond_a_names=["high_prevhit_-0.7_0_induced", "high_prevmiss_-0.7_0_induced", "high_prevcr_-0.7_0_induced"],
+        cond_b_names=["low_prevhit_-0.7_0_induced", "low_prevmiss_-0.7_0_induced", "low_prevcr_-0.7_0_induced"],
+    )
+
+    high_beta = [scipy.integrate.trapezoid(a[0].data[:,12:28,:], axis=1) for a in tfr_a_cond[0]]
+    low_beta = [scipy.integrate.trapezoid(a[0].data[:,12:28,:], axis=1) for a in tfr_b_cond[0]]
+
+    # alpha band
+    high_alpha = [scipy.integrate.trapezoid(a[0].data[:,8:12,:], axis=1) for a in tfr_a_cond[0]]
+    low_alpha = [scipy.integrate.trapezoid(a[0].data[:,8:12,:], axis=1) for a in tfr_b_cond[0]]
+
+    # calculate the difference for each participant
+    high_low_beta = [h - l for h, l in zip(high_beta, low_beta)]
+    high_low_alpha = [h - l for h, l in zip(high_alpha, low_alpha)]
+
+    # calculate standard error of the mean for the difference
+    high_low_beta_sem = stats.sem(np.array(high_low_beta), axis=0)
+    high_low_alpha_sem = stats.sem(np.array(high_low_alpha), axis=0)
+
+    # calculate mean difference
+    high_low_beta_mean = np.mean(np.array(high_low_beta), axis=0)
+    high_low_alpha_mean = np.mean(np.array(high_low_alpha), axis=0)
+
+    # plot the difference
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
+    # set figure title
+    fig.suptitle("Stable environment: Previous Correct Rejection")
+
+    # plot beta band
+    axs[0].plot(tfr_a_cond[1][0].times, high_low_beta_mean[ch_index,:], color="black", label="Beta band")
+    axs[0].fill_between(
+        tfr_a_cond[1][0].times,
+        high_low_beta_mean[ch_index,:] - high_low_beta_sem[ch_index,:],
+        high_low_beta_mean[ch_index,:] + high_low_beta_sem[ch_index,:],
+        color="black",
+        alpha=0.3,
+    )
+    
+    # beta band
+    axs[0].set_title("Difference in beta band power high - low probability")
+
+    # plot alpha band
+    axs[1].plot(tfr_a_cond[1][0].times, high_low_alpha_mean[ch_index,:], color="black", label="Alpha band")
+    axs[1].fill_between(
+        tfr_a_cond[1][0].times,
+        high_low_alpha_mean[ch_index,:] - high_low_alpha_sem[ch_index,:],
+        high_low_alpha_mean[ch_index,:] + high_low_alpha_sem[ch_index,:],
+        color="black",
+        alpha=0.3,
+    )
+    # alpha band
+    axs[1].set_title("Difference in alpha band power high - low probability")
+
+    # set labels
+    axs[0].set(xlabel="Time (s)", ylabel="Power")
+    axs[1].set(xlabel="Time (s)", ylabel="Power")
+
+    plt.show()
+
+    # stats
+    high_low_alpha_cp4 = np.array(high_low_alpha)[:,ch_index,:]
+
+    high_low_beta_cp4 = np.array(high_low_beta)[:,ch_index,:]
+
+    t, p, h = mne.stats.permutation_t_test(high_low_alpha_cp4)
+
+    tfr_a_cond[1][0].times[np.where(p<0.05)]
+
+
 def plot_tfr_cluster_test_output(
     cond: str,
     tfr_a_cond: list,
@@ -480,7 +557,7 @@ def plot_tfr_cluster_test_output(
                     tfr_a = np.array(tfr_a_cond[idx])
                     tfr_b = np.array(tfr_b_cond[idx])
                     x_conds = []
-                    for conds in range(tfr_a.shape[1] - 1):  # exclude prevfa
+                    for conds in range(tfr_a.shape[1]):
                         # contrast data
                         x = np.array([
                             h.copy().crop(tmin=t[0], tmax=t[1]).pick_channels(channel_names).data
