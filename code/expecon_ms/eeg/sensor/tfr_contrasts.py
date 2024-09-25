@@ -23,7 +23,7 @@ import mne
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy import stats
+import scipy
 
 from expecon_ms.configs import PROJECT_ROOT, config, params, paths
 from expecon_ms.utils import zero_pad_or_mirror_data, drop_trials
@@ -401,8 +401,18 @@ def load_tfr_conds(
     return tfr_a_cond, tfr_b_cond
 
 
-def plot_freq_bands_over_time():
-    ""
+def plot_freq_bands_over_time(ch_index: int):
+    """
+    Plot the difference in power between high and low probability conditions for the alpha and beta band.
+    
+    Args:
+    ----
+    ch_index : int, info: index of the channel to plot
+    
+    Returns:
+    -------
+    None
+    """
     # load the tfr data for each condition for probability conds.
     tfr_a_cond, tfr_b_cond = load_tfr_conds(
         studies=[1, 2],
@@ -413,12 +423,26 @@ def plot_freq_bands_over_time():
         cond_b_names=["low_prevhit_-0.7_0_induced", "low_prevmiss_-0.7_0_induced", "low_prevcr_-0.7_0_induced"],
     )
 
-    high_beta = [scipy.integrate.trapezoid(a[0].data[:,12:28,:], axis=1) for a in tfr_a_cond[0]]
-    low_beta = [scipy.integrate.trapezoid(a[0].data[:,12:28,:], axis=1) for a in tfr_b_cond[0]]
+    # load the tfr data for each condition for prev_resp conds.
+    tfr_a_cond, tfr_b_cond = load_tfr_conds(
+        studies=[1, 2],
+        cond="prev_resp",
+        cond_a_name="prevyesresp_highprob_prevstim_-0.7_0_induced",
+        cond_b_name="prevnoresp_highprob_prevstim_-0.7_0_induced",
+        cond_a_names=["prevyesresp_samecue_lowprob_-0.7_0_induced", "prevyesresp_samecue_highprob_-0.7_0_induced"],
+        cond_b_names=["prevnoresp_samecue_lowprob_-0.7_0_induced", "prevnoresp_samecue_highprob_-0.7_0_induced"],
+    )
+
+    times = tfr_a_cond[1][0].times
+
+    ch_index = tfr_a_cond[1][0].ch_names.index('CP4')
+
+    high_beta = [scipy.integrate.trapezoid(a.data[:,12:28,:], axis=1) for a in tfr_a_cond[1]]
+    low_beta = [scipy.integrate.trapezoid(a.data[:,12:28,:], axis=1) for a in tfr_b_cond[1]]
 
     # alpha band
-    high_alpha = [scipy.integrate.trapezoid(a[0].data[:,8:12,:], axis=1) for a in tfr_a_cond[0]]
-    low_alpha = [scipy.integrate.trapezoid(a[0].data[:,8:12,:], axis=1) for a in tfr_b_cond[0]]
+    high_alpha = [scipy.integrate.trapezoid(a.data[:,8:12,:], axis=1) for a in tfr_a_cond[1]]
+    low_alpha = [scipy.integrate.trapezoid(a.data[:,8:12,:], axis=1) for a in tfr_b_cond[1]]
 
     # calculate the difference for each participant
     high_low_beta = [h - l for h, l in zip(high_beta, low_beta)]
@@ -438,9 +462,9 @@ def plot_freq_bands_over_time():
     fig.suptitle("Stable environment: Previous Correct Rejection")
 
     # plot beta band
-    axs[0].plot(tfr_a_cond[1][0].times, high_low_beta_mean[ch_index,:], color="black", label="Beta band")
+    axs[0].plot(times, high_low_beta_mean[ch_index,:], color="black", label="Beta band")
     axs[0].fill_between(
-        tfr_a_cond[1][0].times,
+        times,
         high_low_beta_mean[ch_index,:] - high_low_beta_sem[ch_index,:],
         high_low_beta_mean[ch_index,:] + high_low_beta_sem[ch_index,:],
         color="black",
@@ -451,9 +475,9 @@ def plot_freq_bands_over_time():
     axs[0].set_title("Difference in beta band power high - low probability")
 
     # plot alpha band
-    axs[1].plot(tfr_a_cond[1][0].times, high_low_alpha_mean[ch_index,:], color="black", label="Alpha band")
+    axs[1].plot(times, high_low_alpha_mean[ch_index,:], color="black", label="Alpha band")
     axs[1].fill_between(
-        tfr_a_cond[1][0].times,
+        times,
         high_low_alpha_mean[ch_index,:] - high_low_alpha_sem[ch_index,:],
         high_low_alpha_mean[ch_index,:] + high_low_alpha_sem[ch_index,:],
         color="black",
@@ -473,9 +497,19 @@ def plot_freq_bands_over_time():
 
     high_low_beta_cp4 = np.array(high_low_beta)[:,ch_index,:]
 
-    t, p, h = mne.stats.permutation_t_test(high_low_alpha_cp4)
+    t, p_beta, h = mne.stats.permutation_t_test(high_low_beta_cp4)
 
-    tfr_a_cond[1][0].times[np.where(p<0.05)]
+    sign_timepoints_beta = times[np.where(p_beta<0.05)]
+
+    print(f"Significant timepoints for beta band: {sign_timepoints_beta}")
+
+    t, p_alpha, h = mne.stats.permutation_t_test(high_low_alpha_cp4)
+
+    sign_timepoints_alpha = times[np.where(p_alpha<0.05)]
+
+    print(f"Significant timepoints for alpha band: {sign_timepoints_alpha}")
+
+    return "Done plotting freq bands over time"
 
 
 def plot_tfr_cluster_test_output(
