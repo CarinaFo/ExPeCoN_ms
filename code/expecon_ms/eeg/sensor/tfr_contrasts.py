@@ -437,77 +437,119 @@ def plot_freq_bands_over_time(ch_index: int):
 
     ch_index = tfr_a_cond[1][0].ch_names.index('CP4')
 
-    high_beta = [scipy.integrate.trapezoid(a.data[:,12:28,:], axis=1) for a in tfr_a_cond[1]]
-    low_beta = [scipy.integrate.trapezoid(a.data[:,12:28,:], axis=1) for a in tfr_b_cond[1]]
+    for idx in range(len(tfr_a_cond[0])):
 
-    # alpha band
-    high_alpha = [scipy.integrate.trapezoid(a.data[:,8:12,:], axis=1) for a in tfr_a_cond[1]]
-    low_alpha = [scipy.integrate.trapezoid(a.data[:,8:12,:], axis=1) for a in tfr_b_cond[1]]
+        if idx > 2:
+            break
+      
+        conditions = ['Previous_hit', 'Previous_miss', 'Pevious_correct_rejection']
 
-    # calculate the difference for each participant
-    high_low_beta = [h - l for h, l in zip(high_beta, low_beta)]
-    high_low_alpha = [h - l for h, l in zip(high_alpha, low_alpha)]
+        # beta band
+        high_beta = [scipy.integrate.trapezoid(a[idx].data[:,12:28,:], axis=1) for a in tfr_a_cond[0]]
+        low_beta = [scipy.integrate.trapezoid(a[idx].data[:,12:28,:], axis=1) for a in tfr_b_cond[0]]
 
-    # calculate standard error of the mean for the difference
-    high_low_beta_sem = stats.sem(np.array(high_low_beta), axis=0)
-    high_low_alpha_sem = stats.sem(np.array(high_low_alpha), axis=0)
+        # alpha band
+        high_alpha = [scipy.integrate.trapezoid(a[idx].data[:,8:12,:], axis=1) for a in tfr_a_cond[0]]
+        low_alpha = [scipy.integrate.trapezoid(a[idx].data[:,8:12,:], axis=1) for a in tfr_b_cond[0]]
 
-    # calculate mean difference
-    high_low_beta_mean = np.mean(np.array(high_low_beta), axis=0)
-    high_low_alpha_mean = np.mean(np.array(high_low_alpha), axis=0)
+        # calculate the difference for each participant
+        high_low_beta = [h - l for h, l in zip(high_beta, low_beta)]
+        high_low_alpha = [h - l for h, l in zip(high_alpha, low_alpha)]
 
-    # plot the difference
-    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
-    # set figure title
-    fig.suptitle("Stable environment: Previous Correct Rejection")
+        # calculate standard error of the mean for the difference
+        high_low_beta_sem = scipy.stats.sem(np.array(high_low_beta), axis=0)
+        high_low_alpha_sem = scipy.stats.sem(np.array(high_low_alpha), axis=0)
 
-    # plot beta band
-    axs[0].plot(times, high_low_beta_mean[ch_index,:], color="black", label="Beta band")
-    axs[0].fill_between(
-        times,
-        high_low_beta_mean[ch_index,:] - high_low_beta_sem[ch_index,:],
-        high_low_beta_mean[ch_index,:] + high_low_beta_sem[ch_index,:],
-        color="black",
-        alpha=0.3,
-    )
-    
-    # beta band
-    axs[0].set_title("Difference in beta band power high - low probability")
+        # calculate mean difference
+        high_low_beta_mean = np.mean(np.array(high_low_beta), axis=0)
+        high_low_alpha_mean = np.mean(np.array(high_low_alpha), axis=0)
 
-    # plot alpha band
-    axs[1].plot(times, high_low_alpha_mean[ch_index,:], color="black", label="Alpha band")
-    axs[1].fill_between(
-        times,
-        high_low_alpha_mean[ch_index,:] - high_low_alpha_sem[ch_index,:],
-        high_low_alpha_mean[ch_index,:] + high_low_alpha_sem[ch_index,:],
-        color="black",
-        alpha=0.3,
-    )
-    # alpha band
-    axs[1].set_title("Difference in alpha band power high - low probability")
+        # stats
+        high_low_alpha_cp4 = np.array(high_low_alpha)[:,ch_index,:]
 
-    # set labels
-    axs[0].set(xlabel="Time (s)", ylabel="Power")
-    axs[1].set(xlabel="Time (s)", ylabel="Power")
+        high_low_beta_cp4 = np.array(high_low_beta)[:,ch_index,:]
 
-    plt.show()
+        t, p_beta, h = mne.stats.permutation_t_test(high_low_beta_cp4)
 
-    # stats
-    high_low_alpha_cp4 = np.array(high_low_alpha)[:,ch_index,:]
+        sign_timepoints_beta = times[np.where(p_beta<0.05)]
 
-    high_low_beta_cp4 = np.array(high_low_beta)[:,ch_index,:]
+        print(f"Significant timepoints for beta band: {sign_timepoints_beta}")
 
-    t, p_beta, h = mne.stats.permutation_t_test(high_low_beta_cp4)
+        t, p_alpha, h = mne.stats.permutation_t_test(high_low_alpha_cp4)
 
-    sign_timepoints_beta = times[np.where(p_beta<0.05)]
+        sign_timepoints_alpha = times[np.where(p_alpha<0.05)]
 
-    print(f"Significant timepoints for beta band: {sign_timepoints_beta}")
+        print(f"Significant timepoints for alpha band: {sign_timepoints_alpha}")
 
-    t, p_alpha, h = mne.stats.permutation_t_test(high_low_alpha_cp4)
+        # plot the difference
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
+        # set figure title
+        fig.suptitle(f"Stable environment: Difference Amplitude high - low probability\n{conditions[idx]}", fontsize=16)
 
-    sign_timepoints_alpha = times[np.where(p_alpha<0.05)]
+        # plot alpha band
+        axs[0].plot(times, high_low_alpha_mean[ch_index,:], color="black", label="Alpha band")
+        axs[0].fill_between(
+            times,
+            high_low_alpha_mean[ch_index,:] - high_low_alpha_sem[ch_index,:],
+            high_low_alpha_mean[ch_index,:] + high_low_alpha_sem[ch_index,:],
+            color="black",
+            alpha=0.3,
+        )
+             # After plotting, get the current y-axis limits
+        ymin, ymax = axs[0].get_ylim()
 
-    print(f"Significant timepoints for alpha band: {sign_timepoints_alpha}")
+        # if significant timepoints mark them with a horizontal line
+        if len(sign_timepoints_alpha) > 0:
+            # Get the min and max timepoints for the line span
+            min_time = min(sign_timepoints_alpha)
+            max_time = max(sign_timepoints_alpha)
+
+            # Draw a horizontal line at y = -8 spanning from min_time to max_time
+            axs[0].plot([min_time, max_time], [ymin, ymin], color="red", linestyle="--")
+        # alpha band
+        axs[0].set_title("Alpha frequency band [8-12 Hz]", fontsize=16)
+
+        # plot beta band
+        axs[1].plot(times, high_low_beta_mean[ch_index,:], color="black", label="Beta band")
+        axs[1].fill_between(
+            times,
+            high_low_beta_mean[ch_index,:] - high_low_beta_sem[ch_index,:],
+            high_low_beta_mean[ch_index,:] + high_low_beta_sem[ch_index,:],
+            color="black",
+            alpha=0.3,
+        )
+
+        # After plotting, get the current y-axis limits
+        ymin, ymax = axs[1].get_ylim()
+
+        # if significant timepoints mark them with one bold horizontal line
+        # close to the x axis
+        if len(sign_timepoints_beta) > 0:
+            # Get the min and max timepoints for the line span
+            min_time = min(sign_timepoints_beta)
+            max_time = max(sign_timepoints_beta)
+
+            # Draw a horizontal line at y = -8 spanning from min_time to max_time
+            axs[1].plot([min_time, max_time], [ymin, ymin], color="red", linestyle="--")
+        
+        # beta band
+        axs[1].set_title("Beta frequency band [15-30 Hz]", fontsize=16)
+
+        # set labels
+        axs[0].set(xlabel="Time (s)", ylabel="Power")
+        axs[1].set(xlabel="Time (s)", ylabel="Power")
+
+        # save figure as png and svg
+        for fm in ["svg", "png"]:
+            fig.savefig(
+                Path(
+                    paths.figures.manuscript.figure3,
+                    f"fig3_tfr_freqbands_over_time_{ch_index}_robust_samevminvmax_{conditions[idx]}.{fm}",
+                ),
+                dpi=300,
+                format=fm,
+            )
+        plt.show()
 
     return "Done plotting freq bands over time"
 

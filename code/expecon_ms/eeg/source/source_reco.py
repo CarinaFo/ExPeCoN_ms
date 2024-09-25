@@ -30,6 +30,7 @@ from pathlib import Path
 import mne
 import numpy as np
 import pandas as pd
+import scipy
 from mne.datasets import fetch_fsaverage
 
 from expecon_ms.configs import PROJECT_ROOT, config, params, paths
@@ -166,7 +167,6 @@ def run_source_reco(
     cond: str,
     fmin: int,
     fmax: int,
-    freq_band: str,
     tmin: int,
     tmax: int,
     mirror: bool = False,
@@ -188,7 +188,6 @@ def run_source_reco(
     mirror: bool, info: if True, avoid leakage and edge artifacts by zero padding or mirroring the data
     fmin: int, info: lower frequency bound for DICS beamforming (Hz, inclusive)
     fmax: int, info: upper frequency bound for DICS beamforming (Hz, inclusive)
-    freq_band: str, info: name of the frequency band of interest
     tmin: int, info: lower time bound for DICS beamforming (in seconds)
     tmax: int, info: upper time bound for DICS beamforming (in seconds)
     dics: 1 for DICS beamforming, 0 for eLoreta
@@ -314,24 +313,24 @@ def run_source_reco(
                         & (epochs.metadata.prevresp == 0)
                     )
                 ]
-                cond_a_name = f"high_prevcr_{tmin}_{tmax}_induced"
-                cond_b_name = f"low_prevcr_{tmin}_{tmax}_induced"
+                cond_a_name = f"high_prevcr_induced"
+                cond_b_name = f"low_prevcr_induced"
 
                 if mirror:
-                    cond_a_name = f"high_prevcr_{tmin}_{tmax}_induced_mirrored"
-                    cond_b_name = f"low_prevcr_{tmin}_{tmax}_induced_mirrored"
+                    cond_a_name = f"high_prevcr_induced_mirrored"
+                    cond_b_name = f"low_prevcr_induced_mirrored"
 
             elif study == 2:  # noqa: PLR2004
                 epochs_a = epochs[
                     (epochs.metadata.cue == params.high_p)
                 ]
                 epochs_b = epochs[(epochs.metadata.cue == params.low_p)]
-                cond_a_name = f"high_{tmin}_{tmax}_induced"
-                cond_b_name = f"low_{tmin}_{tmax}_induced"
+                cond_a_name = f"high_induced"
+                cond_b_name = f"low_induced"
 
                 if mirror:
-                    cond_a_name = f"high_{tmin}_{tmax}_induced_mirrored"
-                    cond_b_name = f"low_{tmin}_{tmax}_induced_mirrored"
+                    cond_a_name = f"high_induced_mirrored"
+                    cond_b_name = f"low_induced_mirrored"
 
         elif cond == "prev_resp":
             if study == 1:
@@ -349,12 +348,12 @@ def run_source_reco(
                         & (epochs.metadata.cue == params.high_p)
                     )
                 ]
-                cond_a_name = f"prevyesresp_highprob_prevstim_{tmin}_{tmax}_induced"
-                cond_b_name = f"prevnoresp_highprob_prevstim_{tmin}_{tmax}_induced"
+                cond_a_name = f"prevyesresp_highprob_prevstim_induced"
+                cond_b_name = f"prevnoresp_highprob_prevstim_induced"
 
                 if mirror:
-                    cond_a_name = f"prevyesresp_highprob_prevstim_{tmin}_{tmax}_induced_mirrored"
-                    cond_b_name = f"prevnoresp_highprob_prevstim_{tmin}_{tmax}_induced_mirrored"
+                    cond_a_name = f"prevyesresp_highprob_prevstim_induced_mirrored"
+                    cond_b_name = f"prevnoresp_highprob_prevstim_induced_mirrored"
 
             elif study == 2:
                 epochs_a = epochs[
@@ -368,18 +367,18 @@ def run_source_reco(
 
                 ]
 
-                cond_a_name = f"prevyesresp_samecue_lowprob_{tmin}_{tmax}_induced"
-                cond_b_name = f"prevnoresp_samecue_lowprob_{tmin}_{tmax}_induced"
+                cond_a_name = f"prevyesresp_samecue_lowprob_induced"
+                cond_b_name = f"prevnoresp_samecue_lowprob_induced"
 
                 if mirror:
-                    cond_a_name = f"prevyesresp_samecue_lowprob_{tmin}_{tmax}_induced_mirrored"
-                    cond_b_name = f"prevnoresp_samecue_lowprob_{tmin}_{tmax}_induced_mirrored"
+                    cond_a_name = f"prevyesresp_samecue_lowprob_induced_mirrored"
+                    cond_b_name = f"prevnoresp_samecue_lowprob_induced_mirrored"
 
         elif cond == "control":
                 epochs_a = epochs[(epochs.metadata.isyes == 1)]
                 epochs_b = epochs[(epochs.metadata.isyes == 0)]
-                cond_a_name = f"stimulus_{tmin}_{tmax}"
-                cond_b_name = f"noise_{tmin}_{tmax}"
+                cond_a_name = f"stimulus"
+                cond_b_name = f"noise"
         else:
                 raise ValueError("input should be 'probability' or 'prev_resp' or 'control'")
 
@@ -420,8 +419,8 @@ def run_source_reco(
             source_power_a, freqs = mne.beamformer.apply_dics_csd(csd_a, filters)
             source_power_b, freqs = mne.beamformer.apply_dics_csd(csd_b, filters)
 
-            source_power_a.save(Path(save_path, f"{cond_a_name}_{freq_band}_{subj}_{study}"))
-            source_power_b.save(Path(save_path, f"{cond_b_name}_{freq_band}_{subj}_{study}"))
+            source_power_a.save(Path(save_path, f"{cond_a_name}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}"))
+            source_power_b.save(Path(save_path, f"{cond_b_name}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}"))
 
         else:
             # average epochs for MNE
@@ -641,7 +640,8 @@ def run_source_reco_per_trial(study: int, fmin: int, fmax: int, tmin: int, tmax:
     return source_power_allsubs_prob, source_power_allsubs_prevresp
 
 
-def create_source_contrast_array(study: int, cond_a: str, cond_b: str,
+def create_source_contrast_array(study: int, cond_a: str, cond_b: str, tmin=-0.3, tmax=0, 
+                                    fmin=15, fmax=25,
                                     method: str = 'beamformer'):
     """
     Load source estimates per participant.
@@ -679,8 +679,8 @@ def create_source_contrast_array(study: int, cond_a: str, cond_b: str,
         if (study == 2) and (subj == "013"):  # noqa: PLR2004
             continue
         # load source estimates
-        stc_high = mne.read_source_estimate(path_to_source / f"{cond_a}_{subj}_{study}")
-        stc_low = mne.read_source_estimate(path_to_source / f"{cond_b}_{subj}_{study}")
+        stc_high = mne.read_source_estimate(path_to_source / f"{cond_a}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}")
+        stc_low = mne.read_source_estimate(path_to_source / f"{cond_b}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}")
         # compute difference between conditions
         stc_diff = stc_high.data - stc_low.data
         # append to list
@@ -726,15 +726,15 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str = 'bea
             stc_array = np.mean(stc_array_conds, axis=0)
 
         elif (study == 2):  # noqa: PLR2004
-            stc_array = create_source_contrast_array(study=study, cond_a=f"high_-0.7_-0.1_induced", 
-                                                    cond_b=f"low_-0.7_-0.1_induced", method=method)
+            stc_array = create_source_contrast_array(study=study, cond_a=f"high_-0.3_0_induced", 
+                                                    cond_b=f"low_-0.3_0_induced", method=method)
     # previous response contrast
     elif cond == "prev_resp":
         if study == 1:
             stc_array = create_source_contrast_array(
                 study=study,
-                cond_a=f"prevyesresp_highprob_prevstim_-0.7_-0.1_induced",
-                cond_b=f"prevnoresp_highprob_prevstim_-0.7_-0.1_induced",
+                cond_a=f"prevyesresp_highprob_prevstim_-0.7_0_induced",
+                cond_b=f"prevnoresp_highprob_prevstim_-0.7_0_induced",
                 method=method,
             )
 
