@@ -8,8 +8,10 @@ library(emmeans)
 library(ggeffects)
 library(sjPlot)
 library(modelsummary)
-library(performance)
+library(performance) # for Nakagawa conditional/marginal R2
+library(partR2) # for part R2 values
 library(r2mlm) # for R2 (power estimates and model comparision for mixed models)
+library(glmmTMB)
 
 # don't forget to give credit to the amazing authors of those packages
 #citation("emmeans")
@@ -25,16 +27,11 @@ options(scipen=999)
 setwd("E:/expecon_ms")
 
 # Define expecon variable
-expecon = 1
-freq_band = 'alpha'
-
+expecon = 2
 # Construct the file path using the expecon variable
-behav_path = file.path("data", "behav", paste0("brain_behav_cleaned_source_", freq_band, "_", expecon, ".csv"))
-
+behav_path = file.path("data", "behav", paste0("brain_behav_cleaned_source_alpha_beta_", expecon, ".csv"))
 # Read the CSV file
 behav = read.csv(behav_path)
-
-pow_variables = c(paste0(freq_band, '_source_prob'), paste0(freq_band, '_source_prev'))
 ################################ prep for modelling ###########################################
 
 # make factors for categorical variables:
@@ -61,36 +58,96 @@ behav$correct[behav$correct == 2] <- 1
 # Remove NaN trials for model comparision (models neeed to have same amount of data)
 behav <- na.omit(behav) 
 
-# remove outlier trials based on pre-stim power
-behav <- behav[!(behav[[pow_variables[1]]] > 3 | behav[[pow_variables[1]]] < -3), ]
-behav <- behav[!(behav[[pow_variables[2]]] > 3 | behav[[pow_variables[2]]] < -3), ]
+# Step 1: Select the 4 columns you're interested in
+selected_columns <- c("beta_source_prob", "alpha_source_prob", "beta_source_prev", "alpha_source_prev")
 
-hist(behav[[pow_variables[1]]])
-hist(behav[[pow_variables[2]]])
+# Step 2: Remove rows (trials) where any of the 4 selected columns have values > 3 or < -3
+behav <- behav %>%
+  filter(
+    if_all(all_of(selected_columns), ~ . >= -3 & . <= 3))# %>% # Keep rows where all selected columns are within the range [-3, 3]
+    #mutate(across(all_of(selected_columns), ~ . + 10)) # Step to add 10 to all selected columns
+
+# Step 3: Reshape the data for plotting histograms of the 4 selected columns
+df_long <- behav %>%
+  pivot_longer(cols = all_of(selected_columns), names_to = "variable", values_to = "value")
+
+# Step 4: Plot histograms for each of the selected columns using ggplot
+ggplot(df_long, aes(x = value)) +
+  geom_histogram(binwidth = 0.5, fill = "skyblue", color = "black") +
+  facet_wrap(~ variable, scales = "free") +  # Facet by variable (column)
+  labs(title = "Histograms of Selected Columns (Outliers Removed)", x = "Value", y = "Frequency") +
+  theme_minimal()
 ##################################GLMMers###########################################################
 
 summary(glm(isyes ~ previsyes, data=behav, family=binomial(link='probit')))
 
 null_model_beta = lmer(beta_source_prob ~ 1 + (1|ID), data=behav)
 
-beta_by_cue_fixed = lmer(beta_source_prob ~ cue + (1|ID), data=behav)
+cue_by_alpha_beta = glmer(cue ~ alpha_source_prob + beta_source_prob + (1|ID)
+                                    ,data=behav, family='binomial') # singularity 
 
-beta_by_cue = lmer(beta_source_prob ~ cue + (cue|ID), data=behav, 
+beta_by_cue = lmerTest::lmer(beta_source_prob ~ cue + (cue|ID), data=behav, 
                    control=lmerControl(optimizer="bobyqa",
                     optCtrl=list(maxfun=2e5)))
 
-beta_by_prevchoice = lmer(beta_source_prev ~ prevresp + (prevresp|ID), data=behav)
+summary(beta_by_cue_fixed)
 
-alpha_by_cue = lmer(alpha_source_prob ~ cue + (cue|ID), data=behav)
+null_model_alpha = lmer(alpha_source_prob ~ 1 + (1|ID), data=behav)
+
+alpha_by_cue_fixed = lmerTest::lmer(alpha_source_prob ~ cue + (1|ID), data=behav,
+                           control=lmerControl(optimizer="bobyqa",
+                                               optCtrl=list(maxfun=2e5)))
+summary(alpha_by_cue_fixed)
+
+alpha_by_cue = lmerTest::lmer(alpha_source_prob ~ cue + (cue|ID), data=behav, 
+                   control=lmerControl(optimizer="bobyqa",
+                                       optCtrl=list(maxfun=2e5)))
 summary(alpha_by_cue)
+
+beta_by_prevchoice = lmer(beta_source_prev ~ prevresp + (prevresp|ID), data=behav)
 
 alpha_by_prevchoice = lmer(alpha_source_prev ~ prevresp + (prevresp|ID), data=behav)
 
-# get R2
-r2mlm(null_model_beta)
+# model comparision
+# Aikake weights and Schwartz (BIC) weights for easier  model comparision
+# see Wagenmakers & Farrell, 2004
+
+# Calculate AIC and BIC for each model
+bic_values <- c(BIC(null_model_beta), BIC(beta_by_cue_fixed), BIC(beta_by_cue))
+aic_values <- c(AIC(null_model_beta), AIC(beta_by_cue_fixed), AIC(beta_by_cue))
+
+# alpha
+bic_values <- c(BIC(null_model_alpha), BIC(alpha_by_cue_fixed), BIC(alpha_by_cue))
+aic_values <- c(AIC(null_model_alpha), AIC(alpha_by_cue_fixed), AIC(alpha_by_cue))
+
+# Calculate ΔAIC and ΔBIC (difference from the minimum)
+delta_aic <- aic_values - min(aic_values)
+delta_bic <- bic_values - min(bic_values)
+
+# Calculate Akaike weights
+akaike_weights <- exp(-0.5 * delta_aic) / sum(exp(-0.5 * delta_aic))
+
+# Calculate BIC (Schwartz) weights
+bic_weights <- exp(-0.5 * delta_bic) / sum(exp(-0.5 * delta_bic))
+
+# Display AIC, BIC, Akaike weights, and BIC weights
+result <- data.frame(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  AIC = aic_values,
+  BIC = bic_values,
+  Delta_AIC = delta_aic,
+  Delta_BIC = delta_bic,
+  Akaike_Weight = akaike_weights,
+  BIC_Weight = bic_weights
+)
+
+print(result)
+
+# get R2 for the best model
 r2mlm(beta_by_cue_fixed)
-r2mlm(alpha_by_cue)
-r2mlm(beta_by_cue)
+r2mlm(alpha_by_cue_fixed)
+#### Run Pseudo R2 and Part R2 ####
+r2_nakagawa(cue_by_alpha_beta)
 
 # does the cue predict beta source prob?
 sdt_glm_prevresp = glmer(sayyes ~ isyes*cue + prevresp*cue +
@@ -213,7 +270,7 @@ any(is.na(behav)) ## returns FALSE
 
 # without p-values, model for mediation function
 med.model_beta_prob <- lme4::lmer(beta_source_prob ~ cue + prevresp +
-                                     (1 + prevresp|ID), 
+                                     (1 + prevresp + cue|ID), 
                                    data = behav,
                                    control=lmerControl(optimizer="bobyqa",
                                                        optCtrl=list(maxfun=2e5)))
