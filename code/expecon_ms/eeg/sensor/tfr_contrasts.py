@@ -99,7 +99,7 @@ def compute_tfr(
 
     """
     # Define frequencies and cycles for multitaper method
-    freqs = np.arange(fmin, fmax, 1)
+    freqs = np.arange(fmin, fmax + 1, 1)
     cycles = freqs / 4.0
 
     # store behavioral data
@@ -219,9 +219,7 @@ def compute_tfr(
                 cond_b_name = f"low_prevcr_{tmin}_{tmax}_induced"
 
             elif study == 2:  # noqa: PLR2004
-                epochs_a = epochs[
-                    (epochs.metadata.cue == params.high_p)
-                ]
+                epochs_a = epochs[(epochs.metadata.cue == params.high_p)]
                 epochs_b = epochs[(epochs.metadata.cue == params.low_p)]
                 cond_a_name = f"high_{tmin}_{tmax}_induced"
                 cond_b_name = f"low_{tmin}_{tmax}_induced"
@@ -268,7 +266,7 @@ def compute_tfr(
         n_ave.append(n_epochs)
 
         # set tfr path
-        if (Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5")).exists():
+        if (Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}_mirror-tfr.h5")).exists():
             print("TFR already exists")
         else:
             tfr_a = mne.time_frequency.tfr_multitaper(
@@ -280,8 +278,8 @@ def compute_tfr(
             )
 
             # save tfr data
-            tfr_a.save(fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"))
-            tfr_b.save(fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}-tfr.h5"))
+            tfr_a.save(fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}_mirror-tfr.h5"))
+            tfr_b.save(fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}_mirror-tfr.h5"))
 
     # save number of epochs per participant as csv file
     pd.DataFrame(n_ave).to_csv(Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"n_ave_{cond_a_name}_{study!s}.csv"))
@@ -401,157 +399,265 @@ def load_tfr_conds(
     return tfr_a_cond, tfr_b_cond
 
 
-def plot_freq_bands_over_time(ch_index: int):
+def calc_freq_band_power_over_time(ch_name: str = 'CP4', cond: str = 'probability'):
     """
     Plot the difference in power between high and low probability conditions for the alpha and beta band.
     
     Args:
     ----
     ch_index : int, info: index of the channel to plot
+    cond : str, info: which condition to analyze: "probability" or "prev_resp"
     
     Returns:
     -------
     None
     """
-    # load the tfr data for each condition for probability conds.
-    tfr_a_cond, tfr_b_cond = load_tfr_conds(
-        studies=[1, 2],
-        cond="probability",
-        cond_a_name="high_-0.7_0_induced",
-        cond_b_name="low_-0.7_0_induced",
-        cond_a_names=["high_prevhit_-0.7_0_induced", "high_prevmiss_-0.7_0_induced", "high_prevcr_-0.7_0_induced"],
-        cond_b_names=["low_prevhit_-0.7_0_induced", "low_prevmiss_-0.7_0_induced", "low_prevcr_-0.7_0_induced"],
-    )
-
-    # load the tfr data for each condition for prev_resp conds.
-    tfr_a_cond, tfr_b_cond = load_tfr_conds(
-        studies=[1, 2],
-        cond="prev_resp",
-        cond_a_name="prevyesresp_highprob_prevstim_-0.7_0_induced",
-        cond_b_name="prevnoresp_highprob_prevstim_-0.7_0_induced",
-        cond_a_names=["prevyesresp_samecue_lowprob_-0.7_0_induced", "prevyesresp_samecue_highprob_-0.7_0_induced"],
-        cond_b_names=["prevnoresp_samecue_lowprob_-0.7_0_induced", "prevnoresp_samecue_highprob_-0.7_0_induced"],
-    )
-
-    times = tfr_a_cond[1][0].times
-
-    ch_index = tfr_a_cond[1][0].ch_names.index('CP4')
-
-    for idx in range(len(tfr_a_cond[0])):
-
-        if idx > 2:
-            break
-      
-        conditions = ['Previous_hit', 'Previous_miss', 'Pevious_correct_rejection']
-
-        # beta band
-        high_beta = [scipy.integrate.trapezoid(a[idx].data[:,12:28,:], axis=1) for a in tfr_a_cond[0]]
-        low_beta = [scipy.integrate.trapezoid(a[idx].data[:,12:28,:], axis=1) for a in tfr_b_cond[0]]
-
-        # alpha band
-        high_alpha = [scipy.integrate.trapezoid(a[idx].data[:,8:12,:], axis=1) for a in tfr_a_cond[0]]
-        low_alpha = [scipy.integrate.trapezoid(a[idx].data[:,8:12,:], axis=1) for a in tfr_b_cond[0]]
-
-        # calculate the difference for each participant
-        high_low_beta = [h - l for h, l in zip(high_beta, low_beta)]
-        high_low_alpha = [h - l for h, l in zip(high_alpha, low_alpha)]
-
-        # calculate standard error of the mean for the difference
-        high_low_beta_sem = scipy.stats.sem(np.array(high_low_beta), axis=0)
-        high_low_alpha_sem = scipy.stats.sem(np.array(high_low_alpha), axis=0)
-
-        # calculate mean difference
-        high_low_beta_mean = np.mean(np.array(high_low_beta), axis=0)
-        high_low_alpha_mean = np.mean(np.array(high_low_alpha), axis=0)
-
-        # stats
-        high_low_alpha_cp4 = np.array(high_low_alpha)[:,ch_index,:]
-
-        high_low_beta_cp4 = np.array(high_low_beta)[:,ch_index,:]
-
-        t, p_beta, h = mne.stats.permutation_t_test(high_low_beta_cp4)
-
-        sign_timepoints_beta = times[np.where(p_beta<0.05)]
-
-        print(f"Significant timepoints for beta band: {sign_timepoints_beta}")
-
-        t, p_alpha, h = mne.stats.permutation_t_test(high_low_alpha_cp4)
-
-        sign_timepoints_alpha = times[np.where(p_alpha<0.05)]
-
-        print(f"Significant timepoints for alpha band: {sign_timepoints_alpha}")
-
-        # plot the difference
-        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
-        # set figure title
-        fig.suptitle(f"Stable environment: Difference Amplitude high - low probability\n{conditions[idx]}", fontsize=16)
-
-        # plot alpha band
-        axs[0].plot(times, high_low_alpha_mean[ch_index,:], color="black", label="Alpha band")
-        axs[0].fill_between(
-            times,
-            high_low_alpha_mean[ch_index,:] - high_low_alpha_sem[ch_index,:],
-            high_low_alpha_mean[ch_index,:] + high_low_alpha_sem[ch_index,:],
-            color="black",
-            alpha=0.3,
+    if cond == "probability":
+        # load the tfr data for each condition for probability conds.
+        tfr_a_cond, tfr_b_cond = load_tfr_conds(
+            studies=[1, 2],
+            cond="proba",
+            cond_a_name="high_-0.7_0_induced",
+            cond_b_name="low_-0.7_0_induced",
+            cond_a_names=["high_prevhit_-0.7_0_induced", "high_prevmiss_-0.7_0_induced", "high_prevcr_-0.7_0_induced"],
+            cond_b_names=["low_prevhit_-0.7_0_induced", "low_prevmiss_-0.7_0_induced", "low_prevcr_-0.7_0_induced"],
         )
-             # After plotting, get the current y-axis limits
-        ymin, ymax = axs[0].get_ylim()
-
-        # if significant timepoints mark them with a horizontal line
-        if len(sign_timepoints_alpha) > 0:
-            # Get the min and max timepoints for the line span
-            min_time = min(sign_timepoints_alpha)
-            max_time = max(sign_timepoints_alpha)
-
-            # Draw a horizontal line at y = -8 spanning from min_time to max_time
-            axs[0].plot([min_time, max_time], [ymin, ymin], color="red", linestyle="--")
-        # alpha band
-        axs[0].set_title("Alpha frequency band [8-12 Hz]", fontsize=16)
-
-        # plot beta band
-        axs[1].plot(times, high_low_beta_mean[ch_index,:], color="black", label="Beta band")
-        axs[1].fill_between(
-            times,
-            high_low_beta_mean[ch_index,:] - high_low_beta_sem[ch_index,:],
-            high_low_beta_mean[ch_index,:] + high_low_beta_sem[ch_index,:],
-            color="black",
-            alpha=0.3,
+        cond_name = 'high minus low'
+    else:
+        # load the tfr data for each condition for prev_resp conds.
+        tfr_a_cond, tfr_b_cond = load_tfr_conds(
+            studies=[1, 2],
+            cond="previous yes response",
+            cond_a_name="prevyesresp_highprob_prevstim_-0.7_0_induced",
+            cond_b_name="prevnoresp_highprob_prevstim_-0.7_0_induced",
+            cond_a_names=["prevyesresp_samecue_lowprob_-0.7_0_induced", "prevyesresp_samecue_highprob_-0.7_0_induced"],
+            cond_b_names=["prevnoresp_samecue_lowprob_-0.7_0_induced", "prevnoresp_samecue_highprob_-0.7_0_induced"],
         )
+        cond_name = 'previous yes minus previous no response'
 
-        # After plotting, get the current y-axis limits
-        ymin, ymax = axs[1].get_ylim()
+    times = tfr_a_cond[1][0].copy().times
 
-        # if significant timepoints mark them with one bold horizontal line
-        # close to the x axis
-        if len(sign_timepoints_beta) > 0:
-            # Get the min and max timepoints for the line span
-            min_time = min(sign_timepoints_beta)
-            max_time = max(sign_timepoints_beta)
+    ch_index = tfr_a_cond[1][0].ch_names.index(ch_name)
 
-            # Draw a horizontal line at y = -8 spanning from min_time to max_time
-            axs[1].plot([min_time, max_time], [ymin, ymin], color="red", linestyle="--")
+    for idx, (cond_a, cond_b) in enumerate(zip(tfr_a_cond, tfr_b_cond)):
+        if idx == 1:
+
+            study = 'Volatile'
+
+            # beta band
+            high_beta = [scipy.integrate.trapezoid(a.data[:,12:28,:], axis=1) for a in tfr_a_cond[idx]]
+            low_beta = [scipy.integrate.trapezoid(a.data[:,12:28,:], axis=1) for a in tfr_b_cond[idx]]
+
+            # alpha band
+            high_alpha = [scipy.integrate.trapezoid(a.data[:,8:12,:], axis=1) for a in tfr_a_cond[idx]]
+            low_alpha = [scipy.integrate.trapezoid(a.data[:,8:12,:], axis=1) for a in tfr_b_cond[idx]]
+
+            # calculate the difference for each participant
+            high_low_beta = [h - l for h, l in zip(high_beta, low_beta)]
+            high_low_alpha = [h - l for h, l in zip(high_alpha, low_alpha)]
+
+            # calculate standard error of the mean for the difference
+            high_low_beta_sem = scipy.stats.sem(np.array(high_low_beta), axis=0)
+            high_low_alpha_sem = scipy.stats.sem(np.array(high_low_alpha), axis=0)
+
+            # calculate mean difference
+            high_low_beta_mean = np.mean(np.array(high_low_beta), axis=0)
+            high_low_alpha_mean = np.mean(np.array(high_low_alpha), axis=0)
+
+            # stats
+            high_low_alpha_cp4 = np.array(high_low_alpha)[:,ch_index,:]
+
+            high_low_beta_cp4 = np.array(high_low_beta)[:,ch_index,:]
+
+            t, p_beta, h = mne.stats.permutation_t_test(high_low_beta_cp4)
+
+            sign_timepoints_beta = times[np.where(p_beta<0.05)]
+
+            print(f"Significant timepoints for beta band: {sign_timepoints_beta}")
+
+            t, p_alpha, h = mne.stats.permutation_t_test(high_low_alpha_cp4)
+
+            sign_timepoints_alpha = times[np.where(p_alpha<0.05)]
+
+            print(f"Significant timepoints for alpha band: {sign_timepoints_alpha}")
+
+            plot_freq_band_over_time(ch_index, high_low_alpha_mean, high_low_alpha_sem, 
+                                high_low_beta_mean, high_low_beta_sem,
+                                sign_timepoints_alpha, sign_timepoints_beta, times,
+                                cond_name, study)
+
+        else:
+            conditions = ['previous hit', 'previous miss', 'previous correct rejection']
+            study = 'Stable'
+            for idx_cond in range(len(conditions)):
+
+                # beta band
+                high_beta = [scipy.integrate.trapezoid(a[idx_cond].data[:,12:28,:], axis=1) for a in tfr_a_cond[idx]]
+                low_beta = [scipy.integrate.trapezoid(a[idx_cond].data[:,12:28,:], axis=1) for a in tfr_b_cond[idx]]
+
+                # alpha band
+                high_alpha = [scipy.integrate.trapezoid(a[idx_cond].data[:,8:12,:], axis=1) for a in tfr_a_cond[idx]]
+                low_alpha = [scipy.integrate.trapezoid(a[idx_cond].data[:,8:12,:], axis=1) for a in tfr_b_cond[idx]]
+
+                # calculate the difference for each participant
+                high_low_beta = [h - l for h, l in zip(high_beta, low_beta)]
+                high_low_alpha = [h - l for h, l in zip(high_alpha, low_alpha)]
+
+                # calculate standard error of the mean for the difference
+                high_low_beta_sem = scipy.stats.sem(np.array(high_low_beta), axis=0)
+                high_low_alpha_sem = scipy.stats.sem(np.array(high_low_alpha), axis=0)
+
+                # calculate mean difference
+                high_low_beta_mean = np.mean(np.array(high_low_beta), axis=0)
+                high_low_alpha_mean = np.mean(np.array(high_low_alpha), axis=0)
+
+                # stats
+                high_low_alpha_cp4 = np.array(high_low_alpha)[:,ch_index,:]
+
+                high_low_beta_cp4 = np.array(high_low_beta)[:,ch_index,:]
+
+                t, p_beta, h = mne.stats.permutation_t_test(high_low_beta_cp4)
+
+                sign_timepoints_beta = times[np.where(p_beta<0.05)]
+
+                print(f"Significant timepoints for beta band: {sign_timepoints_beta}")
+
+                t, p_alpha, h = mne.stats.permutation_t_test(high_low_alpha_cp4)
+
+                sign_timepoints_alpha = times[np.where(p_alpha<0.05)]
+
+                print(f"Significant timepoints for alpha band: {sign_timepoints_alpha}")
+
+                plot_freq_band_over_time(ch_index, high_low_alpha_mean, high_low_alpha_sem, 
+                                            high_low_beta_mean, high_low_beta_sem,
+                                            sign_timepoints_alpha, sign_timepoints_beta, times,
+                                            cond_name, study)
         
-        # beta band
-        axs[1].set_title("Beta frequency band [15-30 Hz]", fontsize=16)
-
-        # set labels
-        axs[0].set(xlabel="Time (s)", ylabel="Power")
-        axs[1].set(xlabel="Time (s)", ylabel="Power")
-
-        # save figure as png and svg
-        for fm in ["svg", "png"]:
-            fig.savefig(
-                Path(
-                    paths.figures.manuscript.figure3,
-                    f"fig3_tfr_freqbands_over_time_{ch_index}_robust_samevminvmax_{conditions[idx]}.{fm}",
-                ),
-                dpi=300,
-                format=fm,
-            )
-        plt.show()
-
     return "Done plotting freq bands over time"
+
+
+def plot_freq_band_over_time(ch_index, high_low_alpha_mean, high_low_alpha_sem, high_low_beta_mean, 
+                                high_low_beta_sem, sign_timepoints_alpha, sign_timepoints_beta, times,
+                                cond_name, study):
+    """
+    Plot the difference in power between high and low probability conditions for the alpha and beta band.
+
+    Args:
+    ----
+    ch_index : int, info: index of the channel to plot
+    high_low_alpha_mean : np.array, info: mean power difference for alpha band
+    high_low_alpha_sem : np.array, info: standard error of the mean for alpha band
+    high_low_beta_mean : np.array, info: mean power difference for beta band
+    high_low_beta_sem : np.array, info: standard error of the mean for beta band
+    sign_timepoints_alpha : np.array, info: significant timepoints for alpha band
+    sign_timepoints_beta : np.array, info: significant timepoints for beta band
+    times : np.array, info: time points
+    cond_name : str, info: condition name
+    study : str, info: study name
+
+    Returns:
+    -------
+    None
+    """
+    # plot the difference
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
+    # set figure title
+    if study == 'volatile':
+        fig.suptitle(f"{study} environment: difference Amplitude {cond_name}", 
+                        fontsize=24, y=1.05)
+    else:
+        fig.suptitle(f"{study} environment: difference Amplitude {cond_name}\n{conditions[idx_cond]}",
+                    fontsize=24, y=1.05)
+    # plot alpha band
+    axs[0].plot(times, high_low_alpha_mean[ch_index, :], color="black", label="Alpha band")
+    axs[0].fill_between(
+        times,
+        high_low_alpha_mean[ch_index, :] - high_low_alpha_sem[ch_index, :],
+        high_low_alpha_mean[ch_index, :] + high_low_alpha_sem[ch_index, :],
+        color="black",
+        alpha=0.3,
+    )
+
+    # alpha band
+    axs[0].set_title("Alpha frequency band [8-12 Hz]", fontsize=20)
+
+    # plot beta band
+    axs[1].plot(times, high_low_beta_mean[ch_index, :], color="black", label="Beta band")
+    axs[1].fill_between(
+        times,
+        high_low_beta_mean[ch_index, :] - high_low_beta_sem[ch_index, :],
+        high_low_beta_mean[ch_index, :] + high_low_beta_sem[ch_index, :],
+        color="black",
+        alpha=0.3,
+    )
+
+    # beta band
+    axs[1].set_title("Beta frequency band [15-30 Hz]", fontsize=20)
+
+    # set labels with customized font sizes
+    axs[0].set_xlabel("Time (s)", fontsize=20)  # X-axis label font size
+    axs[0].set_ylabel("Power", fontsize=20)     # Y-axis label font size
+    axs[1].set_xlabel("Time (s)", fontsize=20)  # X-axis label font size
+    axs[1].set_ylabel("Power", fontsize=20)     # Y-axis label font size
+
+    # Set tick font sizes
+    axs[0].tick_params(axis='both', which='major', labelsize=16)  # Tick font size for both axes
+    axs[1].tick_params(axis='both', which='major', labelsize=16)  # Tick font size for both axes
+
+    # Set the same y-axis limits on both plots to make them comparable
+    # Get the current y-limits from both plots
+    alpha_ymin, alpha_ymax = axs[0].get_ylim()
+    beta_ymin, beta_ymax = axs[1].get_ylim()
+
+    # Find the global min and max for the y-axis across both plots
+    global_ymin = min(alpha_ymin, beta_ymin)
+    global_ymax = max(alpha_ymax, beta_ymax)
+
+    # Set the same y-limits for both subplots
+    axs[0].set_ylim(global_ymin, global_ymax)
+    axs[1].set_ylim(global_ymin, global_ymax)
+
+    # Set the same x-axis limits for both subplots
+    axs[0].set_xlim(-0.7, 0)
+    axs[1].set_xlim(-0.7, 0)
+
+    # if significant timepoints mark them with a horizontal line
+    if len(sign_timepoints_alpha) > 0:
+        # Get the min and max timepoints for the line span
+        min_time = min(sign_timepoints_alpha)
+        max_time = max(sign_timepoints_alpha)
+
+        # Draw a thicker horizontal line at y = global_ymin + offset spanning from min_time to max_time
+        axs[0].plot([min_time, max_time], [global_ymin, global_ymin], color="red", linestyle="--", linewidth=8)
+        
+    # if significant timepoints mark them with one bold horizontal line
+    # close to the x axis
+    if len(sign_timepoints_beta) > 0:
+        # Get the min and max timepoints for the line span
+        min_time = min(sign_timepoints_beta)
+        max_time = max(sign_timepoints_beta)
+
+        # Draw a thicker horizontal line at y = global_ymin + offset spanning from min_time to max_time
+        axs[1].plot([min_time, max_time], [global_ymin, global_ymin], color="red", linestyle="--", linewidth=8)
+
+    if study == 'volatile':
+        fig.savefig(
+            Path(
+                paths.figures.manuscript.figure3,
+                f"fig3_tfr_freqbands_over_time_{ch_index}_robust_samevminvmax_{cond_name}_{study}.svg",
+            ),
+            dpi=300,
+            format="svg",
+        )
+    else:
+        fig.savefig(
+            Path(
+                paths.figures.manuscript.figure3,
+                f"fig3_tfr_freqbands_over_time_{ch_index}_robust_samevminvmax_{conditions[idx_cond]}_{study}.svg",
+            ),
+            dpi=300,
+            format="svg",
+        )
 
 
 def plot_tfr_cluster_test_output(
