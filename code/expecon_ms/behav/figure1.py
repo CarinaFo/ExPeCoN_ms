@@ -148,7 +148,7 @@ def prepro_behavioral_data(expecon: int):
     return data
 
 
-def exclude_data(expecon: int):
+def exclude_data(expecon: int = 1):
     """
     Exclude experimental blocks from the data based on the exclusion criteria (hit rates, fa rates).
 
@@ -285,6 +285,183 @@ def calculate_mean_sdt_param_changes(expecon=1):
     print(diff_dprime.mean())
     print(diff_crit.mean())
     print(diff_congruency.mean())
+
+
+def calculate_cohens_d_and_criterion_change(expecon: int = 1, 
+                                            subject_col: str = 'ID', 
+                                            cue_col: str = 'cue', 
+                                            criterion_col: str = 'criterion', 
+                                            high_cue_value: float = 0.75, 
+                                            low_cue_value: float = 0.25,
+                                            correct_trials_only: bool = True,
+                                            sdt: bool = False):
+    """
+    Calculate Cohen's d for the difference in criterion between high and low cue conditions.
+    Also prints the number of subjects with a negative criterion change.
+
+    Parameters:
+    df (pd.DataFrame): DataFrame containing subject data.
+    subject_col (str): Column name for subjects.
+    cue_col (str): Column name for cue conditions.
+    criterion_col (str): Column name for decision criteria.
+    high_cue_value (float): Value for high cue condition.
+    low_cue_value (float): Value for low cue condition.
+
+    Returns:
+    float: Cohen's d value for the criterion difference.
+    """
+    # load cleaned dataframe
+    df_raw = exclude_data(expecon=expecon)
+
+    df = calculate_sdt_dataframe(df_raw, "isyes", "sayyes", "ID", "cue")
+
+    # Get unique subjects
+    subjects = df[subject_col].unique()
+    
+    # Initialize lists to store criteria
+    high_criteria = []
+    low_criteria = []
+    
+    # Iterate over each subject to get their criteria for high and low cues
+    for subject in subjects:
+        high_criterion = df[(df[subject_col] == subject) & (df[cue_col] == high_cue_value)][criterion_col]
+        low_criterion = df[(df[subject_col] == subject) & (df[cue_col] == low_cue_value)][criterion_col]
+        
+        if not high_criterion.empty and not low_criterion.empty:
+            high_criteria.append(high_criterion.values[0])
+            low_criteria.append(low_criterion.values[0])
+
+    # Calculate differences in criterion
+    differences = np.array(high_criteria) - np.array(low_criteria)
+
+    # Count the number of subjects with negative criterion change
+    negative_criterion_change_count = np.sum(differences < 0)
+    print(f"Number of subjects with higher {criterion_col} in low probability condition: {negative_criterion_change_count}/{len(subjects)}")
+
+    # Calculate Cohen's d
+    mean_diff = np.mean(differences)
+    std_diff = np.std(differences, ddof=1)
+    n = len(differences)
+
+    if std_diff == 0:
+        return float('nan')  # Avoid division by zero if standard deviation is zero
+
+    cohens_d = mean_diff / std_diff
+
+    print(f"Cohen's d {criterion_col}: {cohens_d}")
+    print(f'mean difference in {criterion_col}: {mean_diff}')
+
+    # calculate the effect size for the difference in mean confidence between congruent and incongruent conditions
+    if sdt:
+        return cohens_d, mean_diff
+    else:
+        # Filter for correct trials only
+        df = df_raw[df_raw.correct == 1]
+        # calculate mean confidence for each participant and congruency condition
+        data_grouped = df.groupby([subject_col, 'congruency'])['conf'].mean()
+        con_condition = data_grouped.unstack()[True].reset_index()
+        incon_condition = data_grouped.unstack()[False].reset_index()
+
+        diff_congruency = con_condition[True] - incon_condition[False]
+     
+        # calculate Cohens d for the difference in confidence between congruent and incongruent conditions
+        mean_diff = diff_congruency.mean()
+        std_diff = diff_congruency.std(ddof=1)
+        n = len(diff_congruency)
+
+        if std_diff == 0:
+            return float('nan')
+        
+        cohens_d = mean_diff / std_diff
+
+        print(f"Cohen's d congruency: {cohens_d}")
+        print(f'mean difference in congruency: {mean_diff}')
+
+        # print for how many participants the confidence is higher in the congruent condition
+        print(f"Number of subjects with higher confidence in congruent condition: {np.sum(diff_congruency > 0)}/{len(subjects)}")
+    
+    return cohens_d, mean_diff
+
+
+def calculate_response_bias(expecon: int = 1, subject_col: str = 'ID', cue_col: str = 'cue', response_col: str = 'sayyes'):
+    """
+    Calculate the response bias for each subject in the dataset.
+
+    Parameters:
+    df (pd.DataFrame): DataFrame containing subject data.
+    subject_col (str): Column name for subjects.
+    cue_col (str): Column name for cue conditions.
+    response_col (str): Column name for responses.
+
+    Returns:
+    list: List of response biases for each subject.
+    """
+    # load cleaned dataframe
+    df = exclude_data(expecon=expecon)
+
+    # add column with response repetition
+    df['response_repeat'] = df['prevresp'] == df[response_col]
+
+    response_biases = df.groupby([subject_col])['response_repeat'].mean().reset_index()
+
+    # how many participants tend to repeat their previous response
+    print(f"Number of subjects with a response bias < .05: {np.sum(np.array(response_biases) < 0.5)}")
+    # is the response bias signficantly different from 0.5
+    t, p = stats.ttest_1samp(response_biases, 0.5)
+    print(f"t-value: {t}")
+    print(f"p-value: {p}")
+
+    print(f"Mean response bias: {np.mean(response_biases)}")
+    
+    # now we want to check if their is a difference in bias between low and high previous confidence
+    response_bias = df.groupby([subject_col, 'prevconf'])['response_repeat'].mean().reset_index()
+
+    # check if the response bias is significantly different between the previous confidence conditions
+    t, p = stats.ttest_rel(
+        response_bias[response_bias['prevconf'] == 0].response_repeat,
+        response_bias[response_bias['prevconf'] == 1].response_repeat,
+    )
+
+    print(f"t-value: {t}")
+    print(f"p-value: {p}")
+
+    # print mean response bias for each previous confidence condition
+    print(response_bias.groupby('prevconf')['response_repeat'].mean())
+
+    # is the bias significantly different from 0.5 for confident and unconfident trials
+    t, p = stats.ttest_1samp(response_bias[response_bias['prevconf'] == 0].response_repeat, 0.5)
+    print(f"t-value: {t}")
+    print(f"p-value: {p}")
+
+    t, p = stats.ttest_1samp(response_bias[response_bias['prevconf'] == 1].response_repeat, 0.5)
+    print(f"t-value: {t}")
+    print(f"p-value: {p}")
+
+    # calculate only for previous confident trials
+
+    # calculate previous response bias for each subject and each cue condition
+    response_bias = df.groupby([subject_col, cue_col, 'prevconf'])['response_repeat'].mean().reset_index()
+
+    # check if the response bias is significantly different between the cue conditions for previous confident trials
+    t, p = stats.ttest_rel(
+        response_bias[(response_bias['prevconf'] == 1) & (response_bias[cue_col] == 0.25)].response_repeat,
+        response_bias[(response_bias['prevconf'] == 1) & (response_bias[cue_col] == 0.75)].response_repeat,
+    )
+
+    print(f"p-value confident: {p}")
+
+    # same for previous unconfident trials
+    t, p = stats.ttest_rel(
+        response_bias[(response_bias['prevconf'] == 0) & (response_bias[cue_col] == 0.25)].response_repeat,
+        response_bias[(response_bias['prevconf'] == 0) & (response_bias[cue_col] == 0.75)].response_repeat,
+    )
+
+    print(f"p-value unconfident: {p}")
+
+    # print mean response bias for each cue condition and previous confidence condition
+    print(response_bias.groupby([cue_col, 'prevconf'])['response_repeat'].mean())
+
+
 
 
 def plot_mean_response_and_confidence(
@@ -1290,10 +1467,10 @@ def calculate_sdt_dataframe(df_study, signal_col, response_col, subject_col, con
         for condition in conditions:
             subset = df_study[(df_study[subject_col] == subject) & (df_study[condition_col] == condition)]
 
-            detect_hits = subset[(subset[signal_col] is True) & (subset[response_col] is True)].shape[0]
-            detect_misses = subset[(subset[signal_col] is True) & (subset[response_col] is False)].shape[0]
-            false_alarms = subset[(subset[signal_col] is False) & (subset[response_col] is True)].shape[0]
-            correct_rejections = subset[(subset[signal_col] is False) & (subset[response_col] is False)].shape[0]
+            detect_hits = subset[(subset[signal_col] == True) & (subset[response_col] == True)].shape[0]
+            detect_misses = subset[(subset[signal_col] == True) & (subset[response_col] == False)].shape[0]
+            false_alarms = subset[(subset[signal_col] == False) & (subset[response_col] == True)].shape[0]
+            correct_rejections = subset[(subset[signal_col] == False) & (subset[response_col] == False)].shape[0]
 
             # log linear correction (Hautus, 1995)
             hit_rate = (detect_hits + 0.5) / (detect_hits + detect_misses + 1)
