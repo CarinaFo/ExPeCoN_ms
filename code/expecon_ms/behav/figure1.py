@@ -461,7 +461,41 @@ def calculate_response_bias(expecon: int = 1, subject_col: str = 'ID', cue_col: 
     # print mean response bias for each cue condition and previous confidence condition
     print(response_bias.groupby([cue_col, 'prevconf'])['response_repeat'].mean())
 
+    # calculate lag 1 autocorrelation for each participant
+    autocorr_resp = df.groupby([subject_col])[response_col].apply(lambda x: x.autocorr(lag=1)).reset_index()
+    autocorr_stim = df.groupby([subject_col])['isyes'].apply(lambda x: x.autocorr(lag=1)).reset_index()
+    
+    # how many participants have show a negative autocorrelation
+    print(f"Number of subjects with a negative autocorrelation: {np.sum(np.array(autocorr_resp) < 0)}")
 
+    # print mean autocorrelation
+    print(f"Mean autocorrelation: {autocorr_resp[response_col].mean()}")
+    # is the autocorrelation significantly different from 0
+    t, p = stats.ttest_1samp(autocorr_resp[response_col], 0)
+    print(f"t-value: {t}")
+    print(f"p-value: {p}")
+
+    # same for stimulus
+    print(f"Mean autocorrelation: {autocorr_stim['isyes'].mean()}")
+    t, p = stats.ttest_1samp(autocorr_stim['isyes'], 0)
+    print(f"t-value: {t}")
+    print(f"p-value: {p}")
+
+    # plot a histogram of the autocorrelation
+    plt.hist(autocorr_resp[response_col], bins=20)
+    plt.xlabel("Mean autocorrelation response")
+    plt.ylabel("Frequency")
+    plt.title(f'Study {expecon}')
+    plt.show()
+
+    # plot a histogram of the autocorrelation for the stimulus
+    plt.hist(autocorr_stim['isyes'], bins=20)
+    plt.xlabel("Mean autocorrelation stimulus")
+    plt.ylabel("Frequency")
+    plt.title(f'Study {expecon}')
+    plt.show()
+
+    return autocorr_resp, autocorr_stim
 
 
 def plot_mean_response_and_confidence(

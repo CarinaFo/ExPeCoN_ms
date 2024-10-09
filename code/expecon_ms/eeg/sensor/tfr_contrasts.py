@@ -261,18 +261,18 @@ def compute_tfr(
                 (
                     (epochs.metadata.sayyes == 1)
                     & (epochs.metadata.isyes == 1)
-                    & (epochs.metadata.cue == params.high_p)
+                    #& (epochs.metadata.cue == params.low_p)
                 )
             ]
             epochs_b = epochs[
                 (
                     (epochs.metadata.sayyes == 0)
                     & (epochs.metadata.isyes == 1)
-                    & (epochs.metadata.cue == params.high_p)
+                    #& (epochs.metadata.cue == params.low_p)
                 )
             ]
-            cond_a_name = f"hit_highprob_{tmin}_{tmax}_induced"
-            cond_b_name = f"miss_highprob_{tmin}_{tmax}_induced"
+            cond_a_name = f"hit_{tmin}_{tmax}_induced"
+            cond_b_name = f"miss_{tmin}_{tmax}_induced"
         else:
             raise ValueError("input should be 'probability' or 'prev_resp' or 'hitmiss'")
 
@@ -305,8 +305,10 @@ def compute_tfr(
 
 
 def load_tfr_conds(
-    studies: list = [1, 2], cond: str = 'hitmiss', cond_a_name: str = "hit_highprob_-0.7_0_induced", 
-                cond_b_name: str = "miss_highprob_-0.7_0_induced", cond_a_names: list = None, cond_b_names: list = None
+    studies: list = [1, 2], cond: str = 'hitmiss', 
+    cond_a_name: str = "hit_lowprob_-0.7_0_induced", 
+    cond_b_name: str = "miss_lowprob_-0.7_0_induced", 
+    cond_a_names: list = None, cond_b_names: list = None
 ):
     """
     Load tfr data for the two conditions.
@@ -417,11 +419,11 @@ def load_tfr_conds(
                         continue
                     # load tfr data
                     tfr_a = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}_mirror-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"),
                         condition=0,
                     )
                     tfr_b = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}_mirror-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}-tfr.h5"),
                         condition=0,
                     )
                     tfr_a_all.append(tfr_a)
@@ -430,11 +432,11 @@ def load_tfr_conds(
                 for subj in id_list:
                     # load tfr data
                     tfr_a = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}_mirror-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"),
                         condition=0,
                     )
                     tfr_b = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}_mirror-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}-tfr.h5"),
                         condition=0,
                     )
                     tfr_a_all.append(tfr_a)
