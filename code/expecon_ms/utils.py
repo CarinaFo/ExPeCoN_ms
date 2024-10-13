@@ -18,45 +18,74 @@ from scipy.stats import pearsonr
 
 from expecon_ms.configs import PROJECT_ROOT, config, params, paths
 
-def zero_pad_or_mirror_data(data, zero_pad: bool):
-    """
-    Zero-pad or mirror data on both sides to avoid edge artifacts.
 
+def zero_pad_or_mirror_epochs(epochs, zero_pad: bool, pad_length: int = 100):
+    """
+    Zero-pad or mirror an MNE.Epochs object on both sides to avoid edge artifacts.
+    
     Args:
     ----
-    data: data array with the structure epochs x channels x time
-    zero_pad: boolean, info: whether to zero pad or mirror the data
+    epochs: mne.Epochs
+        The input MNE Epochs object to be padded or mirrored.
+    zero_pad: bool
+        If True, zero-pad the data. If False, mirror the data.
+    pad_length: int, optional
+        Number of time points to pad (default is 100).
 
     Returns:
     -------
-    array with mirrored data on both ends = data.shape[2]
-
+    padded_epochs: mne.EpochsArray
+        The padded or mirrored MNE.EpochsArray object with adjusted time dimensions.
     """
+    data = epochs.get_data()  # Extract the data from the epochs object
+    n_epochs, n_channels, n_times = data.shape
+    sfreq = epochs.info['sfreq']  # Get the sampling frequency
+    times = epochs.times  # Original time array
+    # save metadata
+    metadata = epochs.metadata
+
+    # Initialize list to collect padded/mirrored data
+    padded_list = []
+
     if zero_pad:
-        padded_list = []
+        # Create a zero-padding array with shape (pad_length,)
+        zero_pad_array = np.zeros(pad_length)
 
-        zero_pad = np.zeros(data.shape[2])
-        # loop over epochs
-        for epoch in range(data.shape[0]):
+        # Loop over epochs and channels to zero-pad the data
+        for epoch in range(n_epochs):
             ch_list = []
-            # loop over channels
-            for ch in range(data.shape[1]):
-                # zero padded data at beginning and end
-                ch_list.append(np.concatenate([zero_pad, data[epoch][ch], zero_pad]))
-            padded_list.append(list(ch_list))
+            for ch in range(n_channels):
+                # Zero pad at beginning and end
+                ch_list.append(np.concatenate([zero_pad_array, data[epoch][ch], zero_pad_array]))
+            padded_list.append(ch_list)
+
     else:
-        padded_list = []
-
-        # loop over epochs
-        for epoch in range(data.shape[0]):
+        # Mirror data at the edges with a length equal to `pad_length`
+        for epoch in range(n_epochs):
             ch_list = []
-            # loop over channels
-            for ch in range(data.shape[1]):
-                # mirror data at beginning and end
-                ch_list.append(np.concatenate([data[epoch][ch][::-1], data[epoch][ch], data[epoch][ch][::-1]]))
-            padded_list.append(list(ch_list))
+            for ch in range(n_channels):
+                # Mirror pad at the beginning and end using `pad_length`
+                ch_list.append(np.concatenate([
+                    data[epoch][ch][:pad_length][::-1],  # Mirror the first `pad_length` points
+                    data[epoch][ch],  # Original data
+                    data[epoch][ch][-pad_length:][::-1]  # Mirror the last `pad_length` points
+                ]))
+            padded_list.append(ch_list)
 
-    return np.squeeze(np.array(padded_list))
+    # Convert the list back to a numpy array with the correct shape
+    padded_data = np.array(padded_list)
+
+    # Adjust the time array to match the new data length
+    time_step = times[1] - times[0]  # Time step based on sampling frequency
+    new_times = np.arange(times[0] - pad_length * time_step, times[-1] + pad_length * time_step, time_step)
+
+    # Create a new MNE EpochsArray with the padded/mirrored data
+    padded_epochs = mne.EpochsArray(padded_data, epochs.info, tmin=new_times[0], events=epochs.events, event_id=epochs.event_id)
+
+    # Add metadata back to the epochs object
+    padded_epochs.metadata = metadata
+    
+    return padded_epochs
 
 
 def drop_trials(data=None):
