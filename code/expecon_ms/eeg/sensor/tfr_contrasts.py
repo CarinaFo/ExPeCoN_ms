@@ -255,18 +255,18 @@ def compute_tfr(
                 (
                     (epochs.metadata.sayyes == 1)
                     & (epochs.metadata.isyes == 1)
-                    #& (epochs.metadata.cue == params.low_p)
+                    & (epochs.metadata.cue == params.high_p)
                 )
             ]
             epochs_b = epochs[
                 (
                     (epochs.metadata.sayyes == 0)
                     & (epochs.metadata.isyes == 1)
-                    #& (epochs.metadata.cue == params.low_p)
+                    & (epochs.metadata.cue == params.high_p)
                 )
             ]
-            cond_a_name = f"hit_{tmin}_{tmax}_induced"
-            cond_b_name = f"miss_{tmin}_{tmax}_induced"
+            cond_a_name = f"hit_high_prob_{tmin}_{tmax}_induced"
+            cond_b_name = f"miss_high_prob_{tmin}_{tmax}_induced"
         else:
             raise ValueError("input should be 'probability' or 'prev_resp' or 'hitmiss'")
 
@@ -304,11 +304,11 @@ def compute_tfr(
 
 
 def load_tfr_conds(
-    studies: list = [1, 2], cond: str = 'probability', 
-    cond_a_name: str = "high_-1_1_induced", 
-    cond_b_name: str = "low_-1_1_induced", 
-    cond_a_names: list = ['high_prevmiss_-1_1_induced', 'high_prevhit_-1_1_induced', 'high_prevcr_-1_1_induced'],
-     cond_b_names: list = ['low_prevmiss_-1_1_induced', 'low_prevhit_-1_1_induced', 'low_prevcr_-1_1_induced']
+    studies: list = [1, 2], cond: str = 'hitmiss', 
+    cond_a_name: str = "hit_high_prob_-0.7_0_induced", 
+    cond_b_name: str = "miss_high_prob_-0.7_0_induced", 
+    cond_a_names: list = [],
+    cond_b_names: list = []
 ):
     """
     Load tfr data for the two conditions.
@@ -432,11 +432,11 @@ def load_tfr_conds(
                 for subj in id_list:
                     # load tfr data
                     tfr_a = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}_mirror-tfr.h5"),
                         condition=0,
                     )
                     tfr_b = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}_mirror-tfr.h5"),
                         condition=0,
                     )
                     tfr_a_all.append(tfr_a)
@@ -843,12 +843,12 @@ def plot_freq_band_over_time(ch_name, alpha_high, alpha_low, beta_high, beta_low
 
 
 def plot_tfr_cluster_test_output(
-    cond: str = 'hitmiss',
+    cond: str = 'hitmiss_highprob',
     threed_test: bool = False,
     cond_a_name: str = 'hit',
     cond_b_name: str = 'miss',
     channel_names: list = ['CP4'],
-    tmin: float = -0.5,
+    tmin: float = -0.7,
     tmax: float = 0,
 ):
     """
@@ -876,7 +876,7 @@ def plot_tfr_cluster_test_output(
     None
 
     """
-    tfr_a_cond, tfr_b_cond, cond = load_tfr_conds()
+    tfr_a_cond, tfr_b_cond, _ = load_tfr_conds()
 
     # Create a 2x3 grid of plots (2 rows, 3 columns)
     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
@@ -1062,7 +1062,7 @@ def plot_tfr_cluster_test_output(
         fig.savefig(
             Path(
                 paths.figures.manuscript.figure3,
-                f"fig3_tfr_{cond_a_name}_{cond_b_name}_{tmin}_{tmax}_{channel_names[0]}.{fm}",
+                f"fig3_tfr_{cond}_{tmin}_{tmax}_{channel_names[0]}.{fm}",
             ),
             dpi=300,
             format=fm,
