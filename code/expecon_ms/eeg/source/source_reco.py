@@ -34,7 +34,7 @@ import scipy
 from mne.datasets import fetch_fsaverage
 
 from expecon_ms.configs import PROJECT_ROOT, config, params, paths
-from expecon_ms.utils import zero_pad_or_mirror_data
+from expecon_ms.utils import zero_pad_or_mirror_epochs, drop_trials
 
 warnings.filterwarnings("ignore")
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -280,21 +280,14 @@ def run_source_reco(
         if subtract_evokeds:
             epochs = epochs.subtract_evoked()
 
-        # avoid leakage and edge artifacts by zero-padding or mirroring the data
-        # on both ends
+        # avoid leakage and edge artifacts by mirroring the data on both ends (for simulations see)
         if mirror:
-            metadata = epochs.metadata
-
-            epoch_data = epochs.crop(tmin, tmax).get_data()
-
-            # zero pad = False = mirror the data on both ends
-            data_mirror = zero_pad_or_mirror_data(epoch_data, zero_pad=False)
-
-            # put back into the epoch structure
-            epochs = mne.EpochsArray(data_mirror, epochs.info, tmin=tmin * 2)
-
-            # add metadata back
-            epochs.metadata = metadata
+     
+            # if zero pad = False = mirror the data on both ends
+            padded_epochs = zero_pad_or_mirror_epochs(epochs, zero_pad=False, pad_length=100)
+            
+            # store the mirrored epochs
+            epochs = padded_epochs
 
         if cond == "probability":
             if study == 1:
@@ -302,35 +295,25 @@ def run_source_reco(
                 epochs_a = epochs[
                     (
                         (epochs.metadata.cue == params.high_p)
-                        & (epochs.metadata.previsyes == 0)
+                        & (epochs.metadata.previsyes == 1)
                         & (epochs.metadata.prevresp == 0)
                     )
                 ]
                 epochs_b = epochs[
                     (
                         (epochs.metadata.cue == params.low_p)
-                        & (epochs.metadata.previsyes == 0)
+                        & (epochs.metadata.previsyes == 1)
                         & (epochs.metadata.prevresp == 0)
                     )
                 ]
-                cond_a_name = f"high_prevcr_induced"
-                cond_b_name = f"low_prevcr_induced"
-
-                if mirror:
-                    cond_a_name = f"high_prevcr_induced_mirrored"
-                    cond_b_name = f"low_prevcr_induced_mirrored"
+                cond_a_name = f"high_prevmiss"
+                cond_b_name = f"low_prevmiss"
 
             elif study == 2:  # noqa: PLR2004
-                epochs_a = epochs[
-                    (epochs.metadata.cue == params.high_p)
-                ]
+                epochs_a = epochs[(epochs.metadata.cue == params.high_p)]
                 epochs_b = epochs[(epochs.metadata.cue == params.low_p)]
-                cond_a_name = f"high_induced"
-                cond_b_name = f"low_induced"
-
-                if mirror:
-                    cond_a_name = f"high_induced_mirrored"
-                    cond_b_name = f"low_induced_mirrored"
+                cond_a_name = f"high"
+                cond_b_name = f"low"
 
         elif cond == "prev_resp":
             if study == 1:
@@ -348,39 +331,46 @@ def run_source_reco(
                         & (epochs.metadata.cue == params.high_p)
                     )
                 ]
-                cond_a_name = f"prevyesresp_highprob_prevstim_induced"
-                cond_b_name = f"prevnoresp_highprob_prevstim_induced"
-
-                if mirror:
-                    cond_a_name = f"prevyesresp_highprob_prevstim_induced_mirrored"
-                    cond_b_name = f"prevnoresp_highprob_prevstim_induced_mirrored"
-
+                cond_a_name = f"prevyesresp_highprob_prevstim"
+                cond_b_name = f"prevnoresp_highprob_prevstim"
             elif study == 2:
                 epochs_a = epochs[
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == params.low_p))
+                     (epochs.metadata.cue == params.high_p))
                 ]
 
                 epochs_b = epochs[
                     ((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == params.low_p))
+                     (epochs.metadata.cue == params.high_p))
 
                 ]
 
-                cond_a_name = f"prevyesresp_samecue_lowprob_induced"
-                cond_b_name = f"prevnoresp_samecue_lowprob_induced"
-
-                if mirror:
-                    cond_a_name = f"prevyesresp_samecue_lowprob_induced_mirrored"
-                    cond_b_name = f"prevnoresp_samecue_lowprob_induced_mirrored"
-
+                cond_a_name = f"prevyesresp_samecue_highprob"
+                cond_b_name = f"prevnoresp_samecue_highprob"
+        elif cond == "hitmiss":
+            epochs_a = epochs[
+                (
+                    (epochs.metadata.sayyes == 1)
+                    & (epochs.metadata.isyes == 1)
+                    & (epochs.metadata.cue == params.high_p)
+                )
+            ]
+            epochs_b = epochs[
+                (
+                    (epochs.metadata.sayyes == 0)
+                    & (epochs.metadata.isyes == 1)
+                    & (epochs.metadata.cue == params.high_p)
+                )
+            ]
+            cond_a_name = f"hit_high_prob"
+            cond_b_name = f"miss_high_prob"
         elif cond == "control":
                 epochs_a = epochs[(epochs.metadata.isyes == 1)]
                 epochs_b = epochs[(epochs.metadata.isyes == 0)]
-                cond_a_name = f"stimulus"
+                cond_a_name = f"signal"
                 cond_b_name = f"noise"
         else:
-                raise ValueError("input should be 'probability' or 'prev_resp' or 'control'")
+                raise ValueError("input should be 'probability' or 'prev_resp' or 'control' or 'hitmiss'")
 
         # make sure we have an equal number of trials in both conditions
         mne.epochs.equalize_epoch_counts([epochs_a, epochs_b])
@@ -419,8 +409,12 @@ def run_source_reco(
             source_power_a, freqs = mne.beamformer.apply_dics_csd(csd_a, filters)
             source_power_b, freqs = mne.beamformer.apply_dics_csd(csd_b, filters)
 
-            source_power_a.save(Path(save_path, f"{cond_a_name}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}"))
-            source_power_b.save(Path(save_path, f"{cond_b_name}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}"))
+            # Define the suffix based on whether mirroring was applied
+            suffix_mirror = "_mirror" if mirror else ""
+            suffix_induced = "_induced" if subtract_evokeds else ""
+
+            source_power_a.save(Path(save_path, f"{cond_a_name}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}_{suffix_mirror}{suffix_induced}"))
+            source_power_b.save(Path(save_path, f"{cond_b_name}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}_{suffix_mirror}{suffix_induced}"))
 
         else:
             # average epochs for MNE
@@ -640,8 +634,8 @@ def run_source_reco_per_trial(study: int, fmin: int, fmax: int, tmin: int, tmax:
     return source_power_allsubs_prob, source_power_allsubs_prevresp
 
 
-def create_source_contrast_array(study: int, cond_a: str, cond_b: str, tmin=-0.3, tmax=0, 
-                                    fmin=15, fmax=25,
+def create_source_contrast_array(study: int, cond_a: str, cond_b: str, tmin=-0.3, tmax=-0.125, 
+                                    fmin=15, fmax=30, mirror: bool = False, subtract_evokeds: bool = True,
                                     method: str = 'beamformer'):
     """
     Load source estimates per participant.
@@ -673,14 +667,18 @@ def create_source_contrast_array(study: int, cond_a: str, cond_b: str, tmin=-0.3
         Path(paths.data.eeg.source.beamformer) if method == "beamformer" else Path(paths.data.eeg.source.mne)
     )
 
+    # Define the suffix based on whether mirroring was applied
+    suffix_mirror = "_mirror" if mirror else ""
+    suffix_induced = "_induced" if subtract_evokeds else ""
+
     stc_all = []
     # loop over participants
     for subj in id_list:
         if (study == 2) and (subj == "013"):  # noqa: PLR2004
             continue
         # load source estimates
-        stc_high = mne.read_source_estimate(path_to_source / f"{cond_a}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}")
-        stc_low = mne.read_source_estimate(path_to_source / f"{cond_b}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}")
+        stc_high = mne.read_source_estimate(path_to_source / f"{cond_a}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}_{suffix_mirror}{suffix_induced}")
+        stc_low = mne.read_source_estimate(path_to_source / f"{cond_b}_{subj}_{study}_{tmin}_{tmax}_{fmin}_{fmax}_{suffix_mirror}{suffix_induced}")
         # compute difference between conditions
         stc_diff = stc_high.data - stc_low.data
         # append to list
@@ -726,8 +724,8 @@ def plot_grand_average_source_contrast(study: int, cond: str, method: str = 'bea
             stc_array = np.mean(stc_array_conds, axis=0)
 
         elif (study == 2):  # noqa: PLR2004
-            stc_array = create_source_contrast_array(study=study, cond_a=f"high_-0.3_0_induced", 
-                                                    cond_b=f"low_-0.3_0_induced", method=method)
+            stc_array = create_source_contrast_array(study=study, cond_a=f"high", 
+                                                    cond_b=f"low", method=method)
     # previous response contrast
     elif cond == "prev_resp":
         if study == 1:
@@ -997,88 +995,7 @@ def plot_source_space_electrodes_alignment():
     )
 
 
-def drop_trials(data=None):
-    """
-    Drop trials based on behavioral data.
-
-    Args:
-    ----
-    data: mne.Epochs, epoched data
-
-    Returns:
-    -------
-    data: mne.Epochs, epoched data
-
-    """
-    # store number of trials before rt cleaning
-    before_rt_cleaning = len(data.metadata)
-
-    # remove no response trials or super fast responses
-    data = data[data.metadata.respt1 != params.behavioral_cleaning.rt_max]
-    data = data[data.metadata.respt1 > params.behavioral_cleaning.rt_min]
-
-    # print rt trials dropped
-    rt_trials_removed = before_rt_cleaning - len(data.metadata)
-
-    print("Removed trials based on reaction time: ", rt_trials_removed)
-    # Calculate hit rates per participant
-    signal = data[data.metadata.isyes == 1]
-    hit_rate_per_subject = signal.metadata.groupby(["ID"])["sayyes"].mean()
-
-    print(f"Mean hit rate: {np.mean(hit_rate_per_subject):.2f}")
-
-    # Calculate hit rates by participant and block
-    hit_rate_per_block = signal.metadata.groupby(["ID", "block"])["sayyes"].mean()
-
-    # remove blocks with hit-rates > 90 % or < 20 %
-    filtered_groups = hit_rate_per_block[
-        (hit_rate_per_block > params.behavioral_cleaning.hitrate_max)
-        | (hit_rate_per_block < params.behavioral_cleaning.hitrate_min)
-    ]
-    print("Blocks with hit rates > 0.9 or < 0.2: ", len(filtered_groups))
-
-    # Extract the ID and block information from the filtered groups
-    remove_hit_rates = filtered_groups.reset_index()
-
-    # Calculate false alarm rates by participant and block
-    noise = data[data.metadata.isyes == 0]
-    fa_rate_per_block = noise.metadata.groupby(["ID", "block"])["sayyes"].mean()
-
-    # remove blocks with false alarm rates > 0.4
-    filtered_groups = fa_rate_per_block[fa_rate_per_block > params.behavioral_cleaning.farate_max]
-    print("Blocks with false alarm rates > 0.4: ", len(filtered_groups))
-
-    # Extract the ID and block information from the filtered groups
-    remove_fa_rates = filtered_groups.reset_index()
-
-    # Hit-rate should be > the false alarm rate
-    filtered_groups = hit_rate_per_block[
-        hit_rate_per_block - fa_rate_per_block < params.behavioral_cleaning.hit_fa_diff
-    ]
-    print("Blocks with hit rates < false alarm rates: ", len(filtered_groups))
-
-    # Extract the ID and block information from the filtered groups
-    hit_vs_fa_rate = filtered_groups.reset_index()
-
-    # Concatenate the dataframes
-    combined_df = pd.concat([remove_hit_rates, remove_fa_rates, hit_vs_fa_rate])
-
-    # Remove duplicate rows based on 'ID' and 'block' columns
-    unique_df = combined_df.drop_duplicates(subset=["ID", "block"])
-
-    # Merge the big dataframe with unique_df to retain only the non-matching rows
-    data.metadata = data.metadata.merge(unique_df, on=["ID", "block"], how="left", indicator=True, suffixes=("", "_y"))
-
-    data = data[data.metadata["_merge"] == "left_only"]
-
-    # Remove the '_merge' column
-    data.metadata = data.metadata.drop("_merge", axis=1)
-
-    return data
-
-
 # Unused functions
-
 
 def extract_time_course_from_label(stc: np.ndarray, src: mne.SourceSpaces):
     """
