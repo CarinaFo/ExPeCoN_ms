@@ -176,7 +176,7 @@ def compute_tfr(
         if laplace:
             epochs = mne.preprocessing.compute_current_source_density(epochs)
 
-        # avoid leakage and edge artifacts by zero padding the data
+        # avoid leakage and edge artifacts by mirroring the data on both ends (for simulations see)
         if mirror:
      
             # if zero pad = False = mirror the data on both ends
@@ -198,25 +198,25 @@ def compute_tfr(
                 epochs_a = epochs[
                     (
                         (epochs.metadata.cue == params.high_p)
-                        & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.prevresp == 0)
+                        & (epochs.metadata.previsyes == 0)
+                        & (epochs.metadata.prevresp == 1)
                     )
                 ]
                 epochs_b = epochs[
                     (
                         (epochs.metadata.cue == params.low_p)
-                        & (epochs.metadata.previsyes == 1)
-                        & (epochs.metadata.prevresp == 0)
+                        & (epochs.metadata.previsyes == 0)
+                        & (epochs.metadata.prevresp == 1)
                     )
                 ]
-                cond_a_name = f"high_prevmiss_{tmin}_{tmax}_induced"
-                cond_b_name = f"low_prevmiss_{tmin}_{tmax}_induced"
+                cond_a_name = f"high_prevfa"
+                cond_b_name = f"low_prevfa"
 
             elif study == 2:  # noqa: PLR2004
                 epochs_a = epochs[(epochs.metadata.cue == params.high_p)]
                 epochs_b = epochs[(epochs.metadata.cue == params.low_p)]
-                cond_a_name = f"high_{tmin}_{tmax}_induced"
-                cond_b_name = f"low_{tmin}_{tmax}_induced"
+                cond_a_name = f"high"
+                cond_b_name = f"low"
 
         elif cond == "prev_resp":
             if study == 1:
@@ -234,22 +234,22 @@ def compute_tfr(
                         & (epochs.metadata.cue == params.high_p)
                     )
                 ]
-                cond_a_name = f"prevyesresp_highprob_prevstim_{tmin}_{tmax}_induced"
-                cond_b_name = f"prevnoresp_highprob_prevstim_{tmin}_{tmax}_induced"
+                cond_a_name = f"prevyesresp_highprob_prevstim"
+                cond_b_name = f"prevnoresp_highprob_prevstim"
             elif study == 2:
                 epochs_a = epochs[
                     ((epochs.metadata.prevresp == 1) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == params.high_p))
+                     (epochs.metadata.cue == params.low_p))
                 ]
 
                 epochs_b = epochs[
                     ((epochs.metadata.prevresp == 0) & (epochs.metadata.prevcue == epochs.metadata.cue) &
-                     (epochs.metadata.cue == params.high_p))
+                     (epochs.metadata.cue == params.low_p))
 
                 ]
 
-                cond_a_name = f"prevyesresp_samecue_highprob_{tmin}_{tmax}_induced"
-                cond_b_name = f"prevnoresp_samecue_highprob_{tmin}_{tmax}_induced"
+                cond_a_name = f"prevyesresp_samecue_lowprob"
+                cond_b_name = f"prevnoresp_samecue_lowprob"
         elif cond == "hitmiss":
             epochs_a = epochs[
                 (
@@ -265,8 +265,8 @@ def compute_tfr(
                     & (epochs.metadata.cue == params.high_p)
                 )
             ]
-            cond_a_name = f"hit_high_prob_{tmin}_{tmax}_induced"
-            cond_b_name = f"miss_high_prob_{tmin}_{tmax}_induced"
+            cond_a_name = f"hit_high_prob"
+            cond_b_name = f"miss_high_prob"
         else:
             raise ValueError("input should be 'probability' or 'prev_resp' or 'hitmiss'")
 
@@ -277,10 +277,11 @@ def compute_tfr(
         n_ave.append(n_epochs)
 
         # Define the suffix based on whether mirroring was applied
-        suffix = "_mirror" if mirror else ""
+        suffix_mirror = "_mirror" if mirror else ""
+        suffix_induced = "_induced" if induced else ""
 
         # set tfr path
-        if (Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}{suffix}-tfr.h5")).exists():
+        if (Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5")).exists():
             print("TFR already exists")
         else:
             tfr_a = mne.time_frequency.tfr_multitaper(
@@ -293,9 +294,9 @@ def compute_tfr(
 
             # Save TFR data with the appropriate filename (with or without "mirror" in the name)
             tfr_a.save(fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, 
-                                f"{subj}_{cond_a_name}_{study!s}{suffix}-tfr.h5"))
+                                f"{subj}_{cond_a_name}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"))
             tfr_b.save(fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, 
-                                f"{subj}_{cond_b_name}_{study!s}{suffix}-tfr.h5"))
+                                f"{subj}_{cond_b_name}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"))
 
     # save number of epochs per participant as csv file
     pd.DataFrame(n_ave).to_csv(Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"n_ave_{cond_a_name}_{study!s}.csv"))
@@ -304,11 +305,15 @@ def compute_tfr(
 
 
 def load_tfr_conds(
-    studies: list = [1, 2], cond: str = 'hitmiss', 
-    cond_a_name: str = "hit_high_prob_-0.7_0_induced", 
-    cond_b_name: str = "miss_high_prob_-0.7_0_induced", 
-    cond_a_names: list = [],
-    cond_b_names: list = []
+    studies: list = [1, 2], cond: str = 'prev_resp', 
+    cond_a_name: str = "prevyesresp_highprob_prevstim", 
+    cond_b_name: str = "prevnoresp_highprob_prevstim", 
+    cond_a_names: list = ["prevyesresp_samecue_lowprob", "prevyesresp_samecue_highprob"],
+    cond_b_names: list = ["prevnoresp_samecue_lowprob", "prevnoresp_samecue_highprob"],
+    tmin: int = -0.7, 
+    tmax: int = 0,
+    suffix_mirror: str = '_mirror', 
+    suffix_induced: str ="_induced"
 ):
     """
     Load tfr data for the two conditions.
@@ -352,11 +357,11 @@ def load_tfr_conds(
                     for c_a, c_b in zip(cond_a_names, cond_b_names):
                         # load tfr data
                         tfr_a = mne.time_frequency.read_tfrs(
-                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_a}_{study!s}-tfr.h5"),
+                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_a}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"),
                             condition=0,
                         )
                         tfr_b = mne.time_frequency.read_tfrs(
-                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_b}_{study!s}-tfr.h5"),
+                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_b}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"),
                             condition=0,
                         )
                         tfr_a_all_conds.append(tfr_a)
@@ -369,11 +374,11 @@ def load_tfr_conds(
                         continue
                     # load tfr data
                     tfr_a = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"),
                         condition=0,
                     )
                     tfr_b = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"),
                         condition=0,
                     )
                     tfr_a_all.append(tfr_a)
@@ -388,11 +393,11 @@ def load_tfr_conds(
                     for c_a, c_b in zip(cond_a_names, cond_b_names):
                         # load tfr data
                         tfr_a = mne.time_frequency.read_tfrs(
-                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_a}_{study!s}-tfr.h5"),
+                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_a}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"),
                             condition=0,
                         )
                         tfr_b = mne.time_frequency.read_tfrs(
-                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_b}_{study!s}-tfr.h5"),
+                            fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{c_b}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"),
                             condition=0,
                         )
                         tfr_a_all_conds.append(tfr_a)
@@ -403,11 +408,11 @@ def load_tfr_conds(
                 for subj in id_list:
                     # load tfr data
                     tfr_a = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"),
                         condition=0,
                     )
                     tfr_b = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{tmin}_{tmax}_{study!s}{suffix_mirror}{suffix_induced}-tfr.h5"),
                         condition=0,
                     )
                     tfr_a_all.append(tfr_a)
@@ -843,10 +848,10 @@ def plot_freq_band_over_time(ch_name, alpha_high, alpha_low, beta_high, beta_low
 
 
 def plot_tfr_cluster_test_output(
-    cond: str = 'hitmiss_highprob',
+    cond: str = 'prev_resp',
     threed_test: bool = False,
-    cond_a_name: str = 'hit',
-    cond_b_name: str = 'miss',
+    cond_a_name: str = 'previous_yes',
+    cond_b_name: str = 'previous_no',
     channel_names: list = ['CP4'],
     tmin: float = -0.7,
     tmax: float = 0,
