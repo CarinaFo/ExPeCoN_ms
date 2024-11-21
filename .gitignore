@@ -15,7 +15,6 @@ results/
 
 # Consider to ignore specific file types unique to your project
 *.fif
-*.csv
 *.png
 *.svg
 *.rda
