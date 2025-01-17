@@ -28,7 +28,7 @@ from scipy import stats
 from expecon_ms.configs import paths
 
 
-def reproduce_interaction_non_model_based(expecon: int):
+def reproduce_interaction_non_model_based():
     """
     Reproduce the interaction between stim. probability and the previous response.
 
@@ -58,7 +58,7 @@ def reproduce_interaction_non_model_based(expecon: int):
     sdt_results_long = pd.melt(
         sdt_results,
         id_vars=["ID", "prevresp", "cue", "study"],
-        value_vars=["d_prime", "criterion"],
+        value_vars=["dprime", "criterion"],
         var_name="Measure",
         value_name="Value",
     )
@@ -90,7 +90,7 @@ def reproduce_interaction_non_model_based(expecon: int):
         dodge=True,
     )
 
-    axes[0].set_title("Study 1: Criterion by Previous Response")
+    axes[0].set_title("Stable environment: \nCriterion by Previous Response")
     axes[0].set_xlabel("Previous Response")
     axes[0].set_ylabel("Criterion")
     axes[0].set_xticklabels(["No", "Yes"])
@@ -98,7 +98,7 @@ def reproduce_interaction_non_model_based(expecon: int):
     axes[0].get_legend().remove()
 
     # Plot Criterion for Study 2
-    sns.boxplot(
+    sns.boxplot(    
         x="prevresp",
         y="Value",
         hue="cue",
@@ -118,7 +118,7 @@ def reproduce_interaction_non_model_based(expecon: int):
         dodge=True,
     )
 
-    axes[1].set_title("Study 2: Criterion by Previous Response")
+    axes[1].set_title("Volatile environment: \nCriterion by Previous Response")
     axes[1].set_xlabel("Previous Response")
     axes[1].set_ylabel("Criterion")
     axes[1].set_xticklabels(["No", "Yes"])
@@ -126,45 +126,63 @@ def reproduce_interaction_non_model_based(expecon: int):
     axes[1].get_legend().remove()
 
     plt.tight_layout()
-    plt.savefig(Path(paths.figures.manuscript.figure2, f"interaction_prevresp_cue_expecon{expecon}.png"))
-    plt.savefig(Path(paths.figures.manuscript.figure2, f"interaction_prevresp_cue_expecon{expecon}.svg"))
+    plt.savefig(Path(paths.figures.manuscript.figure2, f"interaction_prevresp_cue_criterion.png"))
+    plt.savefig(Path(paths.figures.manuscript.figure2, f"interaction_prevresp_cue_criterion.svg"))
     plt.show()
 
-    # run paired t-test for the criterion between high and low cue conditions conditioned on previous response
+    # run anova for the criterion between high and low cue conditions conditioned on previous response
     # and control for multiple comparisons
-    p_all = []
+    import pingouin as pg
 
     for study in [1, 2]:
         # control for multiple comparisons
         subset = sdt_results[sdt_results["study"] == study]
-        t, p = stats.ttest_rel(
-            subset[(subset["cue"] == 0.75) & (subset["prevresp"] == 1)]["criterion"],
-            subset[(subset["cue"] == 0.25) & (subset["prevresp"] == 1)]["criterion"],
-        )
-        print(f"Study {study}: t = {t}, p = {p}")
-        p_all.append(p)
-        t, p = stats.ttest_rel(
-            subset[(subset["cue"] == 0.75) & (subset["prevresp"] == 0)]["criterion"],
-            subset[(subset["cue"] == 0.25) & (subset["prevresp"] == 0)]["criterion"],
-        )
-        print(f"Study {study}: t = {t}, p = {p}")
-        p_all.append(p)
-        t, p = stats.ttest_rel(
-            subset[(subset["cue"] == 0.75) & (subset["prevresp"] == 1)]["criterion"],
-            subset[(subset["cue"] == 0.75) & (subset["prevresp"] == 0)]["criterion"],
-        )
-        print(f"Study {study}: t = {t}, p = {p}")
-        p_all.append(p)
-        t, p = stats.ttest_rel(
-            subset[(subset["cue"] == 0.25) & (subset["prevresp"] == 1)]["criterion"],
-            subset[(subset["cue"] == 0.25) & (subset["prevresp"] == 0)]["criterion"],
-        )
-        print(f"Study {study}: t = {t}, p = {p}")
-        p_all.append(p)
+        # Run a repeated-measures ANOVA
+        anova_results = pg.rm_anova(
+                        data=subset,
+                        dv='criterion',        # Dependent variable
+                        within=['cue', 'prevresp'],  # Within-subject factors
+                        subject='ID',          # Subject identifier
+                        detailed=True          # Get detailed output
+                    )
+        print(anova_results)
 
-        _, p_corr = statsmodels.stats.multitest.fdrcorrection(p_all, alpha=0.05, method="indep", is_sorted=False)
+        # if interaction is significant, run pairwise tests
+        # Extract p-value for the interaction
+        interaction_pval = anova_results.loc[anova_results['Source'] == 'cue * prevresp', 'p-unc'].values[0]
 
-        print(np.where(p_corr > 0.05))
+        # Check significance and run specific tests
+        if interaction_pval < 0.05:
+            # Example: Compare Stim_Prob ('High' vs. 'Low') within each level of Prev_Response
+            for response in subset['prevresp'].unique():
+                subset_prev = subset[subset['prevresp'] == response]
+                posthoc_interaction = pg.pairwise_ttests(
+                    data=subset_prev, dv='criterion', within='cue', subject='ID', padjust='bonf'
+                )
+                print(f"Post hoc for Previous Response = {response}:\n", posthoc_interaction)
+
+            # Example: Compare Prev_Response ('Yes' vs. 'No') within each level of Stim_Prob
+            for prob in subset['cue'].unique():
+                subset_prob = subset[subset['cue'] == prob]
+                posthoc_interaction = pg.pairwise_ttests(
+                    data=subset_prob, dv='criterion', within='prevresp', subject='ID', padjust='bonf'
+                )
+                print(f"Post hoc for Stimulus Probability = {prob}:\n", posthoc_interaction)
+
+        else:
+
+            # Pairwise tests for Stim_Prob
+            posthoc_stim = pg.pairwise_tests(
+                data=subset, dv='criterion', within='cue', subject='ID', padjust='bonf'
+            )
+            print(posthoc_stim)
+
+            # Pairwise tests for Prev_Response
+            posthoc_prev = pg.pairwise_tests(
+                data=subset, dv='criterion', within='prevresp', subject='ID', padjust='bonf'
+            )
+            print(posthoc_prev)
+
 
     # Create a figure with 2 rows for d' and criterion
     fig, axes = plt.subplots(1, 2, figsize=(12, 10))
@@ -174,7 +192,7 @@ def reproduce_interaction_non_model_based(expecon: int):
         x="prevresp",
         y="Value",
         hue="cue",
-        data=sdt_results_long[(sdt_results_long["Measure"] == "d_prime") & (sdt_results_long["study"] == 1)],
+        data=sdt_results_long[(sdt_results_long["Measure"] == "dprime") & (sdt_results_long["study"] == 1)],
         ax=axes[0],
         showmeans=False,
         palette=colors,
@@ -183,25 +201,26 @@ def reproduce_interaction_non_model_based(expecon: int):
         x="prevresp",
         y="Value",
         hue="cue",
-        data=sdt_results_long[(sdt_results_long["Measure"] == "d_prime") & (sdt_results_long["study"] == 1)],
+        data=sdt_results_long[(sdt_results_long["Measure"] == "dprime") & (sdt_results_long["study"] == 1)],
         ax=axes[0],
         color=".25",
         alpha=0.5,
         dodge=True,
     )
 
-    axes[0].set_title("Study 1: Dprime by Previous Response")
+    axes[0].set_title("Stable environment: \nDprime by Previous Response")
     axes[0].set_xlabel("Previous Response")
+    axes[0].set_ylabel("Dprime")
     axes[0].set_xticklabels(["No", "Yes"])
-    axes[0].set_ylim(0, 3)  # Set the y-axis limits here
     axes[0].get_legend().remove()
+    axes[0].set_ylim(0, 3)  # Set the y-axis limits here
 
     # Plot Dprime for Study 2
     sns.boxplot(
         x="prevresp",
         y="Value",
         hue="cue",
-        data=sdt_results_long[(sdt_results_long["Measure"] == "d_prime") & (sdt_results_long["study"] == 2)],
+        data=sdt_results_long[(sdt_results_long["Measure"] == "dprime") & (sdt_results_long["study"] == 2)],
         ax=axes[1],
         showmeans=False,
         palette=colors,
@@ -210,22 +229,75 @@ def reproduce_interaction_non_model_based(expecon: int):
         x="prevresp",
         y="Value",
         hue="cue",
-        data=sdt_results_long[(sdt_results_long["Measure"] == "d_prime") & (sdt_results_long["study"] == 2)],
+        data=sdt_results_long[(sdt_results_long["Measure"] == "dprime") & (sdt_results_long["study"] == 2)],
         ax=axes[1],
         color=".25",
         alpha=0.5,
         dodge=True,
     )
 
-    axes[1].set_title("Study 2: Dprime by Previous Response")
+    axes[1].set_title("Volatile environment: \nDprime by Previous Response")
     axes[1].set_xlabel("Previous Response")
+    axes[1].set_ylabel("Dprime")
     axes[1].set_xticklabels(["No", "Yes"])
-    axes[1].get_legend().remove()
     axes[1].set_ylim(0, 3)  # Set the y-axis limits here
+    axes[1].get_legend().remove()
+
     plt.tight_layout()
-    plt.savefig(Path(paths.figures.manuscript.figure2, f"interaction_prevresp_cue_Dprime_expecon{expecon}.png"))
-    plt.savefig(Path(paths.figures.manuscript.figure2, f"interaction_prevresp_cue_Dprime_expecon{expecon}.svg"))
+    plt.savefig(Path(paths.figures.manuscript.figure2, f"interaction_prevresp_cue_dprime.png"))
+    plt.savefig(Path(paths.figures.manuscript.figure2, f"interaction_prevresp_cue_dprime.svg"))
     plt.show()
+
+    # now run ANOVA and post hoc tests
+
+    for study in [1, 2]:
+        # control for multiple comparisons
+        subset = sdt_results[sdt_results["study"] == study]
+        # Run a repeated-measures ANOVA
+        anova_results = pg.rm_anova(
+                        data=subset,
+                        dv='dprime',        # Dependent variable
+                        within=['cue', 'prevresp'],  # Within-subject factors
+                        subject='ID',          # Subject identifier
+                        detailed=True          # Get detailed output
+                    )
+        print(anova_results)
+
+        # if interaction is significant, run pairwise tests
+        # Extract p-value for the interaction
+        interaction_pval = anova_results.loc[anova_results['Source'] == 'cue * prevresp', 'p-unc'].values[0]
+
+        # Check significance and run specific tests
+        if interaction_pval < 0.05:
+            # Example: Compare Stim_Prob ('High' vs. 'Low') within each level of Prev_Response
+            for response in subset['prevresp'].unique():
+                subset_prev = subset[subset['prevresp'] == response]
+                posthoc_interaction = pg.pairwise_ttests(
+                    data=subset_prev, dv='dprime', within='cue', subject='ID', padjust='bonf'
+                )
+                print(f"Post hoc for Previous Response = {response}:\n", posthoc_interaction)
+
+            # Example: Compare Prev_Response ('Yes' vs. 'No') within each level of Stim_Prob
+            for prob in subset['cue'].unique():
+                subset_prob = subset[subset['cue'] == prob]
+                posthoc_interaction = pg.pairwise_ttests(
+                    data=subset_prob, dv='dprime', within='prevresp', subject='ID', padjust='bonf'
+                )
+                print(f"Post hoc for Stimulus Probability = {prob}:\n", posthoc_interaction)
+
+        else:
+
+            # Pairwise tests for Stim_Prob
+            posthoc_stim = pg.pairwise_tests(
+                data=subset, dv='dprime', within='cue', subject='ID', padjust='bonf'
+            )
+            print(posthoc_stim)
+
+            # Pairwise tests for Prev_Response
+            posthoc_prev = pg.pairwise_tests(
+                data=subset, dv='dprime', within='prevresp', subject='ID', padjust='bonf'
+            )
+            print(posthoc_prev)
 
 
 # Helper functions ###############################################
@@ -295,7 +367,7 @@ def calculate_sdt_dataframe(
         condition2_col,
         "hit_rate",
         "false_alarm_rate",
-        "d_prime",
+        "dprime",
         "criterion",
     ]
     results_df = pd.DataFrame(results, columns=columns)
