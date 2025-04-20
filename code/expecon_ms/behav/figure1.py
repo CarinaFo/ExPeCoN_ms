@@ -26,6 +26,8 @@ import seaborn as sns
 import statsmodels.api as sm
 from matplotlib import gridspec
 from scipy import stats
+import numpy as np
+from sklearn.utils import resample
 
 from expecon_ms.configs import PROJECT_ROOT, params, paths
 
@@ -379,8 +381,70 @@ def calculate_cohens_d_and_criterion_change(expecon: int = 1,
 
         # print for how many participants the confidence is higher in the congruent condition
         print(f"Number of subjects with higher confidence in congruent condition: {np.sum(diff_congruency > 0)}/{len(subjects)}")
+
+        # test for normality
+        results = test_normality(differences)
+
+    return cohens_d, mean_diff, results
+
+
+def test_normality(differences, alpha=0.05):
+    """
+    Tests for normality of input differences using statistical and visual methods.
     
-    return cohens_d, mean_diff
+    Parameters:
+    - differences: list or numpy array of paired differences.
+    - alpha: significance level for statistical tests (default 0.05).
+    
+    Returns:
+    - A dictionary summarizing test results.
+    """
+    from scipy.stats import shapiro, normaltest, kstest
+    # Convert input to numpy array if it isn't already
+    differences = np.array(differences)
+    
+    # Statistical Tests
+    shapiro_stat, shapiro_p = shapiro(differences)  # Shapiro-Wilk test
+    ks_stat, ks_p = kstest(differences, 'norm', args=(np.mean(differences), np.std(differences)))  # KS test
+    
+    # D'Agostino and Pearson's test (Normaltest)
+    try:
+        dagostino_stat, dagostino_p = normaltest(differences)
+    except ValueError:  # Handles small sample size errors
+        dagostino_stat, dagostino_p = None, None
+    
+    # Visualization
+    plt.figure(figsize=(12, 6))
+    
+    # Histogram
+    plt.subplot(1, 2, 1)
+    sns.histplot(differences, kde=True, color='skyblue', bins=10)
+    plt.title("Histogram of Differences")
+    plt.xlabel("Differences")
+    plt.ylabel("Frequency")
+    
+    # Q-Q Plot
+    plt.subplot(1, 2, 2)
+    from statsmodels.graphics.gofplots import qqplot
+    qqplot(differences, line='s', ax=plt.gca())
+    plt.title("Q-Q Plot of Differences")
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Results Summary
+    results = {
+        "Shapiro-Wilk Test": {"statistic": shapiro_stat, "p-value": shapiro_p},
+        "Kolmogorov-Smirnov Test": {"statistic": ks_stat, "p-value": ks_p},
+        "D'Agostino-Pearson Test": {"statistic": dagostino_stat, "p-value": dagostino_p},
+        "Normality Conclusion (alpha={})".format(alpha): {
+            "Shapiro-Wilk": "Normal" if shapiro_p > alpha else "Not Normal",
+            "Kolmogorov-Smirnov": "Normal" if ks_p > alpha else "Not Normal",
+            "D'Agostino-Pearson": "Normal" if dagostino_p is not None and dagostino_p > alpha else "Not Normal",
+        },
+    }
+    
+    return results
 
 
 def calculate_response_bias(expecon: int = 1, subject_col: str = 'ID', cue_col: str = 'cue', response_col: str = 'sayyes'):
@@ -998,10 +1062,17 @@ def calc_stats(expecon: int):
 
     cond_list = ["criterion", "hit_rate", "fa_rate", "dprime"]
     for cond in cond_list:
+        bootstrap_wilcoxon(x=df_sdt[cond][df_sdt.cue == params.high_p].reset_index(drop=True),
+            y=df_sdt[cond][df_sdt.cue == params.low_p].reset_index(drop=True))
+
         bootstrap_ci_effect_size_wilcoxon(
             x1=df_sdt[cond][df_sdt.cue == params.low_p].reset_index(drop=True),
             x2=df_sdt[cond][df_sdt.cue == params.high_p].reset_index(drop=True),
         )
+
+        bootstrap_wilcoxon(x= conf[0].reset_index(drop=True).drop("ID", axis=1).iloc[:, 0],
+            y=conf[1].reset_index(drop=True).drop("ID", axis=1).iloc[:, 0],
+       )
 
         bootstrap_ci_effect_size_wilcoxon(
             conf[0].reset_index(drop=True).drop("ID", axis=1).iloc[:, 0],
@@ -1085,6 +1156,27 @@ def bootstrap_ci_effect_size_wilcoxon(x1, x2, n_iterations=1000, alpha=0.95):
     print("Effect size (r) 95% CI:", (ci_lower, ci_upper))
 
     return ci_lower, ci_upper
+
+
+def bootstrap_wilcoxon(x, y):
+
+    # Compute paired differences
+    diffs = np.array(x) - np.array(y)
+
+    # Bootstrap function
+    n_boot = 10000
+    boot_medians = []
+
+    for _ in range(n_boot):
+        sample = resample(diffs)
+        boot_medians.append(np.median(sample))
+
+    # 95% CI
+    ci_lower = np.percentile(boot_medians, 2.5)
+    ci_upper = np.percentile(boot_medians, 97.5)
+
+    print(f"95% CI for median difference: [{ci_lower:.3f}, {ci_upper:.3f}]")
+
 
 
 def supplementary_plots(expecon: int):
