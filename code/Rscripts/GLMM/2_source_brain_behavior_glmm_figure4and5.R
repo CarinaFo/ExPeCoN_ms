@@ -1,7 +1,7 @@
 #####################################ExPeCoN study#################################################
 # generalized linear mixed models to estimate signal detection theory parameters
 # including previous choice effects: Brain-behavior modelling
-# script produces figure 4 and figure 5 from Forster et al., 2025
+# script produces figure 4 and 5 from Forster et al., 20205
 
 # author: Carina Forster
 # email: forster@mpg.cbs.de
@@ -25,10 +25,10 @@ library(gridExtra)
 # Set the font family and size
 par(family = "Arial", cex = 1.2)
 
-#################################### load datasets#####################################################
+####################################load data#####################################################
 setwd("E:/expecon_ms")
-study1 = "brain_behav_source_beta-700-100_1_zscore.csv"
-study2 = "brain_behav_source_beta-700-100_2_zscore.csv"
+study1 = "brain_behav_cleaned_1.csv"
+study2 = "brain_behav_cleanded_2.csv"
 
 brain_behav_path_1 <- file.path("data", "behav", study1)
 brain_behav_path_2 <- file.path("data", "behav", study2)
@@ -57,7 +57,7 @@ behav$level_0 <- NULL
 behav <- na.omit(behav) 
 
 #rename beta power variable
-behav$beta <- behav$beta_source_prob_zscore
+behav$beta <- behav$beta_source_prob
 
 hist(behav$beta)
 
@@ -79,7 +79,7 @@ confint(beta_cue, method='Wald')
 
 summary(lmerTest::lmer(respt1 ~ beta + cue + (beta+cue|ID), data= behav))
 ###################################################################################################
-### does pre-stimulus power predict detection, while controlling for previous choice
+### does prestimulus power predict detection, while controlling for previous choice
 
 beta_base_glm <- glmer(sayyes ~ isyes * prevresp + 
                     ( isyes *prevresp|ID),
@@ -145,10 +145,10 @@ filename = paste("beta_int_glm_", expecon, ".rda", sep="")
 cue_model_path = file.path("data", "behav", "mixed_models", "brain_behav", filename)
 saveRDS(beta_int_glm1, cue_model_path)
 beta_int_glm2 <- readRDS(cue_model_path)
-########################
-# this code plots figure 4
 
-# revision: made sure the y axis limits are the same for all plots
+#####################
+###################################### Plot figure 4
+# revision: make sure the y axis limits align
 
 # Define correct y-axis limits (assuming predicted probabilities are between 0 and 1)
 y_limits_beta_prevresp <- c(0, 0.20)  
@@ -321,7 +321,8 @@ models = list("prob" = conf_full_model_2, "beta" = conf_full_model_beta_2)
 modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
                            statistic = NULL,  output = output_file_path_conf)
 
-# this code creates figure 5
+############# 
+######################################plot figure 5
 
 # Define the common y-axis limits
 common_ylim <- c(0, 1)  # Adjust the range as needed
@@ -414,25 +415,3 @@ diff_bic_2 = BIC(beta_int_glm1) - BIC(beta_prev_glm)
 
 print(diff_aic_2)
 print(diff_bic_2)
-
-##########################congruency###############################################################
-
-# does beta power per trial predict congruent responses in both probability conditions?
-
-con_beta = glmer(congruency ~ beta * cue + isyes + (cue|ID), data=behav, 
-                 family=binomial(link='probit'), 
-                 control=glmerControl(optimizer="bobyqa",
-                                      optCtrl=list(maxfun=2e5)))
-summary(con_beta)
-
-# Post hoc tests for behavior interaction
-emm_model <- emmeans(con_beta, "cue", by = "beta")
-con <- contrast(emm_model)
-con
-
-con_plot_beta = plot_model(con_beta, type='int', mdrt.values = "meansd")
-
-# save congruency plot
-filename = paste("congruency_beta_", expecon, ".svg", sep="")
-savepath_fig5 = file.path("figs", "manuscript_figures", "figure5_brain_behavior", filename)
-ggsave(savepath_fig5, dpi = 300, height = 8, width = 10, plot=con_plot_alpha)

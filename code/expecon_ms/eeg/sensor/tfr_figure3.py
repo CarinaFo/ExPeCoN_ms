@@ -4,11 +4,11 @@ Provide functions that compute time-frequency representations (TFRs).
 
 Moreover, run a cluster test in 2D space (time and frequency)
 
-This script produces figure 3 in Forster et al.
+This script produces figure 3 in Forster et al., 2025
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2024
+Years: 2024/2025
 """
 
 # %% Import
@@ -68,7 +68,7 @@ def compute_tfr(
     fmax: float,
     laplace: bool = False,
     induced: bool = True,
-    mirror: bool = True,
+    mirror: bool = False,
     drop_bads: bool = True,
 ):
     """
@@ -267,6 +267,24 @@ def compute_tfr(
             ]
             cond_a_name = f"hit_high_prob"
             cond_b_name = f"miss_high_prob"
+        elif cond == 'response':
+            epochs_a = epochs[
+                (
+                    (epochs.metadata.sayyes == 1)
+                    & (epochs.metadata.isyes == 1)
+                    & (epochs.metadata.cue == params.high_p)
+                )
+            ]
+            epochs_b = epochs[
+                (
+                    (epochs.metadata.sayyes == 1)
+                    & (epochs.metadata.isyes == 1)
+                    & (epochs.metadata.cue == params.low_p)
+                )
+            ]
+            cond_a_name = f"hit_high_prob"
+            cond_b_name = f"hit_low_prob"
+
         else:
             raise ValueError("input should be 'probability' or 'prev_resp' or 'hitmiss'")
 
@@ -305,11 +323,12 @@ def compute_tfr(
 
 
 def load_tfr_conds(
-    studies: list = [1, 2], cond: str = 'prev_resp', 
-    cond_a_name: str = "prevyesresp_highprob_prevstim", 
-    cond_b_name: str = "prevnoresp_highprob_prevstim", 
-    cond_a_names: list = ["prevyesresp_samecue_lowprob", "prevyesresp_samecue_highprob"],
-    cond_b_names: list = ["prevnoresp_samecue_lowprob", "prevnoresp_samecue_highprob"],
+    studies=[1, 2],
+    cond="probability",
+    cond_a_name="high",
+    cond_b_name="low",
+    cond_a_names=["high_prevhit", "high_prevmiss", "high_prevcr"],
+    cond_b_names=["low_prevhit", "low_prevmiss", "low_prevcr"],
     tmin: int = -0.7, 
     tmax: int = 0,
     suffix_mirror: str = '_mirror', 
@@ -417,18 +436,18 @@ def load_tfr_conds(
                     )
                     tfr_a_all.append(tfr_a)
                     tfr_b_all.append(tfr_b)
-        elif cond == 'hitmiss':
+        elif cond == 'hitmiss' or 'response':
             if study == 2:
                 for subj in id_list:
                     if subj == "013":
                         continue
                     # load tfr data
                     tfr_a = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}_mirror-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{tmin}_{tmax}_{study!s}{suffix_induced}-tfr.h5"),
                         condition=0,
                     )
                     tfr_b = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}_mirror-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{tmin}_{tmax}_{study!s}{suffix_induced}-tfr.h5"),
                         condition=0,
                     )
                     tfr_a_all.append(tfr_a)
@@ -437,11 +456,11 @@ def load_tfr_conds(
                 for subj in id_list:
                     # load tfr data
                     tfr_a = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{study!s}_mirror-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_a_name}_{tmin}_{tmax}_{study!s}{suffix_induced}-tfr.h5"),
                         condition=0,
                     )
                     tfr_b = mne.time_frequency.read_tfrs(
-                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{study!s}_mirror-tfr.h5"),
+                        fname=Path(paths.data.eeg.sensor.tfr.tfr_contrasts, f"{subj}_{cond_b_name}_{tmin}_{tmax}_{study!s}{suffix_induced}-tfr.h5"),
                         condition=0,
                     )
                     tfr_a_all.append(tfr_a)
@@ -453,405 +472,11 @@ def load_tfr_conds(
     return tfr_a_cond, tfr_b_cond, cond
 
 
-def perform_stat_tests(power_high: np.array, power_low: np.array, times: np.array):
-    """
-    Perform statistical tests on power difference and return significant timepoints.
-    
-    Args:
-    -----
-    power_high : np.array
-        Power across participants for the high condition.
-    power_low : np.array
-        Power across participants for the low condition.
-    ch_index : int
-        Index of the channel.
-    
-    Returns:
-    --------
-    sign_timepoints : np.array
-        Significant timepoints where the p-value is below 0.05.
-    """
-    diff = power_high - power_low
-    t_vals, p_vals, _ = mne.stats.permutation_t_test(diff)
-    print(f"Significant time points: {times[np.where(p_vals < 0.05)]}")
-    return times[np.where(p_vals < 0.05)]
-
-
-def compute_power(tfr_a_cond, tfr_b_cond, ch_index: int, freq_band: tuple, study: int, cond: str,
-                    idx_cond: int, tmin: float, tmax: float):
-    """
-    Load the data and compute power for the given frequency band.
-
-    Args:
-    -----
-    tfr_a_cond : list
-        TFR data for high condition.
-    tfr_b_cond : list
-        TFR data for low condition.
-    ch_index : int
-        Index of the channel to analyze.
-    freq_band : tuple
-        Frequency band for power computation (start_freq, end_freq).
-    study : str
-        Study name for labeling.
-    cond : str
-        Condition to analyze: either "probability" or "prev_resp".
-
-    Returns:
-    --------
-    high_mean : np.array
-        Mean power for the high condition.
-    high_sem : np.array
-        SEM for the high condition.
-    low_mean : np.array
-        Mean power for the low condition.
-    low_sem : np.array
-        SEM for the low condition.
-    """
-    start_freq, end_freq = freq_band
-    end_freq += 1  # Include the last frequency in the range
-
-    if cond == 'probability':
-        if study == 'stable':
-                # Compute band power only for the specified channel for all participants in the stable condition
-                high_power = np.array([scipy.integrate.trapezoid(a[idx_cond].crop(tmin,tmax).data[ch_index, start_freq:end_freq, :], axis=0) for a in tfr_a_cond])
-                low_power = np.array([scipy.integrate.trapezoid(a[idx_cond].crop(tmin,tmax).data[ch_index, start_freq:end_freq, :], axis=0) for a in tfr_b_cond])
-        else:
-            # Compute band power only for the specified channel for all participants in the volatile condition
-            high_power = np.array([scipy.integrate.trapezoid(a.crop(tmin,tmax).data[ch_index, start_freq:end_freq, :], axis=0) for a in tfr_a_cond])
-            low_power = np.array([scipy.integrate.trapezoid(a.crop(tmin,tmax).data[ch_index, start_freq:end_freq, :], axis=0) for a in tfr_b_cond])
-    else:
-        if study == 'stable':
-            # Compute band power only for the specified channel for all participants in the stable condition
-            high_power = np.array([scipy.integrate.trapezoid(a.crop(tmin,tmax).data[ch_index, start_freq:end_freq, :], axis=0) for a in tfr_a_cond])
-            low_power = np.array([scipy.integrate.trapezoid(a.crop(tmin,tmax).data[ch_index, start_freq:end_freq, :], axis=0) for a in tfr_b_cond])
-        else:
-            # Compute band power only for the specified channel for all participants in the volatile condition
-            high_power = np.array([scipy.integrate.trapezoid(a[idx_cond].crop(tmin,tmax).data[ch_index, start_freq:end_freq, :], axis=0) for a in tfr_a_cond])
-            low_power = np.array([scipy.integrate.trapezoid(a[idx_cond].crop(tmin,tmax).data[ch_index, start_freq:end_freq, :], axis=0) for a in tfr_b_cond])
-
-    # Calculate mean and SEM for both conditions
-    high_mean = np.mean(high_power, axis=0)
-    high_sem = scipy.stats.sem(high_power, axis=0)
-    low_mean = np.mean(low_power, axis=0)
-    low_sem = scipy.stats.sem(low_power, axis=0)
-
-    return high_mean, high_sem, low_mean, low_sem, high_power, low_power
-
-
-def calc_freq_band_power_over_time(ch_name: str = 'CP4', cond: str = 'probability', tmin=-0.7, tmax=0, 
-                                    fmin_alpha: int = 8, fmax_alpha: int = 12, fmin_beta: int = 15, fmax_beta: int = 30):
-    """
-    Plot the power for both high and low conditions (not the difference) for the alpha and beta bands.
-    
-    Args:
-    ----
-    ch_name : str
-        Name of the channel to analyze (e.g., 'CP4').
-    cond : str
-        Condition to analyze: either "probability" or "prev_resp".
-    
-    Returns:
-    -------
-    None
-    """
-    if cond == "probability":
-        # Load data for probability condition
-        tfr_a_cond, tfr_b_cond, cond = load_tfr_conds(
-            studies=[1, 2],
-            cond="probability",
-            cond_a_name="high_-0.7_0_induced",
-            cond_b_name="low_-0.7_0_induced",
-            cond_a_names=["high_prevhit_-0.7_0_induced", "high_prevmiss_-0.7_0_induced", "high_prevcr_-0.7_0_induced"],
-            cond_b_names=["low_prevhit_-0.7_0_induced", "low_prevmiss_-0.7_0_induced", "low_prevcr_-0.7_0_induced"],
-        )
-        cond_name = 'high vs low'
-    else:
-        # Load data for previous response condition
-        tfr_a_cond, tfr_b_cond, cond = load_tfr_conds(
-            studies=[1, 2],
-            cond="prev_resp",
-            cond_a_name="prevyesresp_highprob_prevstim_-0.7_0_induced",
-            cond_b_name="prevnoresp_highprob_prevstim_-0.7_0_induced",
-            cond_a_names=["prevyesresp_samecue_lowprob_-0.7_0_induced", "prevyesresp_samecue_highprob_-0.7_0_induced"],
-            cond_b_names=["prevnoresp_samecue_lowprob_-0.7_0_induced", "prevnoresp_samecue_highprob_-0.7_0_induced"],
-        )
-        cond_name = 'previous yes vs previous no response'
-
-    if cond == "probability":
-        times = tfr_a_cond[1][0].crop(tmin, tmax).times
-        ch_index = tfr_a_cond[1][0].ch_names.index(ch_name)
-    else:
-        times = tfr_a_cond[0][0].crop(tmin, tmax).times
-        ch_index = tfr_a_cond[0][0].ch_names.index(ch_name)
-        
-    for idx, (cond_a, cond_b) in enumerate(zip(tfr_a_cond, tfr_b_cond)):
-        if cond == "probability":
-            if idx == 1:
-                conditions = None
-                idx_cond = None
-                study = 'volatile'
-
-                # Alpha and Beta power computation for high and low conditions
-                beta_high_mean, beta_high_sem, beta_low_mean, beta_low_sem, high_power_beta, low_power_beta = compute_power(tfr_a_cond[idx], tfr_b_cond[idx],
-                                                                                ch_index, (fmin_beta, fmax_beta), study, 'probability', idx_cond, tmin, tmax)
-                alpha_high_mean, alpha_high_sem, alpha_low_mean, alpha_low_sem, high_power_alpha, low_power_alpha = compute_power(tfr_a_cond[idx], tfr_b_cond[idx], 
-                                                                                    ch_index, (fmin_alpha, fmax_alpha), study, 'probability', idx_cond, tmin, tmax)
-                
-                # get significant time points for alpha and  beta
-                significant_times_alpha = perform_stat_tests(high_power_alpha, low_power_alpha, times)
-                significant_times_beta = perform_stat_tests(high_power_beta, low_power_beta, times)
-
-                # Plot results
-                plot_freq_band_over_time(
-                    ch_index, high_power_alpha, low_power_alpha, 
-                    high_power_beta, low_power_beta,
-                    times, cond, study, conditions, tmin, tmax, idx_cond, 
-                    significant_times_alpha=significant_times_alpha,
-                    significant_times_beta=significant_times_beta
-                )
-
-            else:
-                conditions = ['previous hit', 'previous miss', 'previous correct rejection']
-                study = 'stable'
-
-                for idx_cond in range(len(conditions)):
-                    # Alpha and Beta power computation for high and low conditions
-                    beta_high_mean, beta_high_sem, beta_low_mean, beta_low_sem, high_power_beta, low_power_beta = compute_power(tfr_a_cond[idx], tfr_b_cond[idx], 
-                                                                                    ch_index, (fmin_beta, fmax_beta), study, 'probability', idx_cond, tmin, tmax)
-                    alpha_high_mean, alpha_high_sem, alpha_low_mean, alpha_low_sem, high_power_alpha, low_power_alpha = compute_power(
-                                                                                    tfr_a_cond[idx], tfr_b_cond[idx], 
-                                                                                    ch_index, (fmin_alpha, fmax_alpha), study, 'probability', idx_cond, tmin, tmax)
-
-                    significant_times_alpha = perform_stat_tests(high_power_alpha, low_power_alpha, times)
-                    significant_times_beta = perform_stat_tests(high_power_beta, low_power_beta, times)
-
-                    # Plot results
-                    plot_freq_band_over_time(
-                        ch_index, high_power_alpha, low_power_alpha, 
-                        high_power_beta, low_power_beta,
-                        times, cond, study, conditions, tmin, tmax, idx_cond, 
-                        significant_times_alpha=significant_times_alpha,
-                        significant_times_beta=significant_times_beta
-                    )
-        else:
-            if idx == 0:
-
-                conditions = None
-                study = 'stable'
-                idx_cond = 0
-
-                # Alpha and Beta power computation for high and low conditions
-                beta_high_mean, beta_high_sem, beta_low_mean, beta_low_sem, high_power_beta, low_power_beta = compute_power(tfr_a_cond[idx], tfr_b_cond[idx], 
-                                                                                ch_index, (fmin_beta, fmax_beta), study, 'prev_resp', idx_cond, tmin, tmax)
-                alpha_high_mean, alpha_high_sem, alpha_low_mean, alpha_low_sem, high_power_alpha, low_power_alpha = compute_power(tfr_a_cond[idx], tfr_b_cond[idx], 
-                                                                                ch_index, (fmin_alpha, fmax_alpha), study, 'prev_resp', idx_cond, tmin, tmax)
-
-                significant_times_alpha = perform_stat_tests(high_power_alpha, low_power_alpha, times)
-                significant_times_beta = perform_stat_tests(high_power_beta, low_power_beta, times)
-
-                # Plot results
-                plot_freq_band_over_time(
-                    ch_index, high_power_alpha, low_power_alpha,
-                    high_power_beta, low_power_beta,
-                    times, cond, study, conditions, tmin, tmax, idx_cond, 
-                    significant_times_alpha=significant_times_alpha,
-                    significant_times_beta=significant_times_beta
-                )
-        
-            else:
-                conditions = ['high probability', 'low probability']
-                study = 'volatile'
-
-                for idx_cond in range(len(conditions)):
-                    # Alpha and Beta power computation for high and low conditions
-                    beta_high_mean, beta_high_sem, beta_low_mean, beta_low_sem, high_power_beta, low_power_beta = compute_power(tfr_a_cond[idx], tfr_b_cond[idx], 
-                                                                                    ch_index, (fmin_beta, fmax_beta), study, 'prev_resp', idx_cond, tmin, tmax)
-                    alpha_high_mean, alpha_high_sem, alpha_low_mean, alpha_low_sem, high_power_alpha, low_power_alpha = compute_power(tfr_a_cond[idx], tfr_b_cond[idx], 
-                                                                                    ch_index, (fmin_alpha, fmax_alpha), study, 'prev_resp', idx_cond, tmin, tmax)
-
-                    significant_times_alpha = perform_stat_tests(high_power_alpha, low_power_alpha, times)
-                    significant_times_beta = perform_stat_tests(high_power_beta, low_power_beta, times)
-
-                    # Plot results
-                    plot_freq_band_over_time(
-                        ch_index, high_power_alpha, low_power_alpha,
-                        high_power_beta, low_power_beta,
-                        times, cond, study, conditions, tmin, tmax, idx_cond, 
-                        significant_times_alpha=significant_times_alpha,
-                        significant_times_beta=significant_times_beta
-                    )
-
-    return "Done plotting freq bands over time"
-
-
-def plot_freq_band_over_time(ch_name, alpha_high, alpha_low, beta_high, beta_low,
-                             times, cond, study, conditions, tmin, tmax, idx_cond: int = 0,
-                             significant_times_alpha=None, significant_times_beta=None):
-    """
-    Plot the power for both high and low probability conditions for the alpha and beta bands,
-    and mark significant time points with horizontal lines.
-
-    Args:
-    ----
-    ch_name : str
-        Name of the channel to plot.
-    alpha_high : np.array
-        Power for the high probability condition in the alpha band.
-    alpha_low : np.array
-        Power for the low probability condition in the alpha band.
-    beta_high : np.array
-        Power for the high probability condition in the beta band.
-    beta_low : np.array
-        Power for the low probability condition in the beta band.
-    times : np.array
-        Time points for the x-axis.
-    cond : str
-        Condition name for labeling.
-    study : str
-        Study name for labeling.
-    conditions : list of str
-        List of conditions for the previous response condition.
-    idx_cond : int
-        Index of the current condition.
-    significant_times : np.array or list, optional
-        Array of time points where the difference between conditions is statistically significant (p < 0.05).
-
-    Returns:
-    -------
-    None
-    """
-
-    def calculate_confidence_intervals(mean, sem, n, confidence_level=0.95):
-        """Calculate the confidence intervals for a given mean and standard error."""
-        from scipy.stats import t
-        t_value = t.ppf((1 + confidence_level) / 2, n - 1)  # Use degrees of freedom (n - 1)
-        ci_upper = mean + t_value * sem
-        ci_lower = mean - t_value * sem
-        return ci_lower, ci_upper
-
-    def plot_difference_with_ci(ax, times, high, low, n_high, n_low, title, band_label, color_diff='green'):
-        """
-        Function to plot the difference between high and low power conditions 
-        with shaded error (confidence intervals).
-        """
-        # Compute the difference between high and low for each participant
-        diff = high - low
-
-        # now calculate the mean difference over participants and the SEM
-        diff_mean = np.mean(diff, axis=0)
-        diff_sem = scipy.stats.sem(diff, axis=0)
-
-        # Calculate the confidence intervals for the difference
-        diff_ci_lower, diff_ci_upper = calculate_confidence_intervals(diff_mean, diff_sem, min(n_high, n_low))
-
-        # Plot the difference with CI
-        ax.plot(times, diff_mean, color=color_diff)
-        ax.fill_between(times, diff_ci_lower, diff_ci_upper, color=color_diff, alpha=0.2)
-
-        # Customize plot appearance
-        ax.set_title(title, fontsize=20)
-        ax.legend(loc='lower right', fontsize=12)
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel(band_label)
-
-
-    def set_common_axis_properties(ax, x_label, y_label):
-        """Set common axis properties for both subplots."""
-        ax.set_xlabel(x_label, fontsize=20)
-        ax.set_ylabel(y_label, fontsize=20)
-        ax.tick_params(axis='both', which='major', labelsize=16)
-        ax.set_xlim(tmin, tmax)
-
-    # Create the figure and subplots
-    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(16, 6))
-
-    # Define the figure title based on study and condition
-    if study == 'volatile':
-        fig_title = f'{study.capitalize()} environment:' ' High minus Low Stimulus Probability' if cond == 'probability' else f'{study.capitalize()} environment: Previous Yes minus No Response \n{conditions[idx_cond]}'
-    else:
-        fig_title = f'{study.capitalize()} environment:' f' High minus Low Stimulus Probability \n{conditions[idx_cond]}' if cond == 'probability' else f'{study.capitalize()} environment: Previous Yes minus No Response'
-
-    fig.suptitle(fig_title, fontsize=24, y=1.05)
-
-    # Plot alpha band (High and Low Probability)
-    plot_difference_with_ci(axs[0], times, alpha_high, alpha_low,
-              len(alpha_high), len(alpha_low), "Alpha Frequency Band [8-12 Hz]", "Alpha band")
-
-    # Add red vertical lines for significant time points (p < 0.05)
-    if significant_times_alpha is not None:
-        for sig_time in significant_times_alpha:
-            plt.axvline(x=sig_time, color='red', linestyle='--', linewidth=1, alpha=0.3)
-
-    # Plot beta band (High and Low Probability)
-    plot_difference_with_ci(axs[1], times, beta_high, beta_low,
-              len(beta_high), len(beta_low), "Beta Frequency Band [15-30 Hz]", "Beta band")
-
-    # Add red vertical lines for significant time points (p < 0.05)
-    if significant_times_beta is not None:
-        for sig_time in significant_times_beta:
-            plt.axvline(x=sig_time, color='red', linestyle='--', linewidth=1, alpha=0.3)
-
-    # Calculate global y-limits based on both subplots
-    alpha_ymin, alpha_ymax = axs[0].get_ylim()
-    beta_ymin, beta_ymax = axs[1].get_ylim()
-    global_ymin = min(alpha_ymin, beta_ymin)
-    global_ymax = max(alpha_ymax, beta_ymax)
-
-    # Set the same y-limits across both subplots
-    axs[0].set_ylim(global_ymin, global_ymax)
-    axs[1].set_ylim(global_ymin, global_ymax)
-
-    # Set common axis properties
-    set_common_axis_properties(axs[0], "Time (s)", "Power")
-    set_common_axis_properties(axs[1], "Time (s)", "Power")
-
-    figure3_savepath = Path(paths.figures.manuscript.figure3)
-
-    # Determine the correct save path based on the condition and study
-    file_base = f"{figure3_savepath}/fig3_tfr_freqbands_over_time_{ch_name}_{cond}"
-
-    # Handle the study-specific part of the path
-    if study == 'volatile':
-        # Handle volatile case
-        if cond == 'probability':
-            save_path = f"{file_base}_{study}.svg"
-        else:
-            save_path = f"{file_base}_{conditions[idx_cond]}_{study}.svg"
-    else:
-        # Handle non-volatile case
-        if cond == 'probability':
-            save_path = f"{file_base}_{conditions[idx_cond]}_{study}.svg"
-        else:
-            save_path = f"{file_base}_{study}.svg"
-
-    # Save both SVG and PNG versions of the figure
-    svg_save_path = save_path
-    png_save_path = save_path.replace(".svg", ".png")
-    
-    # save figure in this path
-    # Assuming `fig` is your matplotlib figure object:
-    fig.savefig(svg_save_path, format='svg')
-    fig.savefig(png_save_path, format='png')
-
-    print(f"Figure saved as SVG: {svg_save_path}")
-    print(f"Figure saved as PNG: {png_save_path}")
-
-    # Plot the label legend in the middle upper corner for the 'prev_resp' condition
-    if cond == 'prev_resp':
-        plt.legend(loc='upper center', ncol=2, fontsize=16)
-    else:
-        plt.legend(loc='lower right', ncol=2, fontsize=16)
-
-    plt.tight_layout()
-    plt.show()
-
-
 def plot_tfr_cluster_test_output(
-    cond: str = 'prev_resp',
+    cond: str = 'probability',
     threed_test: bool = False,
-    cond_a_name: str = 'previous_yes',
-    cond_b_name: str = 'previous_no',
+    cond_a_name: str = 'high',
+    cond_b_name: str = 'low',
     channel_names: list = ['CP4'],
     tmin: float = -0.7,
     tmax: float = 0,
@@ -962,14 +587,12 @@ def plot_tfr_cluster_test_output(
             )
 
             # run cluster test over time, frequencies and channels
-            t_obs, _, cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
-                x, n_jobs=-1, n_permutations=10000, threshold=None, tail=0, adjacency=tfr_adjacency
+            t_obs, clusters, cluster_p_values, H0 = mne.stats.permutation_cluster_1samp_test(
+                x, n_jobs=-1, n_permutations=1000, threshold=None, tail=0, 
+                adjacency=tfr_adjacency
             )
 
-            print(f"smallest cluster p-value: {min(cluster_p)}")
-            cluster_p = np.around(cluster_p, 2)
-
-        else:
+        else: # 2D test
             if cond == "probability":
                 if idx == 0:
                     tfr_a = np.array(tfr_a_cond[idx])
@@ -1036,12 +659,49 @@ def plot_tfr_cluster_test_output(
             threshold_tfce = dict(start=0, step=0.1)
 
             # run cluster test over time and frequencies (no need to define adjacency)
-            t_obs, _, cluster_p, _ = mne.stats.permutation_cluster_1samp_test(
-                x, n_jobs=-1, n_permutations=10000, threshold=threshold_tfce, tail=0
+            t_obs, cluster, cluster_p, ho = mne.stats.permutation_cluster_1samp_test(
+                x, n_jobs=-1, n_permutations=1000, threshold=threshold_tfce, tail=0,
+                seed=42
             )
-
+            
+            # print stats for manuscript
             print(f"smallest cluster p-value: {min(cluster_p)}")
-            cluster_p = np.around(cluster_p, 2)
+
+            # get index of cluster with lowest p value
+            lowest_p_idx = np.argmin(cluster_p)
+
+            stats = []
+
+            # Reshape for later: participants x (freq*time)
+            x_reshaped = x.reshape(x.shape[0], -1)
+            t_obs_flat = t_obs.flatten()
+
+            mask = cluster[lowest_p_idx][0].flatten()  # cluster mask over freqs x times
+            cluster_size = np.sum(mask)
+
+            # Peak t-value within the cluster
+            peak_t = np.max(np.abs(t_obs_flat[mask]))
+
+            # Extract participant data for that cluster
+            x_cluster = x_reshaped[:, mask]
+            subject_means = np.mean(x_cluster, axis=1)
+
+            # Cohen's d
+            mean_diff = np.mean(subject_means)
+            std_diff = np.std(subject_means, ddof=1)
+            cohen_d = mean_diff / std_diff if std_diff != 0 else np.nan
+
+            stats.append({
+                "Cluster Index": lowest_p_idx + 1,
+                "Cluster p-value": round(cluster_p[lowest_p_idx], 4),
+                "Cluster Size": int(cluster_size),
+                "Peak |t|": round(peak_t, 3),
+                "Cohen's d": round(cohen_d, 3),
+                "H0": "mean = 0"
+            })
+
+            df = pd.DataFrame(stats)
+            df.to_csv(Path(paths.figures.manuscript.figure3, f"cluster_stats_with_power_{cond}_{str(idx)}.csv", index=False))
 
             # set mask for plotting sign. points that belong to the cluster
             mask = np.array(cluster_p).reshape(t_obs.shape[0], t_obs.shape[1])
@@ -1074,7 +734,7 @@ def plot_tfr_cluster_test_output(
         )
     plt.show()
 
-    return "Done with cluster test"
+    return "Done with cluster test", t_obs, cluster, cluster_p, ho
 
 
 def plot_cluster_contours(
@@ -1137,16 +797,18 @@ def plot_cluster_contours(
     res = scipy.stats.ttest_1samp(data, popmean=0)
 
     t_val = np.squeeze(res[0])
-
-    vmin_val = np.min(t_val)
-    vmax_val = abs(vmin_val)
-
+    if cond == "probability":
+        vmin_val = -6 #min(t_val)
+        vmax_val = 6 #abs(vmin_val)
+    else:
+        vmin_val = -3
+        vmax_val = 3
     # Plot tmap as heatmap, use the same vmin and vmax for all plots
     sns.heatmap(t_val, cbar=True, cmap="coolwarm", robust=True, ax=axs[idx], vmin=vmin_val, vmax=vmax_val)
 
     # Customize the font size and family for various elements
     plt.rcParams["font.family"] = "Arial"  # Set the font family for the entire plot to Arial
-    plt.rcParams["font.size"] = 12  # Set the default font size to 12
+    plt.rcParams["font.size"] = 16  # Set the default font size to 12
 
     # Draw the cluster outline
     for i in range(mask.shape[0]):  # frequencies
@@ -1165,8 +827,8 @@ def plot_cluster_contours(
     axs[idx].axvline([t_obs.shape[1]], color="white", linestyle="dotted", linewidth=5)  # stimulation onset
     axs[idx].set(xlabel="Time (s)", ylabel="Frequency (Hz)")
     # Set the font size for xlabel and ylabel
-    axs[idx].xaxis.label.set_fontsize(16)  # Adjust the font size for the xlabel
-    axs[idx].yaxis.label.set_fontsize(16)  # Adjust the font size for the ylabel
+    axs[idx].xaxis.label.set_fontsize(20)  # Adjust the font size for the xlabel
+    axs[idx].yaxis.label.set_fontsize(20)  # Adjust the font size for the ylabel
 
     # Set custom the x and y-axis ticks and labels
     axs[idx].set_xticks(x_ticks)
@@ -1176,12 +838,8 @@ def plot_cluster_contours(
     axs[idx].yaxis.labelpad = 15  # Adjust the distance between the y-axis label and the y-axis ticks
     axs[idx].xaxis.labelpad = 15  # Adjust the distance between the x-axis label and the y-axis ticks
 
-    # Create a colorbar for the current subplot
-    # cbar = axs[idx].collections[0].colorbar
-    # Set the colorbar ticks to only include the minimum and maximum values of the data
-    # min_val = np.ceil(min(map(min, t_val)))
-    # max_val = np.ceil(max(map(max, t_val)))
-    # cbar.set_ticks([min_val, max_val])
+    # Increase font size for x and y ticks
+    axs[idx].tick_params(axis='both', which='major', labelsize=16)  # Adjust font size
 
     return "Plotted and saved figure"
 

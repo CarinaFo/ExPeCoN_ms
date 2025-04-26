@@ -21,6 +21,7 @@ library(dplyr)# pandas style
 library(tidyr)
 library(emmeans)
 library(performance)
+library(brms)
 
 # don't forget to give credit to the amazing authors of those packages
 #citation("emmeans")
@@ -114,7 +115,7 @@ behav <- na.omit(behav)
 # study 1: block design
 # study 2: trial by trial cues
 
-expecon = 2
+expecon = 1
 
 behav = filter(behav, study == expecon)
 
@@ -131,7 +132,7 @@ simple_sdt_model = glmer(sayyes ~ isyes + (isyes|ID), data=behav,
 summary(simple_sdt_model)
 
 # now add the stimulus probability as a regressor: exclude interaction random effects: singularity
-cue_model = glmer(sayyes ~ isyes+cue + isyes*cue + (isyes+cue|ID), data=behav, 
+cue_model = glmer(sayyes ~ isyes*cue + (isyes+cue|ID), data=behav, 
                   family=binomial(link='probit'),
                   control=glmerControl(optimizer="bobyqa",
                                        optCtrl=list(maxfun=2e5)),
@@ -167,7 +168,6 @@ summary(cue_prev_model)
 check_collinearity(cue_prev_model)
 check_convergence(cue_prev_model)
 
-
 # save the model to disk
 filename = paste("cue_prev_model_expecon", expecon, ".rda", sep="_")
 cue_model_path = file.path("data", "behav", "mixed_models", "behavior", filename)
@@ -176,8 +176,10 @@ cue_prev_model <- readRDS(cue_model_path)
 
 # extract random effects
 ranef <- ranef(cue_prev_model)
-cue_ran = ranef$ID[,3] # probability cue
-prev_choice_ran = ranef$ID[,4] # previous choice
+cue_ran = ranef$ID[,4] # probability cue
+prev_choice_ran = ranef$ID[,3] # previous choice
+
+sum(prev_choice_ran<0)
 
 # the stronger the effect of previous choice, the weaker the effect of the probability cue
 cor.test(cue_ran, prev_choice_ran)
@@ -197,14 +199,20 @@ ggplot(plot_data, aes(beta_probcue, beta_previouschoice)) +
   labs(x = "probability condition beta weight", y = "previous choice beta weight")
 
 ################ including interaction between cue and previous choice#############################
-
-
-cue_prev_int_model = glmer(sayyes ~ isyes + cue + prevresp + prevresp*cue + 
-                           + cue*isyes +
+cue_prev_int_model = glmer(sayyes ~ prevresp*cue + isyes*cue +
                              (isyes+cue+prevresp|ID), data=behav, 
                            family=binomial(link='probit'),
                            control=glmerControl(optimizer="bobyqa",
                                                 optCtrl=list(maxfun=2e5)),
+)
+
+summary(cue_prev_int_model)
+
+# Revision: fit bayesian model
+
+cue_prev_int_model = brm(sayyes ~ prevresp*cue + isyes*cue +
+                             (isyes+cue+prevresp|ID), data=behav, 
+                           family=binomial()
 )
 
 summary(cue_prev_int_model)
@@ -221,7 +229,9 @@ cue_prev_int_model <- readRDS(cue_model_path)
 # Post hoc tests for behavior interaction
 emm_model <- emmeans(cue_prev_int_model, "prevresp", by = "cue", infer=TRUE)
 con <- contrast(emm_model)
-con
+
+# get confidence interval
+confint(con)
 
 # Post hoc tests for behavior interaction
 emm_model <- emmeans(cue_prev_int_model, "cue", by = 'prevresp', infer=TRUE)
@@ -304,8 +314,8 @@ print(diff_bic_2)
 filename = paste("expecon", expecon, ".docx", sep="_")
 output_file_path <- file.path("figs", "manuscript_figures", "Tables", filename)
 
-models = list("base" = simple_sdt_model, "add cue" = cue_model, "add prev resp" = cue_prev_model,
-              "interaction" = cue_prev_int_model)
+models = list("base" = simple_sdt_model, "add_cue" = cue_model, "add_prev_resp" = cue_prev_model,
+              "add_interaction" = cue_prev_int_model)
 
 modelsummary::modelsummary(models, estimate  = "{estimate} [{conf.low}, {conf.high}], {stars}", 
                            statistic = NULL,  output = output_file_path)
@@ -325,12 +335,13 @@ cue_prev_int_model_signal = glmer(sayyes ~ prevresp*cue + isyes*cue +
 )
 
 summary(cue_prev_int_model_signal)
+confint(cue_prev_int_model_signal)
 
 check_collinearity(cue_prev_int_model_signal)
 check_convergence(cue_prev_int_model_signal)
 
 #only fitted for expecon 1
-cue_model_path = file.path("data", "behav", "mixed_models", "behavior", "cue_prev_int_model_prevsignal_1.rda")
+cue_model_path = file.path("data", "behav", "mixed_models", "behavior", "cue_prev_int_model_noise_1.rda")
 saveRDS(cue_prev_int_model_signal, cue_model_path)
 cue_prev_int_model_signal <- readRDS(cue_model_path)
 

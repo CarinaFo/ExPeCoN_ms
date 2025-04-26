@@ -394,8 +394,10 @@ def plot_response_times_behaviour_descriptives():
         plt.ylabel("Response Time (s)", fontdict={'fontsize': 14})
         plt.xlabel("Trial Type", fontdict={'fontsize': 14})
         # Save the plot
-        plot_path = os.path.join(save_dir, f'sdt_rts_{s}.png')
-        plt.savefig(plot_path)
+        plot_path_png = os.path.join(save_dir, f'sdt_rts_{s}.png')
+        plot_path_svg = os.path.join(save_dir, f'sdt_rts_{s}.svg')
+        plt.savefig(plot_path_png)
+        plt.savefig(plot_path_svg)
         plt.show()
     
     # Stats
@@ -403,21 +405,21 @@ def plot_response_times_behaviour_descriptives():
     # use the pingouin package
     import pingouin as pg
 
-    for study in [1, 2]:
+    for s in [1, 2]:
         # test for differences in accuracy
-        subset = rt_acc[rt_acc["study"] == study]
+        subset = rt_acc[rt_acc["study"] == s]
         correct = subset[subset["accuracy"] == True]["rt"]
         incorrect = subset[subset["accuracy"] == False]["rt"]
         # print the results
-        print(f"Study {study}:")
+        print(f"Study {s}:")
         print("Accuracy contrast")
         print(pg.ttest(correct, incorrect, paired=True))
 
-        subset = rt_congruent[rt_congruent["study"] == study]
+        subset = rt_congruent[rt_congruent["study"] == s]
         congruent = subset[subset["congruency"] == True]["rt"]
         incongruent = subset[subset["congruency"] == False]["rt"]
         # print the results
-        print(f"Study {study}:")
+        print(f"Study {s}:")
         print("Congruency contrast")
         print(pg.ttest(congruent, incongruent, paired=True))
         
@@ -428,17 +430,17 @@ def plot_response_times_behaviour_descriptives():
         sdt_miss = df[(df["study"] == s) & (df['miss'] == 1)].groupby("ID")['rt'].mean().reset_index()
 
         # print the results
-        print(f"Study {study}:")
+        print(f"Study {s}:")
         print("Hits vs. Correct Rejections")
         print(pg.ttest(sdt_hit['rt'], sdt_cr['rt'], paired=True))
 
         # test for difference between miss and false alarms
         # print the results
-        print(f"Study {study}:")
+        print(f"Study {s}:")
         print("Miss vs. False Alarm")
         if s == 2:
         # drop rows where ID is 62 or 75 or 83 from sdt_miss 
-            sdt_miss = sdt_miss[~sdt_miss["ID"].isin([62, 75, 83])] # no false alarms
+            sdt_miss = sdt_miss[~sdt_miss["ID"].isin([62, 75, 83, 85])] # no false alarms
         print(pg.ttest(sdt_miss['rt'], sdt_fa['rt'], paired=True))
 
 
@@ -446,8 +448,20 @@ def plot_boxplot(data, title, hue):
     
     plt.figure(figsize=(10, 6))
 
-    # use violin plot
-    sns.violinplot(x="study", y="rt", hue=hue, data=data)
+    if hue == "congruency":
+        # choose different colors for congruent and incongruent trials (colorblind friendly)
+        # cya = cyan, mag = magenta
+        colors = ["cyan", "magenta"]
+        # use violin plot
+        sns.violinplot(x="study", y="rt", hue=hue, data=data, palette=colors)
+    elif hue == "accuracy":
+        # choose different colors for correct and incorrect trials (colorblind friendly)
+        # #purple, # yello
+        colors = ["#9467bd", "#ff7f0e"]
+        # use violin plot
+        sns.violinplot(x="study", y="rt", hue=hue, data=data, palette=colors)
+    else:
+        sns.violinplot(x="study", y="rt", hue=hue, data=data)
     plt.xticks(ticks=[0, 1], labels=["Stable Environment", "Volatile Environment"])
     plt.ylabel("Response Time (s)")
 
@@ -475,8 +489,10 @@ def plot_boxplot(data, title, hue):
     # Create a new legend with the custom labels
     plt.legend(handles, labels, title=hue)
 
-    plot_path = os.path.join(save_dir, f'{hue}_rt.png')
-    plt.savefig(plot_path)
+    plot_path_png = os.path.join(save_dir, f'{hue}_rt.png')
+    plot_path_svg = os.path.join(save_dir, f'{hue}_rt.svg')
+    plt.savefig(plot_path_png)
+    plt.savefig(plot_path_svg)
     plt.show()
 
 

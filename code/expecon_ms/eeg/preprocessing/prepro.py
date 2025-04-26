@@ -4,7 +4,7 @@ The script contains functions for preprocessing of EEG data using the MNE toolbo
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2023
+Years: 2024/2025
 """
 
 # %% Import

@@ -5,15 +5,15 @@ The script contains functions that source reconstruct 62 channel EEG data.
 It is based on MNE methods (e.g., eLORETA) or beamforming for time-frequency.
 
 Moreover, the script includes functions for statistical analysis in source space:
-    permutation t-test or cluster permutation test in source space
+permutation t-test or cluster permutation test in source space
 
-Also, it includes a function to plot contrasts in source space.
+It includes a function to plot contrasts in source space.
 
-This script produces source plots for figure 3 in Forster et al., 2024 (preprint)
+This script produces the source plots (brain visualisation) for figure 3 in Forster et al., 2025
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2024
+Years: 2024/2025
 """
 
 # %% Import

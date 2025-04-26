@@ -1,7 +1,7 @@
 #####################################ExPeCoN study#################################################
 ### prepare single trial power for generalized linear mixed effects modelling ######################
 
-# written by Carina Forster (2023)
+# written by Carina Forster (2025)
 
 # please report bugs:
 
@@ -13,8 +13,7 @@ library(lme4)
 library(lmerTest) # pvalues for lmer models
 
 # which study do you want to analyze?
-expecon <- 1 # 1 or 2 
-source <- 1 # 1 or 0 
+expecon <- 2 # 1 or 2 
 
 # check wether the removal of the trend worked?
 check_trend_removal = 1
@@ -24,45 +23,19 @@ check_trend_removal = 1
 setwd("E:/expecon_ms")
 
 if (expecon == 1) {
-  if (source == 1) {
-    # Identify the relative path from your current working directory to the file
-    relative_path <- file.path("data", "behav", "brain_behav_source_-700-100_1.csv")
-    # Use the relative path to read the CSV file
-    power <- read.csv(relative_path)
-    # add prediction error per trial
-    power$PE_abs = abs(power$isyes - power$cue)
-    # expecon 2
-    columns_to_process <- c("alpha_source_prob", "alpha_source_prev")
-  }else {
   # Identify the relative path from your current working directory to the file
-  relative_path <- file.path("data", "behav", "brain_behav_1.csv")
-  # Use the relative path to read the CSV file
-  power <- read.csv(relative_path)
-  # add prediction error per trial
-  power$PE_abs = abs(power$isyes - power$cue)
-  # Columns to process
-  columns_to_process <- c("pre_alpha", "pre_beta")}
-  
+  relative_path <- file.path("data", "behav", "brain_behav_source_beta-700-100_1.csv")
 } else {
-  if (source == 1) {
-    # Identify the relative path from your current working directory to the file
-    relative_path <- file.path("data", "behav", "brain_behav_source_-700-100_2.csv")
-    # Use the relative path to read the CSV file
-    power <- read.csv(relative_path)
-    # add prediction error per trial
-    power$PE_abs = abs(power$isyes - power$cue)
-    # expecon 2
-    columns_to_process <- c("alpha_source_prob", "alpha_source_prev")
-  }else{
   # Identify the relative path from your current working directory to the file
-  relative_path <- file.path("data", "behav", "brain_behav_2.csv")
-  # Use the relative path to read the CSV file
-  power <- read.csv(relative_path)
-  # add prediction error per trial
-  power$PE_abs = abs(power$isyes - power$cue)
-  # expecon 2
-  columns_to_process <- c("pre_alpha", "pre_beta")}
+  relative_path <- file.path("data", "behav", "brain_behav_source_beta-700-100_2.csv")
 }
+
+# Use the relative path to read the CSV file
+power <- read.csv(relative_path)
+# add prediction error per trial
+power$PE_abs = abs(power$isyes - power$cue)
+# expecon 2
+columns_to_process <- c("beta_source_prob", "beta_source_prev")
 
 #https://philippmasur.de/2018/05/23/how-to-center-in-multilevel-models/
 
@@ -117,53 +90,22 @@ trend_removal_model <- function(column_index) {
   summary(lmer(formula, data = power, REML = TRUE))
 }
 
-# Main conditional logic
-if (check_trend_removal == 1) {
-  if (expecon == 2) {
-    if (source == 1) {
-      trend_removal_model(1)
-    } else {
-      trend_removal_model(2)
-    }
-  } else if (expecon == 1) {
-    if (source == 1) {
-      trend_removal_model(1)
-    } else {
-      trend_removal_model(2)
-    }
-  }
-}
-
+trend_removal_model(1) # trend over trials
+trend_removal_model(2) # trend over blocks
 
 # define filename for cleaned power
 filename_cleaned_power = paste("brain_behav_cleaned_", expecon, ".csv", sep="")
 
 if (expecon == 1) {
-  if (source == 1) {
-    # define filename for cleaned power
-    filename_cleaned_power = paste("brain_behav_cleaned_source_alpha_", expecon, ".csv", sep="")
     # remove unnecessary variables 
     power <- power[, !(names(power) %in% c("index", "sayyes_y",'X', 'Unnamed..0.1',
                                            'Unnamed..0', "level_0"))]
     relative_path <- file.path("data", "behav", filename_cleaned_power)
-  }else{
-  # remove unnecessary variables 
-  power <- power[, !(names(power) %in% c("index", "sayyes_y", "X", "Unnamed..0.1",
-                                         "Unnamed..0", "sayyes_y", "level_0"))]
-  relative_path <- file.path("data", "behav", filename_cleaned_power)}
+
 } else {
-  if (source == 1) {
-    # define filename for cleaned power
-    filename_cleaned_power = paste("brain_behav_cleaned_source_alpha_", expecon, ".csv", sep="")
     # remove unnecessary variables 
     power <- power[, !(names(power) %in% c("index", "sayyes_y",'X', 'Unnamed..0.2', 'Unnamed..0.1',
                                            'Unnamed..0'))]
     relative_path <- file.path("data", "behav", filename_cleaned_power)
-  }else{
-    # remove unnecessary variables 
-    power <- power[, !(names(power) %in% c("index", "sayyes_y"))]
-    relative_path <- file.path("data", "behav", filename_cleaned_power)
-  }
 }
-
 write.csv(power, relative_path)

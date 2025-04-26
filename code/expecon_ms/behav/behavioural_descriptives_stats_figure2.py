@@ -12,7 +12,7 @@ dataset 2: variable environment, 120 trials in 5 blocks, 40 participants,
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2023
+Years: 2023/2024/2025
 """
 
 # %% Import
@@ -721,9 +721,9 @@ def prepare_for_plotting(exclude_high_fa: bool, expecon: int):
     return conditions, exclude_high_fa
 
 
-def plot_figure1_grid(expecon: int, exclude_high_fa: bool):
+def plot_figure2_grid(expecon: int, exclude_high_fa: bool):
     """
-    Plot the figure 1 grid and the behavioral data for the EXPECON study.
+    Plot the figure 2 grid and the behavioral data for the EXPECON study.
 
     Args:
     ----

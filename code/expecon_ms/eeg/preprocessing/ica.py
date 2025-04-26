@@ -9,7 +9,7 @@ Data is re-referenced to the common average and saved as a .fif file.
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2023
+Years: 2024/2025
 """
 
 # %% Import
