@@ -133,7 +133,7 @@ def run_ica(study: int = 1, l_freq: float = 1, infomax: int = 0, save_psd: int =
     return "Done with ICA"
 
 
-def label_ica_correlation(study: int = 1, l_freq: float = 0.1):
+def label_ica_correlation(study: int = 1, l_freq: float = 0.1, save_psd: bool = True):
     """
     Perform template matching for blink and cardiac artifact detection.
 
@@ -147,6 +147,7 @@ def label_ica_correlation(study: int = 1, l_freq: float = 0.1):
     ----
         study (int): Flag indicating whether to use the data from study 1 or study 2.
         l_freq (float): Flag indicating high pass filter cut off from preprocessing.
+        save_psd (bool): Flag indicating whether to save psd after ica.
 
     Returns:
     -------
@@ -254,6 +255,17 @@ def label_ica_correlation(study: int = 1, l_freq: float = 0.1):
             epochs_filter.save(
                 Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2, f"{subj}_icacorr_{l_freq}Hz-epo.fif")
             )
+
+        # Pick EEG channels for ICA
+        picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
+
+        if save_psd:
+            # Compute and plot the power spectral density (PSD)
+            epochs_filter.compute_psd(fmin=1, fmax=40, picks=picks).plot(show=False)
+            if study == 1:
+                plt.savefig(Path(paths.data.eeg.preprocessed.ica.PSD1, f"PSD_{subj}_afterica.png"))
+            else:
+                plt.savefig(Path(paths.data.eeg.preprocessed.ica.PSD2, f"PSD_{subj}_afterica.png"))
 
         print(f"Saved ICA cleaned epochs for participant {subj}.")
 
