@@ -19,8 +19,8 @@ templates = "./data/templates"
 
 # raw EEG data
 [paths.data.eeg]
-RAW_expecon1 = "./data/eeg/raw_concatenated_expecon1"
-RAW_expecon2 = "./data/eeg/raw_concatenated_expecon2"
+RAW_expecon1 = "./data/eeg/raw_concatenated_expecon1_anon"
+RAW_expecon2 = "./data/eeg/raw_concatenated_expecon2_anon"
 
 # preprocessed EEG data (no ICA), stimulus or cue locked
 [paths.data.eeg.preprocessed]
@@ -84,23 +84,5 @@ hit_fa_diff = 0.05
 family = "sans-serif"
 sans_serif = "Arial"
 size = 14
-
-# ID lists for both studies
-[participants]
-ID_list_expecon1 = [
-    "007", "008", "009", "010", "011", "012", "013", "014", "015", "016",
-    "017", "018", "019", "020", "021", "022", "023", "024", "025", "026",
-    "027", "028", "029", "030", "031", "032", "033", "034", "035", "036",
-    "037", "038", "039", "040", "041", "042", "043", "044", "045", "046",
-    "047", "048", "049"
-]
-pilot_counter = 7
-
-ID_list_expecon2 = [
-    "001", "002", "003", "004", "005", "006", "007", "008", "009", "010",
-    "011", "012", "013", "014", "015", "016","017", "018", "019", "020",
-     "021", "022", "023", "024", "025", "026", "027", "028", "029", "030",
-    "031", "032", "033", "034", "035", "036", "037", "038", "039", "040"
-]
 
 # Note store private configs in the same folder as: "./[PRIVATE_PREFIX]_configs.toml"
