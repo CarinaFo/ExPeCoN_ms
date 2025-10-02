@@ -76,7 +76,7 @@ Use jupyter notebooks to explore the data and analysis:
 ### Open the code in your preferred editor, but make sure to run the code in the correct environment
 
 ```shell
-jupyter lab code/notebooks/expecon_ms.ipynb &
+jupyter lab code/notebooks/expecon_ms.ipynb
 ```
 
 ## Publications
