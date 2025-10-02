@@ -44,13 +44,13 @@ conda install mamba -n base -c conda-forge
 ```
 
 ```shell
-mamba create -n expecon_3.9 python=3.9.7
+mamba create -n expecon python=3.12
 ```
 
 And activate the conda environment :
 
 ```shell
-mamba activate expecon_3.9
+mamba activate expecon
 ```
 
 Install the project code `expecon_ms` as Python package:
@@ -68,7 +68,7 @@ Thus, the `-e` flag is recommended to use.
 Now, add the conda environment as kernel to jupyter (notebook)
 
 ```shell
-python -m ipykernel install --user --name=expecon_3.9
+python -m ipykernel install --user --name=expecon
 ```
 
 *R*-scripts of the analysis are stored in `./code/Rscripts/`.
