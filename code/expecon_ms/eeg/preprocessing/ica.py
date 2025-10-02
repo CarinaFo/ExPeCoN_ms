@@ -16,14 +16,13 @@ Years: 2024/2025
 from __future__ import annotations
 
 import pickle
-import subprocess
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import mne
 import pandas as pd
 
-from expecon_ms.configs import PROJECT_ROOT, config, paths
+from expecon_ms.configs import paths
 
 # if you change the config.toml file instead of reloading the kernel,
 # you can uncomment and execute the following lines of code:
@@ -36,14 +35,6 @@ from expecon_ms.configs import PROJECT_ROOT, config, paths
 # for plotting in a new window (copy to interpreter)
 # %matplotlib qt
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-# Specify the file path for which you want the last commit date
-__file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/preprocessing/ica.py")  # == __file__
-
-last_commit_date = (
-    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
-)
-print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # directory where to find the cleaned, stimulus locked and epoched data
 epochs_for_ica_1 = Path(paths.data.eeg.preprocessed.stimulus_expecon1)
@@ -61,26 +52,38 @@ Path(paths.data.eeg.preprocessed.ica.PSD2).mkdir(parents=True, exist_ok=True)
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 # participant IDs
-id_list_expecon1 = config.participants.ID_list_expecon1
-id_list_expecon2 = config.participants.ID_list_expecon2
 
 
-def run_ica(study: int, infomax: int, save_psd: int):
+def run_ica(study: int = 1, l_freq: float = 1, infomax: int = 0, save_psd: int = 1):
     """
     Run ICA on epoched data and save the ICA solution.
 
     Args:
     ----
         study (int): Flag indicating whether to use the data from study 1 or study 2.
-        infomax (int): Flag indicating whether to use the infomax method (default: 1).
-        save_psd (int): Flag indicating whether to save the power spectral density (PSD) plot (default: 0).
+        l_freq (float): Flag indicating high pass filter cut off from preprocessing.
+        infomax (int): Flag indicating whether to use the infomax method of fastica (default: 0 = fastica).
+        save_psd (int): Flag indicating whether to save the power spectral density (PSD) plot (default: 1).
 
     Returns:
     -------
         None
 
     """
-    id_list = id_list_expecon1 if study == 1 else id_list_expecon2
+    # Choose the folder based on the study
+    folder = (
+        Path(paths.data.eeg.preprocessed.stimulus_expecon1)
+        if study == 1
+        else Path(paths.data.eeg.preprocessed.stimulus_expecon2)
+    )
+
+    # Collect all files matching the pattern "P*_epochs_1Hz-epo.fif"
+    files = folder.glob(f"*_epochs_{l_freq}Hz-epo.fif")
+
+    # Extract the subject IDs from filenames
+    id_list = sorted([f.stem.split("_")[0] for f in files])
+
+    print(id_list)
 
     for subj in id_list:
         file_path = (
@@ -94,11 +97,11 @@ def run_ica(study: int, infomax: int, save_psd: int):
 
             # Read the epoch data for the current participant (1Hz filtered data for ICA)
             if study == 1:
-                epochs = mne.read_epochs(epochs_for_ica_1 / f"P{subj}_epochs_1Hz-epo.fif")
+                epochs = mne.read_epochs(epochs_for_ica_1 / f"{subj}_epochs_{l_freq}Hz-epo.fif")
             else:
-                if subj == "013":
+                if subj == "T875UW":
                     continue
-                epochs = mne.read_epochs(epochs_for_ica_2 / f"P{subj}_epochs_1Hz-epo.fif")
+                epochs = mne.read_epochs(epochs_for_ica_2 / f"{subj}_epochs_{l_freq}Hz-epo.fif")
 
             # Pick EEG channels for ICA
             picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
@@ -130,7 +133,7 @@ def run_ica(study: int, infomax: int, save_psd: int):
     return "Done with ICA"
 
 
-def label_ica_correlation(study: int):
+def label_ica_correlation(study: int = 1, l_freq: float = 0.1):
     """
     Perform template matching for blink and cardiac artifact detection.
 
@@ -143,6 +146,7 @@ def label_ica_correlation(study: int):
     Args:
     ----
         study (int): Flag indicating whether to use the data from study 1 or study 2.
+        l_freq (float): Flag indicating high pass filter cut off from preprocessing.
 
     Returns:
     -------
@@ -155,18 +159,29 @@ def label_ica_correlation(study: int):
 
     comps_removed = []
 
-    id_list = id_list_expecon1 if study == 1 else id_list_expecon2
+    # Choose the folder based on the study
+    folder = (
+        Path(paths.data.eeg.preprocessed.stimulus_expecon1)  # or whatever your epochs folder is
+        if study == 1
+        else Path(paths.data.eeg.preprocessed.stimulus_expecon2)
+    )
+
+    # Collect all files matching the pattern "P*_epochs_1Hz-epo.fif"
+    files = folder.glob(f"*_epochs_{l_freq}Hz-epo.fif")
+
+    # Extract the subject IDs from filenames
+    id_list = sorted([f.stem.split("_")[0] for f in files])
 
     for subj in id_list:
         # no ica for ID 13 in study 2
-        if (study == 2) and (subj == "013"):  # noqa: PLR2004
+        if (study == 2) and (subj == "T875UW"):  # noqa: PLR2004
             continue
 
         # set the file path for clean epochs (1Hz filtered)
         file_path = (
-            epochs_for_ica_1 / f"P{subj}_epochs_1Hz-epo.fif"
+            epochs_for_ica_1 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
             if study == 1
-            else epochs_for_ica_2 / f"P{subj}_epochs_1Hz-epo.fif"
+            else epochs_for_ica_2 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
         )
 
         # load epochs (1Hz filtered)
@@ -216,11 +231,11 @@ def label_ica_correlation(study: int):
 
         # now load the highpass filtered data (0.1 Hz)
         if study == 1:
-            filter_path = epochs_for_ica_1 / f"P{subj}_epochs_0.1Hz-epo.fif"
+            filter_path = epochs_for_ica_1 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
         else:
-            if subj == "013":
+            if subj == "T875UW":
                 continue
-            filter_path = epochs_for_ica_2 / f"P{subj}_epochs_0.1Hz-epo.fif"
+            filter_path = epochs_for_ica_2 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
 
         epochs_filter = mne.read_epochs(filter_path, preload=True)
 
@@ -233,11 +248,11 @@ def label_ica_correlation(study: int):
         # save the cleaned epochs
         if study == 1:
             epochs_filter.save(
-                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, f"P{subj}_icacorr_0.1Hz-epo.fif")
+                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, f"{subj}_icacorr_{l_freq}Hz-epo.fif")
             )
         else:
             epochs_filter.save(
-                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2, f"P{subj}_icacorr_0.1Hz-epo.fif")
+                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2, f"{subj}_icacorr_{l_freq}Hz-epo.fif")
             )
 
         print(f"Saved ICA cleaned epochs for participant {subj}.")
