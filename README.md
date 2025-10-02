@@ -13,6 +13,8 @@ Scripts for the manuscript Expectation Perception Confidence Neural Correlates (
 The `ExPeCoN` study investigates stimulus probabilities and the influence on perception and confidence in a
 near-threshold somatosensory detection task in two datasets
 
+Please open an Issue to report bugs
+
 ## Project structure
 
 Analysis code can be found in `code/`.
@@ -23,8 +25,7 @@ The project structure is based on [`scilaunch`](https://github.com/SHEscher/scil
 
 ### Data
 
-* data is openly available on EDMOND: Forster Carina, 2025, "Forster et al., 2025, Pre-stimulus beta power mediates explicit and implicit perceptual biases in distinct cortical areas", https://doi.org/10.17617/3.ENMTDJ, Edmond, V1
-
+data is openly available on [EDMOND](https://doi.org/10.17617/3.ENMTDJ)
 
 ## Install research code as package
 
