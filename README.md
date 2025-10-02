@@ -1,8 +1,10 @@
 # Expectation Perception Confidence Neural Correlates (`ExPeCoN`)
 
-    Author(s): Carina Forster et al., 2025
+Author: Carina Forster
+Code Review: Simon M. Hoffmann
+Last update: 02.10.2025
+
     Contact: carinaforster0611@gmail.com
-    Last update: 02.10.2025
 ***
 
 ## Description
