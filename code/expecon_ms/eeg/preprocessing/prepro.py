@@ -133,6 +133,8 @@ def prepro(
             continue
 
         if study == 1:
+            if subj == "7TQ58Y":  # split file, have to check what went wrong here
+                continue
             # load raw data concatenated for all blocks
             raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon1, f"{subj}_concatenated_raw.fif"), preload=True)
         else:
