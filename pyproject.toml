@@ -3,7 +3,7 @@ name = "ExPeCoN"
 version = "0.1.0"
 description = "Expectation Perception Confidence Neural Correlates (ExPeCoN)."
 readme = "README.md"
-requires-python = "==3.9.*"
+requires-python = ">=3.9,<3.13"
 license = { file = "LICENSE" }
 authors = [{ name = "Carina Forster", email = "forster@cbs.mpg.de" }]
 maintainers = [
@@ -21,18 +21,16 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
 ]
 
+# Core dependencies (use minimal top-level packages, let pip/conda resolve transitive deps)
 dependencies = [
-    "autoreject==0.4.2",
-    "ipykernel",
-    "matplotlib==3.7.3",
-    "mne==1.5.1",
-    "mne_icalabel==0.4",
-    "numpy==1.25.2",
-    "pandas==2.0.3",
-    "scipy==1.11.3",
-    "seaborn==0.13.0",
-    "statsmodels==0.14.0",
-    "toml>=0.10",
+    "numpy",
+    "scipy",
+    "pandas",
+    "matplotlib",
+    "seaborn",
+    "pyqt6",
+    "mne",
+    "autoreject"
 ]
 
 [project.optional-dependencies]

@@ -37,16 +37,20 @@ cd expecon_ms
 ```
 
 Create a conda environment specific to `expecon_ms`.
-Make sure you are in the local folder where you cloned the repository into:
+We recommend using mamba (much faster) for setting up the environment
 
 ```shell
-conda create -n expecon_3.9 python=3.9.7
+conda install mamba -n base -c conda-forge
+```
+
+```shell
+mamba create -n expecon_3.9 python=3.9.7
 ```
 
 And activate the conda environment :
 
 ```shell
-conda activate expecon_3.9
+mamba activate expecon_3.9
 ```
 
 Install the project code `expecon_ms` as Python package:
