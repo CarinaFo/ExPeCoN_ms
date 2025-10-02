@@ -11,29 +11,13 @@ Years: 2024/2025
 from __future__ import annotations
 
 import copy
-import subprocess
 from pathlib import Path
 
 import mne
 import pandas as pd
 from autoreject import AutoReject, Ransac  # Jas et al., 2016
 
-from expecon_ms.configs import PROJECT_ROOT, config, paths
-
-# if you change the config.toml file instead of reloading the kernel,
-# you can uncomment and execute the following lines of code:
-# from importlib import reload # noqa: ERA001
-# reload(expecon_ms) # noqa: ERA001
-# reload(expecon_ms.configs) # noqa: ERA001
-# from expecon_ms.configs import paths # noqa: ERA001
-# %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-# Specify the file path for which you want the last commit date
-__file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/preprocessing/prepro.py")  # == __file__
-
-last_commit_date = (
-    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
-)
-print("Last Commit Date for", __file__path, ":", last_commit_date)
+from expecon_ms.configs import paths
 
 # set global variables
 
@@ -55,24 +39,21 @@ Path(paths.data.templates).mkdir(parents=True, exist_ok=True)
 # raw behavioral data
 Path(paths.data.behavior).mkdir(parents=True, exist_ok=True)
 
-# participant IDs
-participants = config.participants
-
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
 def prepro(
-    study: int,
-    trigger: str,
-    l_freq: float,
-    h_freq: int,
-    tmin: float,
-    tmax: float,
-    resample_rate: float,
-    sf: int,
-    detrend: int,
-    ransac: int,
-    autoreject: int,
+    study: int = 2,
+    trigger: str = "stimulus",
+    l_freq: float = 0.1,
+    h_freq: int = 40,
+    tmin: float = -2,
+    tmax: float = 2,
+    resample_rate: float = 250,
+    sf: int = 2500,
+    detrend: int = 1,
+    ransac: int = True,
+    autoreject: int = True,
 ):
     """
     Preprocess EEG data using the MNE toolbox.
@@ -109,6 +90,7 @@ def prepro(
     ransac: int
         If 1, RANSAC is used to detect bad channels.
     autoreject: int
+        If 1, autoreject flags bad epochs (marked as bad)
 
     Returns:
     -------
@@ -121,11 +103,12 @@ def prepro(
     if study == 1:
         # load the cleaned behavioral data for EEG preprocessing (kicked out trials with
         # no matching trigger in the EEG recording)
-        id_list = participants.ID_list_expecon1
-        df_cleaned = pd.read_csv(Path(paths.data.behavior, "behav_cleaned_for_eeg_expecon1.csv"))
+        df_cleaned = pd.read_csv(Path(paths.data.behavior, "behav_cleaned_for_eeg_expecon1_anonymized.csv"))
     else:
-        df_cleaned = pd.read_csv(Path(paths.data.behavior, "behav_cleaned_for_eeg_expecon2.csv"))
-        id_list = participants.ID_list_expecon2
+        df_cleaned = pd.read_csv(Path(paths.data.behavior, "behav_cleaned_for_eeg_expecon2_anonymized.csv"))
+
+    # create ID list based on dataframe column storing IDs
+    id_list = pd.unique(df_cleaned.ID)
 
     # set eeg channel layout for topo plots
     montage = mne.channels.read_custom_montage(Path(paths.data.templates, "CACS-64_REF.bvef"))
@@ -146,7 +129,7 @@ def prepro(
         save_dir = Path(paths.data.eeg.preprocessed.cue_expecon2)
 
     # loop over participants
-    for index, subj in enumerate(id_list):
+    for subj in id_list:
         # if file exists, skip
         if (save_dir / f"P{subj}_epochs_{l_freq}Hz-epo.fif").exists():
             print(f"{subj} already exists")
@@ -154,11 +137,11 @@ def prepro(
 
         if study == 1:
             # load raw data concatenated for all blocks
-            raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon1, f"P{subj}_concatenated_raw.fif"), preload=True)
+            raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon1, f"{subj}_concatenated_raw.fif"), preload=True)
         else:
             if subj == "013":  # stimulation device was not working for this participant
                 continue
-            raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon2, f"P{subj}_raw.fif"), preload=True)
+            raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon2, f"{subj}_raw.fif"), preload=True)
 
         # save the annotations (trigger) information
         annot.append(raw.annotations.to_data_frame())
@@ -186,11 +169,8 @@ def prepro(
             cue_events[:, 0] = cue_timings
             cue_events[:, 2] = 2
 
-        if study == 1:
-            # add dataframe as metadata to epochs
-            metadata = df_cleaned[index + participants.pilot_counter == df_cleaned.ID]
-        else:
-            metadata = df_cleaned[index + 1 == df_cleaned.ID]
+        # extract behavioural data for current subject from big dataframe
+        metadata = df_cleaned[subj == df_cleaned.ID]
 
         # lock the data to the specified trigger and create epochs
         if trigger == "cue":
