@@ -50,10 +50,9 @@ def prepro(
     tmin: float = -2,
     tmax: float = 2,
     resample_rate: float = 250,
-    sf: int = 2500,
     detrend: int = 1,
-    ransac: int = True,
-    autoreject: int = True,
+    ransac: int = True,  # quick (takes ~ 15s on Windows 11)
+    autoreject: int = False,  # autoreject epochs takes a looot of time (~ 20 minutes for one patient)
 ):
     """
     Preprocess EEG data using the MNE toolbox.
@@ -83,10 +82,8 @@ def prepro(
         End time after event in seconds.
     resample_rate: float
         New sampling frequency in Hz.
-    sf: int
-        Sampling frequency of the raw data in Hz.
     detrend: int
-        If 1, the data is detrended (linear detrending)
+        If 1, the data is detrended (linear detrending), 0 or None no detrending
     ransac: int
         If 1, RANSAC is used to detect bad channels.
     autoreject: int
@@ -131,7 +128,7 @@ def prepro(
     # loop over participants
     for subj in id_list:
         # if file exists, skip
-        if (save_dir / f"P{subj}_epochs_{l_freq}Hz-epo.fif").exists():
+        if (save_dir / f"{subj}_epochs_{l_freq}Hz-epo.fif").exists():
             print(f"{subj} already exists")
             continue
 
@@ -139,7 +136,7 @@ def prepro(
             # load raw data concatenated for all blocks
             raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon1, f"{subj}_concatenated_raw.fif"), preload=True)
         else:
-            if subj == "013":  # stimulation device was not working for this participant
+            if subj == "T875UW":  # stimulation device was not working for this participant
                 continue
             raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon2, f"{subj}_raw.fif"), preload=True)
 
@@ -159,6 +156,7 @@ def prepro(
 
         # add stimulus onset cue as a trigger to the event structure
         if trigger == "cue":
+            sf = raw.info["sfreq"]
             if study == 1:
                 cue_timings = [i - int(0.4 * sf) for i in events[:, 0]]
             else:
@@ -227,13 +225,14 @@ def prepro(
         # now feed the clean channels into Autoreject to detect bad trials
         if autoreject:
             ar = AutoReject()
-
-            epochs, reject_log = ar.fit_transform(epochs)
-
-            reject_log.save(save_dir / f"P_{subj}_reject_log_{l_freq}.npz")
+            ar.fit(epochs)                 # fits the autoreject parameters
+            epochs = ar.transform(epochs)  # applies the cleaning
+            reject_log = ar.reject_log     # access the rejection log
+            # save reject log
+            reject_log.save(save_dir / f"{subj}_reject_log_{l_freq}.npz")
 
         # save epochs to disk
-        epochs.save(save_dir / f"P{subj}_epochs_{l_freq}Hz-epo.fif")
+        epochs.save(save_dir / f"{subj}_epochs_{l_freq}Hz-epo.fif")
 
         print(f"saved epochs for participant {subj}")
 
