@@ -1,14 +1,9 @@
 # Expectation Perception Confidence Neural Correlates (`ExPeCoN`)
 
-    Author(s): Carina Forster et al., 2024
-    Contact: forster@cbs.mpg.de
-    Status: code has been formally reviewed
-    Last update: 11.06.2024
+    Author(s): Carina Forster et al., 2025
+    Contact: carinaforster0611@gmail.com
+    Last update: 02.10.2025
 ***
-
-## Open ToDos before
-
-- [ ] review functionality
 
 ## Description
 
@@ -27,7 +22,8 @@ The project structure is based on [`scilaunch`](https://github.com/SHEscher/scil
 
 ### Data
 
-* data is uploaded to Zenodo and will be published after publication
+* data is openly available on EDMOND: Forster Carina, 2025, "Forster et al., 2025, Pre-stimulus beta power mediates explicit and implicit perceptual biases in distinct cortical areas", https://doi.org/10.17617/3.ENMTDJ, Edmond, V1
+
 
 ## Install research code as package
 
@@ -83,7 +79,5 @@ jupyter lab code/notebooks/expecon_ms.ipynb &
 
 ## Publications
 
-Forster et al., 2024, [preprint](https://doi.org/10.1101/2024.06.12.598458)
-
-## Contributors/Collaborators
-* add [`TODO`]
+Forster et al., 2025, [Communications Psychology](https://www.nature.com/articles/s44271-025-00265-y)
+ 
