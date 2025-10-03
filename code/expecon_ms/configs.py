@@ -108,11 +108,16 @@ def _set_wd(new_dir: str | Path) -> None:
 
     :param new_dir: name of new working directory (must be in project folder)
     """
-    if PROJECT_NAME not in str(Path.cwd()):
-        msg = f"Current working dir '{Path.cwd()}' is outside of project '{PROJECT_NAME}'."
-        raise OSError(msg)
+    cwd = Path.cwd()
+    project_root = Path(PROJECT_ROOT).resolve()
 
-    print("\033[94m" + f"Current working dir:\t{Path.cwd()}" + "\033[0m")  # print blue
+    # if not inside project root, force switch to project root
+    if not cwd.is_relative_to(project_root):
+        print(f"\033[93mWarning: CWD '{cwd}' is outside project root '{project_root}'. Resetting...\033[0m")
+        os.chdir(project_root)
+        cwd = project_root
+
+    print("\033[94m" + f"Current working dir:\t{cwd}" + "\033[0m")  # print blue
 
     # Check if new_dir is a folder path or just a folder name
     new_dir = Path(new_dir)
