@@ -43,7 +43,7 @@ Path(paths.data.behavior).mkdir(parents=True, exist_ok=True)
 
 
 def prepro(
-    study: int = 2,
+    study: int = 1,
     trigger: str = "stimulus",
     l_freq: float = 0.1,
     h_freq: int = 40,
@@ -133,8 +133,6 @@ def prepro(
             continue
 
         if study == 1:
-            if subj == "7TQ58Y":  # split file, have to check what went wrong here
-                continue
             # load raw data concatenated for all blocks
             raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon1, f"{subj}_concatenated_raw.fif"), preload=True)
         else:
