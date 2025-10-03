@@ -54,7 +54,7 @@ mamba activate expecon
 ```
 
 Install the project code `expecon_ms` as Python package:
-
+Make sure you are in the expecon_ms folder!
 ```shell
 pip install -e .
 ```
