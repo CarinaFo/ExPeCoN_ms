@@ -1,23 +1,24 @@
 #!/usr/bin/python3
 """
-The script provides functions to analyze cleaned epochs and compute evoked signals from different conditions.
+The script provides functions to analyze preprocessed epochs 
+and compute evoked signals for different conditions.
 
-This includes cluster-based permutation tests.
+Statistics are implemented via cluster based permutation testing.
 
-Plotting functions  are also provided.
+Plotting functions are also included (evoked contrasts, cluster permutation output)
 
-Scripts produces suppl. fig. 2.1 for Forster et al. (2025) (SEPs).
+Scripts produces suppl. fig. 2.1 for Forster et al., (2025) (SEPs).
 
 Author: Carina Forster
 Contact: forster@cbs.mpg.de
-Years: 2025/2025
+Years: 2024/2025
 """
 
 # %% Import
 import pickle
 import subprocess
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 import matplotlib.pyplot as plt
 import mne
@@ -25,17 +26,9 @@ import numpy as np
 import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from expecon_ms.configs import PROJECT_ROOT, config, params, paths
+from expecon_ms.configs import params, paths
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-# Specify the file path for which you want the last commit date
-__file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/sensor/evokeds.py")  # == __file__
-
-last_commit_date = (
-    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
-)
-print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # for plotting in a new window (copy to interpreter)
 # %matplotlib qt
@@ -48,12 +41,6 @@ plt.rcParams.update({
     "font.family": params.plot.font.family,
     "font.sans-serif": params.plot.font.sans_serif,
 })
-
-# participant IDs
-participants = config.participants
-
-# pilot data counter
-pilot_counter = config.participants.pilot_counter
 
 # data_cleaning parameters defined in config.toml
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -88,17 +75,16 @@ def create_evokeds_contrast(
     }
 
     # Load participant and behavior data based on study
-    id_list, df_cleaned, epochs_dir = load_participant_data(study)
+    df_cleaned, epochs_dir = load_participant_data(study)
+
+    id_list = pd.unique(df_cleaned.ID)
+    id_list = ['NGRBFS']
 
     for idx, subj in enumerate(id_list):
         print(f"Processing participant {idx+1}/{len(id_list)} (ID: {subj})")
 
-        # Skip participant 013 for study 2 as per original code
-        if study == 2 and subj == "013":
-            continue
-        
         # Load and clean epochs for the current participant
-        epochs = load_and_clean_epochs(subj, epochs_dir, study)
+        epochs = load_and_clean_epochs(subj, epochs_dir, study, 0.1)
         
         # Apply preprocessing steps
         if drop_bads:
@@ -127,74 +113,13 @@ def create_evokeds_contrast(
     return evokeds
 
 
-def load_participant_data(study):
-    """Load participant ID list and behavior data based on study number."""
-    if study == 1:
-        id_list = participants.ID_list_expecon1
-        df_cleaned = pd.read_csv(Path(paths.data.behavior, "prepro_behav_data_1.csv"))
-        epochs_dir = Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1)
-    else:
-        id_list = participants.ID_list_expecon2
-        df_cleaned = pd.read_csv(Path(paths.data.behavior, "prepro_behav_data_2.csv"))
-        epochs_dir = Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2)
-    return id_list, df_cleaned, epochs_dir
-
-
-def load_and_clean_epochs(subj, epochs_dir, study):
-    """Load and clean epochs for a given participant."""
-    epochs = mne.read_epochs(epochs_dir / f"P{subj}_icacorr_0.1Hz-epo.fif")
-    if study == 2:
-        epochs.metadata = epochs.metadata.rename(columns={"resp1_t": "respt1", "stim_type": "isyes", "resp1": "sayyes"})
-    epochs = drop_trials(data=epochs)  # Assume drop_trials is defined elsewhere
-    return epochs
-
-
-def create_epochs_conditions(epochs):
-    """Create epochs conditions based on metadata."""
-    conditions = {
-        "hit_all": epochs[(epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1)],
-        "miss_all": epochs[(epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0)],
-        "high_all": epochs[epochs.metadata.cue == 0.75],
-        "low_all": epochs[epochs.metadata.cue == 0.25],
-        "high_hit_all": epochs[(epochs.metadata.cue == 0.75) & (epochs.metadata.sayyes == 1) & (epochs.metadata.isyes == 1)],
-        "high_miss_all": epochs[(epochs.metadata.cue == 0.75) & (epochs.metadata.sayyes == 0) & (epochs.metadata.isyes == 1)],
-        "low_hit_all": epochs[(epochs.metadata.cue == 0.25) & (epochs.metadata.sayyes == 1) & (epochs.metadata.isyes == 1)],
-        "low_miss_all": epochs[(epochs.metadata.cue == 0.25) & (epochs.metadata.sayyes == 0) & (epochs.metadata.isyes == 1)]
-    }
-    return conditions
-
-
-def equalize_epochs(conditions):
-    """Equalize epoch counts across different conditions."""
-    mne.epochs.equalize_epoch_counts([conditions["hit_all"], conditions["miss_all"]])
-    mne.epochs.equalize_epoch_counts([conditions["high_hit_all"], conditions["low_hit_all"]])
-    mne.epochs.equalize_epoch_counts([conditions["high_miss_all"], conditions["low_miss_all"]])
-    mne.epochs.equalize_epoch_counts([conditions["high_hit_all"], conditions["high_miss_all"]])
-    mne.epochs.equalize_epoch_counts([conditions["low_hit_all"], conditions["low_miss_all"]])
-
-
-def save_drop_log_plot(epochs, subj, epochs_dir):
-    """Save drop log plot for a participant."""
-    drop_log_fig = epochs.plot_drop_log(show=False)
-    drop_log_fig.savefig(epochs_dir / f"drop_log_{subj}.png")
-
-
-def save_evoked_data(evokeds):
-    """Save evoked data to disk for different conditions."""
-    save_paths = {
-        "hit": Path(paths.data.eeg.sensor.erp.hit),
-        "miss": Path(paths.data.eeg.sensor.erp.miss),
-    }
-    for condition, data in evokeds.items():
-        with save_paths[condition].open("wb") as fp:
-            pickle.dump(data, fp)
-
-
-def plot_CPP(tmin: float, tmax: float, tmin_base: float, tmax_base: float,
-             channel_list: list, study: int, baseline: bool = False):
+def plot_CPP(study: int = 2, baseline: bool = True,
+             tmin: float = -2, tmax: float = 2, tmin_base: float = -0.3, 
+             tmax_base: float = -0.05,
+             channel_list: list = ['Cz', 'CP1', 'Pz', 'CPz']):
 
     # Load evoked data
-    evokeds_dict = create_evokeds_contrast(study=1)
+    evokeds_dict = create_evokeds_contrast(study=study)
 
     # Apply baseline and crop
     def process_evokeds(evokeds, tmin_base, tmax_base, tmin, tmax, baseline=False):
@@ -219,19 +144,20 @@ def plot_CPP(tmin: float, tmax: float, tmin_base: float, tmax_base: float,
     # Cluster analysis
     ch_adjacency, _ = mne.channels.find_ch_adjacency(evokeds_dict["hit_all"][0].info, ch_type="eeg")
 
+    # Is there a sign. cluster between hits and miss trials in this window
     for evo_conds in [evoked_contrasts_hit, evoked_contrasts_miss]:
         keys = list(evo_conds.keys())  # Convert keys to a list for easy indexing
         evoked1_data = np.array([evoked.data for evoked in evo_conds[keys[0]]])
         evoked2_data = np.array([evoked.data for evoked in evo_conds[keys[1]]])
         x_diff = evoked1_data - evoked2_data  # Calculate the difference  x_diff = np.transpose(x_diff, [0, 2, 1])
         # reshape (channels need to be last dimension)
-        x_diff = np.transpose(x_diff, [0, 2, 1])
+        x_diff = np.transpose(x_diff, [0, 2, 1]) # needs to be dimensions subjects, timepoints, channels
 
         # Run cluster test
         t_obs, clusters, cluster_p_values, _ = mne.stats.permutation_cluster_1samp_test(
-            x_diff, n_permutations=10000, adjacency=ch_adjacency, tail=0, n_jobs=-1)
+            x_diff, n_permutations=1000, adjacency=ch_adjacency, tail=0, n_jobs=-1)
 
-        # Plot significant clusters if found
+        # Plot significant clusters if there are any
         good_clusters = np.where(cluster_p_values < params.alpha)[0]
 
         if good_clusters.size > 0:
@@ -765,6 +691,68 @@ def drop_trials(data=None):
     data.metadata = data.metadata.drop("_merge", axis=1)
 
     return data
+### helper functions
+
+
+def load_participant_data(study):
+    """Load participant ID list and behavior data based on study number."""
+    if study == 1:
+        df_cleaned = pd.read_csv(Path(paths.data.behavior, "behav_cleaned_for_eeg_expecon1_anonymized.csv"))
+        epochs_dir = Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1)
+    else:
+        df_cleaned = pd.read_csv(Path(paths.data.behavior, "behav_cleaned_for_eeg_expecon2_anonymized.csv"))
+        epochs_dir = Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2)
+    return df_cleaned, epochs_dir
+
+
+def load_and_clean_epochs(subj, epochs_dir, study, l_freq):
+    """Load and clean epochs for a given participant."""
+    epochs = mne.read_epochs(epochs_dir / f"{subj}_icacorr_{l_freq}Hz-epo.fif")
+    if study == 2:
+        epochs.metadata = epochs.metadata.rename(columns={"resp1_t": "respt1", "stim_type": "isyes", "resp1": "sayyes"})
+    epochs = drop_trials(data=epochs)  # Assume drop_trials is defined elsewhere
+    return epochs
+
+
+def create_epochs_conditions(epochs):
+    """Create epochs conditions based on metadata."""
+    conditions = {
+        "hit_all": epochs[(epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 1)],
+        "miss_all": epochs[(epochs.metadata.isyes == 1) & (epochs.metadata.sayyes == 0)],
+        "high_all": epochs[epochs.metadata.cue == 0.75],
+        "low_all": epochs[epochs.metadata.cue == 0.25],
+        "high_hit_all": epochs[(epochs.metadata.cue == 0.75) & (epochs.metadata.sayyes == 1) & (epochs.metadata.isyes == 1)],
+        "high_miss_all": epochs[(epochs.metadata.cue == 0.75) & (epochs.metadata.sayyes == 0) & (epochs.metadata.isyes == 1)],
+        "low_hit_all": epochs[(epochs.metadata.cue == 0.25) & (epochs.metadata.sayyes == 1) & (epochs.metadata.isyes == 1)],
+        "low_miss_all": epochs[(epochs.metadata.cue == 0.25) & (epochs.metadata.sayyes == 0) & (epochs.metadata.isyes == 1)]
+    }
+    return conditions
+
+
+def equalize_epochs(conditions):
+    """Equalize epoch counts across different conditions."""
+    mne.epochs.equalize_epoch_counts([conditions["hit_all"], conditions["miss_all"]])
+    mne.epochs.equalize_epoch_counts([conditions["high_hit_all"], conditions["low_hit_all"]])
+    mne.epochs.equalize_epoch_counts([conditions["high_miss_all"], conditions["low_miss_all"]])
+    mne.epochs.equalize_epoch_counts([conditions["high_hit_all"], conditions["high_miss_all"]])
+    mne.epochs.equalize_epoch_counts([conditions["low_hit_all"], conditions["low_miss_all"]])
+
+
+def save_drop_log_plot(epochs, subj, epochs_dir):
+    """Save drop log plot for a participant."""
+    drop_log_fig = epochs.plot_drop_log(show=False)
+    drop_log_fig.savefig(epochs_dir / f"drop_log_{subj}.png")
+
+
+def save_evoked_data(evokeds):
+    """Save evoked data to disk for different conditions."""
+    save_paths = {
+        "hit": Path(paths.data.eeg.sensor.erp.hit),
+        "miss": Path(paths.data.eeg.sensor.erp.miss),
+    }
+    for condition, data in evokeds.items():
+        with save_paths[condition].open("wb") as fp:
+            pickle.dump(data, fp)
 
 # %% run stuff
 
