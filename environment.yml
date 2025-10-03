@@ -11,5 +11,6 @@ dependencies:
   - seaborn
   - pyqt
   - mne
+  - toml
   - pip:
       - autoreject

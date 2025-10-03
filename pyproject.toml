@@ -1,5 +1,5 @@
 [project]
-name = "ExPeCoN"
+name = "expecon_ms"
 version = "0.1.0"
 description = "Expectation Perception Confidence Neural Correlates (ExPeCoN)."
 readme = "README.md"
