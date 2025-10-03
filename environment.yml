@@ -10,7 +10,7 @@ dependencies:
   - pandas
   - seaborn
   - pyqt
-  - mne
+  - mne=1.10.1
   - toml
   - pip:
       - autoreject
