@@ -15,9 +15,8 @@ Years: 2025/2025
 
 # %% Import
 import pickle
-import subprocess
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 import matplotlib.pyplot as plt
 import mne
@@ -25,17 +24,9 @@ import numpy as np
 import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from expecon_ms.configs import PROJECT_ROOT, config, params, paths
+from expecon_ms.configs import params, paths
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-# Specify the file path for which you want the last commit date
-__file__path = Path(PROJECT_ROOT, "code/expecon_ms/eeg/sensor/evokeds.py")  # == __file__
-
-last_commit_date = (
-    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
-)
-print("Last Commit Date for", __file__path, ":", last_commit_date)
 
 # for plotting in a new window (copy to interpreter)
 # %matplotlib qt
@@ -48,12 +39,6 @@ plt.rcParams.update({
     "font.family": params.plot.font.family,
     "font.sans-serif": params.plot.font.sans_serif,
 })
-
-# participant IDs
-participants = config.participants
-
-# pilot data counter
-pilot_counter = config.participants.pilot_counter
 
 # data_cleaning parameters defined in config.toml
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -68,6 +53,7 @@ def create_evokeds_contrast(
     Load cleaned epoched data and create contrasts.
 
     Args:
+
     ----
     study: int, study number (1 or 2), 1 == expecon1, 2 == expecon2
     drop_bads: boolean, drop bad epochs if True
@@ -75,12 +61,11 @@ def create_evokeds_contrast(
     subtract_evoked: boolean, subtract evoked signal from each epoch
     save_data_to_disk: boolean, save data to disk if True
     save_drop_log: boolean, save drop log plots to disk if True
-
     Returns:
+
     -------
     dict of lists of condition evokeds
     """
-    
     # Initialize evoked data dictionary
     evokeds = {
         "hit_all": [], "miss_all": [], "high_all": [], "low_all": [],
@@ -88,18 +73,19 @@ def create_evokeds_contrast(
     }
 
     # Load participant and behavior data based on study
-    id_list, df_cleaned, epochs_dir = load_participant_data(study)
+    df_cleaned, epochs_dir = load_participant_data(study)
 
-    for idx, subj in enumerate(id_list):
-        print(f"Processing participant {idx+1}/{len(id_list)} (ID: {subj})")
+    id_list = pd.unique(df_cleaned.ID)
 
-        # Skip participant 013 for study 2 as per original code
-        if study == 2 and subj == "013":
+    for subj in id_list:
+
+        # Skip participant for study 2 (trigger off)
+        if study == 2 and subj == "T875UW":
             continue
-        
+
         # Load and clean epochs for the current participant
         epochs = load_and_clean_epochs(subj, epochs_dir, study)
-        
+
         # Apply preprocessing steps
         if drop_bads:
             epochs.drop_bad(reject=dict(eeg=200e-6))
@@ -107,7 +93,7 @@ def create_evokeds_contrast(
             epochs = epochs.subtract_evoked()
         if laplace:
             epochs = mne.preprocessing.compute_current_source_density(epochs)
-        
+
         # Define conditions and equalize epoch counts
         epochs_conditions = create_epochs_conditions(epochs)
         equalize_epochs(epochs_conditions)
@@ -115,11 +101,11 @@ def create_evokeds_contrast(
         # Average each condition and add to respective lists in `evokeds`
         for condition, epoched_data in epochs_conditions.items():
             evokeds[condition].append(epoched_data.average())
-        
+
         # Save drop log if requested
         if save_drop_log:
             save_drop_log_plot(epochs, subj, epochs_dir)
-        
+
     # Save data to disk if requested
     if save_data_to_disk:
         save_evoked_data(evokeds)
@@ -130,19 +116,17 @@ def create_evokeds_contrast(
 def load_participant_data(study):
     """Load participant ID list and behavior data based on study number."""
     if study == 1:
-        id_list = participants.ID_list_expecon1
         df_cleaned = pd.read_csv(Path(paths.data.behavior, "prepro_behav_data_1.csv"))
         epochs_dir = Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1)
     else:
-        id_list = participants.ID_list_expecon2
         df_cleaned = pd.read_csv(Path(paths.data.behavior, "prepro_behav_data_2.csv"))
         epochs_dir = Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2)
-    return id_list, df_cleaned, epochs_dir
+    return df_cleaned, epochs_dir
 
 
-def load_and_clean_epochs(subj, epochs_dir, study):
+def load_and_clean_epochs(subj, epochs_dir, study, l_freq):
     """Load and clean epochs for a given participant."""
-    epochs = mne.read_epochs(epochs_dir / f"P{subj}_icacorr_0.1Hz-epo.fif")
+    epochs = mne.read_epochs(epochs_dir / f"P{subj}_icacorr_{l_freq}Hz-epo.fif")
     if study == 2:
         epochs.metadata = epochs.metadata.rename(columns={"resp1_t": "respt1", "stim_type": "isyes", "resp1": "sayyes"})
     epochs = drop_trials(data=epochs)  # Assume drop_trials is defined elsewhere
@@ -207,15 +191,15 @@ def plot_CPP(tmin: float, tmax: float, tmin_base: float, tmax_base: float,
     # Plot helper function
     def plot_evoked_contrasts(evokeds_dict, picks, title=""):
         mne.viz.plot_compare_evokeds(evokeds_dict, picks=picks, show=True, title=title)
-    
+
     # Process and plot contrasts
     evoked_contrasts_hit = {name: process_evokeds(evokeds_dict[name], tmin_base, tmax_base, tmin, tmax) for name in ["high_hit_all", "low_hit_all"]}
     evoked_contrasts_miss = {name: process_evokeds(evokeds_dict[name], tmin_base, tmax_base, tmin, tmax) for name in ["high_miss_all", "low_miss_all"]}
-    
+
     for evo_conds in [evoked_contrasts_hit, evoked_contrasts_miss]:
         for ch in channel_list:
             plot_evoked_contrasts(evo_conds, picks=ch, title=f"{ch} contrast {list(evo_conds.keys())[0]} - {list(evo_conds.keys())[1]}")
- 
+
     # Cluster analysis
     ch_adjacency, _ = mne.channels.find_ch_adjacency(evokeds_dict["hit_all"][0].info, ch_type="eeg")
 
@@ -241,13 +225,13 @@ def plot_CPP(tmin: float, tmax: float, tmin_base: float, tmax_base: float,
 
 
 def plot_cluster_time_sensor(
-    condition_labels: dict,
-    colors: list = None,
-    linestyles: list = None,
-    cmap_evokeds = None,
-    cmap_topo = None,
-    ci = None,
-):
+        condition_labels: dict,
+        colors: list = None,
+        linestyles: list = None,
+        cmap_evokeds = None,
+        cmap_topo = None,
+        ci = None,
+    ):
     """
     Plot the cluster with the lowest p-value.
     2D cluster plotted with topoplot on the left and evoked signals on the right.
@@ -401,7 +385,7 @@ def plot_roi(study: int, data: np.ndarray, tmin: float, tmax: float, tmin_base: 
     # plot all epochs in CP4
     e_gra.copy().crop(-1,0).plot(picks=['CP4'])
     plt.savefig(Path(paths.figures.manuscript.figure3_suppl_erps, f"prestim_allepochs_{study!s}_CP4.svg"), dpi=300)
-    
+
 
 def get_significant_channel(study: int, data_dict: dict, tmin: float, tmax: float, baseline: bool = False,
                             tmin_base: Union[float, bool] = None, 
