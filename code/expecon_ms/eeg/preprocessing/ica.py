@@ -54,7 +54,7 @@ Path(paths.data.eeg.preprocessed.ica.PSD2).mkdir(parents=True, exist_ok=True)
 # participant IDs
 
 
-def run_ica(study: int = 1, l_freq: float = 1, infomax: int = 0, save_psd: int = 1):
+def run_ica(study: int = 2, l_freq: float = 1.0, infomax: int = 0, save_psd: int = 1):
     """
     Run ICA on epoched data and save the ICA solution.
 
@@ -133,7 +133,7 @@ def run_ica(study: int = 1, l_freq: float = 1, infomax: int = 0, save_psd: int =
     return "Done with ICA"
 
 
-def label_ica_correlation(study: int = 1, l_freq: float = 0.1, save_psd: bool = True):
+def label_ica_correlation(study: int = 2, l_freq: float = 0.1, save_psd: bool = True):
     """
     Perform template matching for blink and cardiac artifact detection.
 
@@ -174,10 +174,6 @@ def label_ica_correlation(study: int = 1, l_freq: float = 0.1, save_psd: bool = 
     id_list = sorted([f.stem.split("_")[0] for f in files])
 
     for subj in id_list:
-        # no ica for ID 13 in study 2
-        if (study == 2) and (subj == "T875UW"):  # noqa: PLR2004
-            continue
-
         # set the file path for clean epochs (1Hz filtered)
         file_path = (
             epochs_for_ica_1 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
@@ -234,8 +230,6 @@ def label_ica_correlation(study: int = 1, l_freq: float = 0.1, save_psd: bool = 
         if study == 1:
             filter_path = epochs_for_ica_1 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
         else:
-            if subj == "T875UW":
-                continue
             filter_path = epochs_for_ica_2 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
 
         epochs_filter = mne.read_epochs(filter_path, preload=True)
