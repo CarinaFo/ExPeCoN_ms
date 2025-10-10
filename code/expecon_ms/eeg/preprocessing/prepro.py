@@ -106,6 +106,7 @@ def prepro(
 
     # create ID list based on dataframe column storing IDs
     id_list = pd.unique(df_cleaned.ID)
+    id_list = ['7TQ58Y']
 
     # set eeg channel layout for topo plots
     montage = mne.channels.read_custom_montage(Path(paths.data.templates, "CACS-64_REF.bvef"))
@@ -128,13 +129,16 @@ def prepro(
     # loop over participants
     for subj in id_list:
         # if file exists, skip
-        if (save_dir / f"{subj}_epochs_{l_freq}Hz-epo.fif").exists():
+        fname = f"{subj}_epochs_{l_freq}Hz-epo.fif"
+        new_fname = format_fname(fname, l_freq=l_freq)
+
+        if (save_dir / new_fname).exists():
             print(f"{subj} already exists")
             continue
 
         if study == 1:
             # load raw data concatenated for all blocks
-            raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon1, f"{subj}_concatenated_raw.fif"), preload=True)
+            raw = mne.io.read_raw_fif(Path(paths.data.eeg.RAW_expecon1, f"{subj}_raw.fif"), preload=True)
         else:
             if subj == "T875UW":  # stimulation device was not working for this participant
                 continue
@@ -231,8 +235,12 @@ def prepro(
             # save reject log
             reject_log.save(save_dir / f"{subj}_reject_log_{l_freq}.npz")
 
+        # When saving
+        fname = f"{subj}_epochs_{l_freq}Hz-epo.fif"
+        new_fname = format_fname(fname, l_freq=l_freq)
+
         # save epochs to disk
-        epochs.save(save_dir / f"{subj}_epochs_{l_freq}Hz-epo.fif")
+        epochs.save(save_dir / new_fname)
 
         print(f"saved epochs for participant {subj}")
 
@@ -289,6 +297,31 @@ def n_channels_interpolated(study: int, trigger: str, l_freq: float) -> None:
     print(f"std of channels interpolated: {df_inter_ch['count_ch'].std()}")
     print(f"min channels interpolated: {df_inter_ch['count_ch'].min()}")
     print(f"max channels interpolated: {df_inter_ch['count_ch'].max()}")
+
+
+def format_fname(base_fname: str | Path, l_freq: float) -> Path:
+    """
+    Create a clean, consistent filename that includes the low-frequency cutoff,
+    e.g., 'subj_epochs_1.0Hz-epo.fif' (without duplicate underscores).
+
+    This function will:
+    - Remove any existing *_XHz* or *_X.YHz* parts.
+    - Ensure the new frequency is inserted once, before '-epo.fif'.
+    """
+    base_path = Path(base_fname)
+    stem, suffix = base_path.stem, base_path.suffix
+
+    # Remove any existing "_<freq>Hz" part (e.g. _1Hz, _1.0Hz, _0.5Hz)
+    parts = stem.split("_")
+    clean_parts = [p for p in parts if not p.endswith("epo")]
+    stem_clean = "_".join(clean_parts)
+
+    # Format frequency nicely (always one decimal)
+    formatted_freq = f"{l_freq:.1f}Hz"
+
+    new_stem = f"{stem_clean}_{formatted_freq}"
+
+    return base_path.with_name(new_stem + suffix)
 
 
 # Unused functions

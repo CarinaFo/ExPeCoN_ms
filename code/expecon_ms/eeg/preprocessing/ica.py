@@ -77,8 +77,11 @@ def run_ica(study: int = 2, l_freq: float = 1.0, infomax: int = 0, save_psd: int
         else Path(paths.data.eeg.preprocessed.stimulus_expecon2)
     )
 
+    # force float
+    l_freq = float(l_freq)
+
     # Collect all files matching the pattern "P*_epochs_1Hz-epo.fif"
-    files = folder.glob(f"*_epochs_{l_freq}Hz-epo.fif")
+    files = folder.glob(f"*_epochs_{l_freq:.1f}Hz-epo.fif")
 
     # Extract the subject IDs from filenames
     id_list = sorted([f.stem.split("_")[0] for f in files])
@@ -97,11 +100,11 @@ def run_ica(study: int = 2, l_freq: float = 1.0, infomax: int = 0, save_psd: int
 
             # Read the epoch data for the current participant (1Hz filtered data for ICA)
             if study == 1:
-                epochs = mne.read_epochs(epochs_for_ica_1 / f"{subj}_epochs_{l_freq}Hz-epo.fif")
+                epochs = mne.read_epochs(epochs_for_ica_1 / f"{subj}_epochs_{l_freq:.1f}Hz-epo.fif")
             else:
                 if subj == "T875UW":
                     continue
-                epochs = mne.read_epochs(epochs_for_ica_2 / f"{subj}_epochs_{l_freq}Hz-epo.fif")
+                epochs = mne.read_epochs(epochs_for_ica_2 / f"{subj}_epochs_{l_freq:.1f}Hz-epo.fif")
 
             # Pick EEG channels for ICA
             picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
@@ -173,12 +176,15 @@ def label_ica_correlation(study: int = 2, l_freq: float = 0.1, save_psd: bool = 
     # Extract the subject IDs from filenames
     id_list = sorted([f.stem.split("_")[0] for f in files])
 
+    # force to float
+    l_freq = float(l_freq)
+
     for subj in id_list:
         # set the file path for clean epochs (1Hz filtered)
         file_path = (
-            epochs_for_ica_1 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
+            epochs_for_ica_1 / f"{subj}_epochs_{l_freq:.1f}Hz-epo.fif"
             if study == 1
-            else epochs_for_ica_2 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
+            else epochs_for_ica_2 / f"{subj}_epochs_{l_freq:.1f}Hz-epo.fif"
         )
 
         # load epochs (1Hz filtered)
@@ -228,9 +234,9 @@ def label_ica_correlation(study: int = 2, l_freq: float = 0.1, save_psd: bool = 
 
         # now load the highpass filtered data (0.1 Hz)
         if study == 1:
-            filter_path = epochs_for_ica_1 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
+            filter_path = epochs_for_ica_1 / f"{subj}_epochs_{l_freq:.1f}Hz-epo.fif"
         else:
-            filter_path = epochs_for_ica_2 / f"{subj}_epochs_{l_freq}Hz-epo.fif"
+            filter_path = epochs_for_ica_2 / f"{subj}_epochs_{l_freq:.1f}Hz-epo.fif"
 
         epochs_filter = mne.read_epochs(filter_path, preload=True)
 
@@ -243,11 +249,11 @@ def label_ica_correlation(study: int = 2, l_freq: float = 0.1, save_psd: bool = 
         # save the cleaned epochs
         if study == 1:
             epochs_filter.save(
-                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, f"{subj}_icacorr_{l_freq}Hz-epo.fif")
+                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon1, f"{subj}_icacorr_{l_freq:.1f}Hz-epo.fif")
             )
         else:
             epochs_filter.save(
-                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2, f"{subj}_icacorr_{l_freq}Hz-epo.fif")
+                Path(paths.data.eeg.preprocessed.ica.clean_epochs_expecon2, f"{subj}_icacorr_{l_freq:.1f}Hz-epo.fif")
             )
 
         # Pick EEG channels for ICA
