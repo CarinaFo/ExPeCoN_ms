@@ -31,16 +31,6 @@ from sklearn.utils import resample
 
 from expecon_ms.configs import PROJECT_ROOT, params, paths
 
-# %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-# Specify the file path for which you want the last commit date
-__file__path = Path(PROJECT_ROOT, "code/expecon_ms/behav/figure1.py")  # == __file__
-
-last_commit_date = (
-    subprocess.check_output(["git", "log", "-1", "--format=%cd", "--follow", __file__path]).decode("utf-8").strip()
-)
-print("Last Commit Date for", __file__path, ":", last_commit_date)
-
 # Set Arial as the default font
 plt.rcParams.update({
     "font.size": params.plot.font.size,
